@@ -20,16 +20,23 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
+import static org.apache.cassandra.cql.jdbc.Utils.*;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
+import java.sql.SQLNonTransientConnectionException;
+import java.sql.SQLNonTransientException;
+import java.sql.SQLRecoverableException;
+import java.sql.SQLSyntaxErrorException;
+import java.sql.SQLTransientConnectionException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
 import java.util.regex.Pattern;
 
 import org.apache.cassandra.thrift.CqlResult;
-import org.apache.cassandra.thrift.CqlResultType;
 import org.apache.cassandra.thrift.InvalidRequestException;
 import org.apache.cassandra.thrift.SchemaDisagreementException;
 import org.apache.cassandra.thrift.TimedOutException;
@@ -40,555 +47,381 @@ import org.apache.thrift.TException;
  * Cassandra statement: implementation class for {@link PreparedStatement}.
  */
 
-class CassandraStatement implements Statement
+class CassandraStatement extends AbstractStatement implements Statement
 {
-    protected static final Pattern UpdatePattern = Pattern.compile("UPDATE .*", Pattern.CASE_INSENSITIVE);
-    
-    /** The connection. */
-    protected final org.apache.cassandra.cql.jdbc.Connection connection;
-    
-    /** The cql. */
-    protected final String cql;
+    /**
+     * The connection.
+     */
+    protected CassandraConnection connection;
 
     /**
-     * Constructor using fields.
-     * @param con     cassandra connection.
+     * The cql.
      */
-    CassandraStatement(org.apache.cassandra.cql.jdbc.Connection con)
+    protected String cql;
+
+    protected int fetchDirection = ResultSet.FETCH_FORWARD;
+
+    protected int fetchSize = 0;
+
+    protected int maxFieldSize = 0;
+
+    protected int maxRows = 0;
+
+    protected int resultSetType = CResultSet.DEFAULT_TYPE;
+
+    protected int resultSetConcurrency = CResultSet.DEFAULT_CONCURRENCY;
+
+    protected int resultSetHoldability = CResultSet.DEFAULT_HOLDABILITY;
+
+    protected ResultSet currentResultSet = null;
+
+    protected int updateCount = -1;
+
+    protected boolean escapeProcessing = true;
+
+    CassandraStatement(CassandraConnection con) throws SQLException
     {
         this(con, null);
     }
 
-    /**
-     * Constructor using fields.
-     *
-     * @param con     cassandra connection
-     * @param cql the cql
-     */
-    CassandraStatement(org.apache.cassandra.cql.jdbc.Connection con, String cql)
+    CassandraStatement(CassandraConnection con, String cql) throws SQLException
     {
         this.connection = con;
         this.cql = cql;
     }
 
-    
-    /**
-     * @param iface
-     * @return
-     * @throws SQLException
-     */
-    public boolean isWrapperFor(Class<?> iface) throws SQLException
+    CassandraStatement(CassandraConnection con, String cql, int resultSetType, int resultSetConcurrency) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
-    }
-    
-    /**
-     * @param <T>
-     * @param iface
-     * @return
-     * @throws SQLException
-     */
-    public <T> T unwrap(Class<T> iface) throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
+        this(con, cql, resultSetType, resultSetConcurrency, ResultSet.HOLD_CURSORS_OVER_COMMIT);
     }
 
-    
-    /**
-     * @param arg0
-     * @throws SQLException
-     */
+    CassandraStatement(CassandraConnection con, String cql, int resultSetType, int resultSetConcurrency,
+                       int resultSetHoldability) throws SQLException
+    {
+        this.connection = con;
+        this.cql = cql;
+
+        if (!(resultSetType == ResultSet.TYPE_FORWARD_ONLY
+              || resultSetType == ResultSet.TYPE_SCROLL_INSENSITIVE
+              || resultSetType == ResultSet.TYPE_SCROLL_SENSITIVE)) throw new SQLSyntaxErrorException(BAD_TYPE_RSET);
+        this.resultSetType = resultSetType;
+
+        if (!(resultSetConcurrency == ResultSet.CONCUR_READ_ONLY
+              || resultSetConcurrency == ResultSet.CONCUR_UPDATABLE)) throw new SQLSyntaxErrorException(BAD_TYPE_RSET);
+        this.resultSetConcurrency = resultSetConcurrency;
+
+
+        if (!(resultSetHoldability == ResultSet.HOLD_CURSORS_OVER_COMMIT
+              || resultSetHoldability == ResultSet.CLOSE_CURSORS_AT_COMMIT))
+            throw new SQLSyntaxErrorException(BAD_HOLD_RSET);
+        this.resultSetHoldability = resultSetHoldability;
+    }
+
     public void addBatch(String arg0) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
-
+        checkNotClosed();
+        throw new SQLFeatureNotSupportedException(NO_BATCH);
     }
 
-    
-    /**
-     * @throws SQLException
-     */
-    public void cancel() throws SQLException
+    private final void checkNotClosed() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
-
+        if (isClosed()) throw new SQLRecoverableException(WAS_CLOSED_STMT);
     }
 
-    
-    /**
-     * @throws SQLException
-     */
     public void clearBatch() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
-
+        checkNotClosed();
+        throw new SQLFeatureNotSupportedException(NO_BATCH);
     }
 
-    
-    /**
-     * @throws SQLException
-     */
     public void clearWarnings() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
-
+        // This implementation does not support the collection of warnings so clearing is a no-op
+        // but it is still an exception to call this on a closed connection.
+        checkNotClosed();
     }
 
-    
-    /**
-     * This is a no-op.
-     * @throws SQLException
-     */
     public void close() throws SQLException
     {
+        connection = null;
+        cql = null;
     }
 
-    
-    /**
-     * @param query
-     * @return
-     * @throws SQLException
-     */
+    private void doExecute(String sql) throws SQLException
+    {
+        try
+        {
+            resetResults();
+            CqlResult rSet = connection.execute(sql);
+            String keyspace = connection.currentKeyspace;
+            String columnfamily = determineCurrentColumnFamily(sql);
+
+            switch (rSet.getType())
+            {
+                case ROWS:
+                    currentResultSet = new CResultSet(this, rSet, connection.decoder, keyspace, columnfamily);
+                    break;
+                case INT:
+                    updateCount = rSet.getNum();
+                    break;
+                case VOID:
+                    updateCount = 0;
+                    break;
+            }
+        }
+        catch (InvalidRequestException e)
+        {
+            throw new SQLSyntaxErrorException(e.getWhy());
+        }
+        catch (UnavailableException e)
+        {
+            throw new SQLNonTransientConnectionException(NO_SERVER, e);
+        }
+        catch (TimedOutException e)
+        {
+            throw new SQLTransientConnectionException(e.getMessage());
+        }
+        catch (SchemaDisagreementException e)
+        {
+            throw new SQLRecoverableException(SCHEMA_MISMATCH);
+        }
+        catch (TException e)
+        {
+            throw new SQLNonTransientConnectionException(e.getMessage());
+        }
+
+    }
+
     public boolean execute(String query) throws SQLException
     {
-        try
-        {
-            return connection.execute(query) != null;
-        } 
-        catch (InvalidRequestException e)
-        {
-            throw new SQLException(e.getWhy());
-        }
-        catch (UnavailableException e)
-        {
-            throw new SQLException("Cassandra was unavialable", e);
-        }
-        catch (TimedOutException e)
-        {
-            throw new SQLException(e.getMessage());
-        }
-        catch (SchemaDisagreementException e)
-        {
-            throw new SQLException("schema does not match across nodes, (try again later).");
-        }
-        catch (TException e)
-        {
-            throw new SQLException(e.getMessage());
-        }
+        checkNotClosed();
+        doExecute(query);
+        return !(currentResultSet == null);
     }
 
-    
-    /**
-     * @param arg0
-     * @param arg1
-     * @return
-     * @throws SQLException
-     */
-    public boolean execute(String arg0, int arg1) throws SQLException
+    public boolean execute(String sql, int autoGeneratedKeys) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+
+        if (!(autoGeneratedKeys == RETURN_GENERATED_KEYS || autoGeneratedKeys == NO_GENERATED_KEYS))
+            throw new SQLSyntaxErrorException(BAD_AUTO_GEN);
+
+        if (autoGeneratedKeys == RETURN_GENERATED_KEYS) throw new SQLFeatureNotSupportedException(NO_GEN_KEYS);
+
+        return execute(sql);
     }
 
-    
-    /**
-     * @param arg0
-     * @param arg1
-     * @return
-     * @throws SQLException
-     */
-    public boolean execute(String arg0, int[] arg1) throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-    
-    /**
-     * @param arg0
-     * @param arg1
-     * @return
-     * @throws SQLException
-     */
-    public boolean execute(String arg0, String[] arg1) throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-    
-    /**
-     * @return
-     * @throws SQLException
-     */
     public int[] executeBatch() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        throw new SQLFeatureNotSupportedException(NO_BATCH);
     }
 
-    
-    /**
-     * @param query
-     * @return
-     * @throws SQLException
-     */
     public ResultSet executeQuery(String query) throws SQLException
     {
-        try
-        {
-            CqlResult rSet = connection.execute(query);
-            // todo: encapsulate.
-            return new CResultSet(rSet, connection.decoder, connection.curKeyspace, connection.curColumnFamily);
-        }
-        catch (InvalidRequestException e)
-        {
-            throw new SQLException(e.getWhy());
-        }
-        catch (UnavailableException e)
-        {
-            throw new SQLException(e.getMessage());
-        }
-        catch (TimedOutException e)
-        {
-            throw new SQLException(e.getMessage());
-        }
-        catch (SchemaDisagreementException e)
-        {
-            throw new SQLException("schema does not match across nodes, (try again later).");
-        }
-        catch (TException e)
-        {
-            throw new SQLException(e.getMessage());
-        }
+        checkNotClosed();
+        doExecute(query);
+        if (currentResultSet == null)
+            throw new SQLNonTransientException(NO_RESULTSET);
+        return currentResultSet;
     }
 
-    /**
-     * @param query
-     * @return
-     * @throws SQLException
-     */
     public int executeUpdate(String query) throws SQLException
     {
-        if (!UpdatePattern.matcher(query).matches())
-            throw new SQLException("Not an update statement.");
-        try
-        {
-            CqlResult rSet = connection.execute(query);
-            assert rSet.getType().equals(CqlResultType.VOID);
-            // if only we knew how many rows were updated.
-            return 0;
-        }
-        catch (InvalidRequestException e)
-        {
-            throw new SQLException(e.getWhy());
-        }
-        catch (UnavailableException e)
-        {
-            throw new SQLException(e.getMessage());
-        }
-        catch (TimedOutException e)
-        {
-            throw new SQLException(e.getMessage());
-        }
-        catch (SchemaDisagreementException e)
-        {
-            throw new SQLException("schema does not match across nodes, (try again later).");
-        }
-        catch (TException e)
-        {
-            throw new SQLException(e.getMessage());
-        }
+        checkNotClosed();
+        doExecute(query);
+        if (currentResultSet != null)
+            throw new SQLNonTransientException(NO_UPDATE_COUNT);
+        return updateCount;
     }
 
-    
-    /**
-     * @param arg0
-     * @param arg1
-     * @return
-     * @throws SQLException
-     */
-    public int executeUpdate(String arg0, int arg1) throws SQLException
+    public int executeUpdate(String sql, int autoGeneratedKeys) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+
+        if (!(autoGeneratedKeys == RETURN_GENERATED_KEYS || autoGeneratedKeys == NO_GENERATED_KEYS))
+            throw new SQLFeatureNotSupportedException(BAD_AUTO_GEN);
+
+        return executeUpdate(sql);
     }
 
-    
-    /**
-     * @param arg0
-     * @param arg1
-     * @return
-     * @throws SQLException
-     */
-    public int executeUpdate(String arg0, int[] arg1) throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-    
-    /**
-     * @param arg0
-     * @param arg1
-     * @return
-     * @throws SQLException
-     */
-    public int executeUpdate(String arg0, String[] arg1) throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-    
-    /**
-     * @return
-     * @throws SQLException
-     */
     public Connection getConnection() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        return (Connection) connection;
     }
 
-    
-    /**
-     * @return
-     * @throws SQLException
-     */
     public int getFetchDirection() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        return fetchDirection;
     }
 
-    
-    /**
-     * @return
-     * @throws SQLException
-     */
     public int getFetchSize() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        return fetchSize;
     }
 
-    
-    /**
-     * @return
-     * @throws SQLException
-     */
-    public ResultSet getGeneratedKeys() throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-    
-    /**
-     * @return
-     * @throws SQLException
-     */
     public int getMaxFieldSize() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        return maxFieldSize;
     }
 
-    
-    /**
-     * @return
-     * @throws SQLException
-     */
     public int getMaxRows() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        return maxRows;
     }
 
-    
-    /**
-     * @return
-     * @throws SQLException
-     */
     public boolean getMoreResults() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        resetResults();
+        // in the current Cassandra implementation there are never MORE results
+        return false;
     }
 
-    
-    /**
-     * @param arg0
-     * @return
-     * @throws SQLException
-     */
-    public boolean getMoreResults(int arg0) throws SQLException
+    public boolean getMoreResults(int current) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+
+        switch (current)
+        {
+            case CLOSE_CURRENT_RESULT:
+                resetResults();
+                break;
+
+            case CLOSE_ALL_RESULTS:
+            case KEEP_CURRENT_RESULT:
+                throw new SQLFeatureNotSupportedException(NO_MULTIPLE);
+
+            default:
+                throw new SQLSyntaxErrorException(String.format(BAD_KEEP_RSET, current));
+        }
+        // in the current Cassandra implementation there are never MORE results
+        return false;
     }
 
-    
-    /**
-     * @return
-     * @throws SQLException
-     */
     public int getQueryTimeout() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        // the Cassandra implementation does not support timeouts on queries
+        return 0;
     }
 
-    
-    /**
-     * @return
-     * @throws SQLException
-     */
     public ResultSet getResultSet() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        return currentResultSet;
     }
 
-    
-    /**
-     * @return
-     * @throws SQLException
-     */
     public int getResultSetConcurrency() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        return ResultSet.CONCUR_READ_ONLY;
     }
 
-    
-    /**
-     * @return
-     * @throws SQLException
-     */
     public int getResultSetHoldability() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        // the Cassandra implementations does not support commits so this is the closest match
+        return ResultSet.HOLD_CURSORS_OVER_COMMIT;
     }
 
-    
-    /**
-     * @return
-     * @throws SQLException
-     */
     public int getResultSetType() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        return ResultSet.TYPE_FORWARD_ONLY;
     }
 
-    
-    /**
-     * @return
-     * @throws SQLException
-     */
     public int getUpdateCount() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        return updateCount;
     }
 
-    
-    /**
-     * @return
-     * @throws SQLException
-     */
     public SQLWarning getWarnings() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        return null;
     }
 
-    
-    /**
-     * @return
-     * @throws SQLException
-     */
     public boolean isClosed() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        return connection == null;
     }
 
-    
-    /**
-     * @return
-     * @throws SQLException
-     */
     public boolean isPoolable() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        return false;
     }
 
-    
-    /**
-     * @param arg0
-     * @throws SQLException
-     */
-    public void setCursorName(String arg0) throws SQLException
+    public boolean isWrapperFor(Class<?> iface) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
-
+        return false;
     }
 
-    
-    /**
-     * @param arg0
-     * @throws SQLException
-     */
-    public void setEscapeProcessing(boolean arg0) throws SQLException
+    private final void resetResults()
     {
-        throw new UnsupportedOperationException("method not supported");
-
+        currentResultSet = null;
+        updateCount = -1;
     }
 
-    
-    /**
-     * @param arg0
-     * @throws SQLException
-     */
-    public void setFetchDirection(int arg0) throws SQLException
+    public void setEscapeProcessing(boolean enable) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
-
+        checkNotClosed();
+        // the Cassandra implementation does not currently look at this
+        escapeProcessing = enable;
     }
 
-    
-    /**
-     * @param arg0
-     * @throws SQLException
-     */
-    public void setFetchSize(int arg0) throws SQLException
+    public void setFetchDirection(int direction) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
 
+        if (direction == ResultSet.FETCH_FORWARD || direction == ResultSet.FETCH_REVERSE || direction == ResultSet.FETCH_UNKNOWN)
+        {
+            if ((getResultSetType() == ResultSet.TYPE_FORWARD_ONLY) && (direction != ResultSet.FETCH_FORWARD))
+                throw new SQLSyntaxErrorException(String.format(BAD_FETCH_DIR, direction));
+            fetchDirection = direction;
+        }
+        else throw new SQLSyntaxErrorException(String.format(BAD_FETCH_DIR, direction));
     }
 
-    
-    /**
-     * @param arg0
-     * @throws SQLException
-     */
+
+    public void setFetchSize(int size) throws SQLException
+    {
+        checkNotClosed();
+        if (size < 0) throw new SQLSyntaxErrorException(String.format(BAD_FETCH_SIZE, size));
+        fetchSize = size;
+    }
+
     public void setMaxFieldSize(int arg0) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
-
+        checkNotClosed();
+        // silently ignore this setting. always use default 0 (unlimited)
     }
 
-    
-    /**
-     * @param arg0
-     * @throws SQLException
-     */
     public void setMaxRows(int arg0) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
-
+        checkNotClosed();
+        // silently ignore this setting. always use default 0 (unlimited)
     }
 
-    
-    /**
-     * @param arg0
-     * @throws SQLException
-     */
-    public void setPoolable(boolean arg0) throws SQLException
+    public void setPoolable(boolean poolable) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
-
+        checkNotClosed();
+        // silently ignore any attempt to set this away from the current default (false)
     }
 
-    
-    /**
-     * @param arg0
-     * @throws SQLException
-     */
     public void setQueryTimeout(int arg0) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        // silently ignore any attempt to set this away from the current default (0)
+    }
 
+    public <T> T unwrap(Class<T> iface) throws SQLException
+    {
+        throw new SQLFeatureNotSupportedException(String.format(NO_INTERFACE, iface.getSimpleName()));
     }
 }

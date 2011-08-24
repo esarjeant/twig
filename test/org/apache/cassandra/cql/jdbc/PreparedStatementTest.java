@@ -44,7 +44,7 @@ public class PreparedStatementTest extends EmbeddedServiceBase
     {
         startCassandraServer();
         Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
-        con = DriverManager.getConnection("jdbc:cassandra:root/root@localhost:9170/Keyspace1");
+        con = DriverManager.getConnection("jdbc:cassandra://localhost:9170/Keyspace1");
     }
     
     @Test

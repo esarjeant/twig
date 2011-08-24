@@ -29,8 +29,8 @@ import org.apache.cassandra.db.marshal.AsciiType;
 import org.apache.cassandra.thrift.*;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+//import org.slf4j.Logger;
+//import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
@@ -43,7 +43,7 @@ import java.util.Map;
  */
 class ColumnDecoder
 {
-    private static final Logger logger = LoggerFactory.getLogger(ColumnDecoder.class);
+//    private static final Logger logger = LoggerFactory.getLogger(ColumnDecoder.class);
 
     private final Map<String, CFMetaData> metadata = new HashMap<String, CFMetaData>();
 
@@ -72,14 +72,14 @@ class ColumnDecoder
         }
     }
 
-    AbstractType getComparator(String keyspace, String columnFamily)
+    AbstractType<?> getComparator(String keyspace, String columnFamily)
     {
-        return metadata.get(String.format("%s.%s", keyspace, columnFamily)).comparator;
+        CFMetaData md = metadata.get(String.format("%s.%s", keyspace, columnFamily));
+        return (md == null) ? null : md.comparator;
     }
 
-    AbstractType getNameType(String keyspace, String columnFamily, ByteBuffer name)
+    AbstractType<?> getNameType(String keyspace, String columnFamily, ByteBuffer name)
     {
-
         CFMetaData md = metadata.get(String.format("%s.%s", keyspace, columnFamily));
         try
         {
@@ -93,7 +93,7 @@ class ColumnDecoder
         return md.comparator;
     }
 
-    AbstractType getValueType(String keyspace, String columnFamily, ByteBuffer name)
+    AbstractType<?> getValueType(String keyspace, String columnFamily, ByteBuffer name)
     {
         CFMetaData md = metadata.get(String.format("%s.%s", keyspace, columnFamily));
         try
@@ -109,15 +109,16 @@ class ColumnDecoder
         return cd == null ? md.getDefaultValidator() : cd.getValidator();
     }
 
-    public AbstractType getKeyValidator(String keyspace, String columnFamily)
+    public AbstractType<?> getKeyValidator(String keyspace, String columnFamily)
     {
-        return metadata.get(String.format("%s.%s", keyspace, columnFamily)).getKeyValidator();
+        CFMetaData md = metadata.get(String.format("%s.%s", keyspace, columnFamily));
+        return (md == null) ? null : md.getKeyValidator();
     }
 
     /** uses the AbstractType to map a column name to a string. */
     public String colNameAsString(String keyspace, String columnFamily, ByteBuffer name)
     {
-        AbstractType comparator = getNameType(keyspace, columnFamily, name);
+        AbstractType<?> comparator = getNameType(keyspace, columnFamily, name);
         return comparator.getString(name);
     }
 
@@ -127,5 +128,15 @@ class ColumnDecoder
         return new TypedColumn(column,
                                getNameType(keyspace, columnFamily, column.name),
                                getValueType(keyspace, columnFamily, column.name));
+    }
+
+    /** constructs a typed column to hold the key */
+    public TypedColumn makeKeyColumn(String keyspace, String columnFamily, byte[] key)
+    {
+        CFMetaData md = metadata.get(String.format("%s.%s", keyspace, columnFamily));
+        Column column = new Column(md.getKeyName()).setValue(key).setTimestamp(-1);
+        return new TypedColumn(column,
+                               getNameType(keyspace, columnFamily, md.getKeyName()),
+                               getValueType(keyspace, columnFamily, md.getKeyName()));
     }
 }

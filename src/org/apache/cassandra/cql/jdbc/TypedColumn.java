@@ -24,7 +24,6 @@ package org.apache.cassandra.cql.jdbc;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.thrift.Column;
 
-import java.nio.ByteBuffer;
 
 public class TypedColumn
 {
@@ -35,9 +34,9 @@ public class TypedColumn
     // (a good example is byte buffers).
     private final Object value;
     private final String nameString;
-    private final AbstractType nameType, valueType;
+    private final AbstractType<?> nameType, valueType;
 
-    public TypedColumn(Column column, AbstractType comparator, AbstractType validator)
+    public TypedColumn(Column column, AbstractType<?> comparator, AbstractType<?> validator)
     {
         rawColumn = column;
         this.value = column.value == null ? null : validator.compose(column.value);

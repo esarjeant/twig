@@ -20,24 +20,26 @@ package org.apache.cassandra.cql.jdbc;
  * 
  */
 
-
 import java.math.BigInteger;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 
 public interface CassandraResultSet extends ResultSet
 {
     /**
      * @return the current row key
      */
-    public byte[] getKey();
+    public byte[] getKey()throws SQLException;;
+    
+    public TypedColumn getTypedKey()throws SQLException;;
 
     /** @return a BigInteger value for the given column offset*/
-    public BigInteger getBigInteger(int i);
+    public BigInteger getBigInteger(int i) throws SQLException;
     /** @return a BigInteger value for the given column name */
-    public BigInteger getBigInteger(String name);
+    public BigInteger getBigInteger(String name) throws SQLException;
 
     /** @return the raw column data for the given column offset */
-    public TypedColumn getColumn(int i);
+    public TypedColumn getColumn(int i) throws SQLException;
     /** @return the raw column data for the given column name */
-    public TypedColumn getColumn(String name);
+    public TypedColumn getColumn(String name) throws SQLException;
 }

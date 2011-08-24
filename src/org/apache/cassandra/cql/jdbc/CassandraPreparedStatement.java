@@ -20,6 +20,11 @@ package org.apache.cassandra.cql.jdbc;
  * 
  */
 
+import static org.apache.cassandra.cql.jdbc.Utils.determineCurrentKeyspace;
+import static org.apache.cassandra.cql.jdbc.Utils.determineCurrentColumnFamily;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_CF;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_COMPARATOR;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_VALIDATOR;
 
 import org.apache.cassandra.db.marshal.*;
 
@@ -40,8 +45,10 @@ import java.sql.Ref;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.RowId;
+import java.sql.SQLDataException;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
+import java.sql.SQLTransientException;
 import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
@@ -55,31 +62,31 @@ import java.util.regex.Pattern;
 
 public class CassandraPreparedStatement extends CassandraStatement implements PreparedStatement
 {
-//    private static final Pattern Parameterizable = Pattern.compile("(SELECT|DELETE|UPDATE)\\s+.*", Pattern.CASE_INSENSITIVE);
+    //    private static final Pattern Parameterizable = Pattern.compile("(SELECT|DELETE|UPDATE)\\s+.*", Pattern.CASE_INSENSITIVE);
     private static final Pattern Select = Pattern.compile("SELECT[\\s+FIRST\\s+\\d+]?[\\s+REVERSED]?\\s+(.*)WHERE\\s+(.*)", Pattern.CASE_INSENSITIVE);
     private static final Pattern Update = Pattern.compile("UPDATE\\s+\\w+.*\\s+SET\\s+(.*)\\s+WHERE KEY(.*)", Pattern.CASE_INSENSITIVE);
     private static final Pattern Delete = Pattern.compile("DELETE\\s+(.*)\\s+FROM\\s+\\w+\\s+WHERE KEY(.*)", Pattern.CASE_INSENSITIVE);
-    
+
     // current set of bound variables.
     private final Map<Integer, Object> variables = new HashMap<Integer, Object>();
-    
+
     // for batching. These are the queries that have been batched and not executed.
     private final List<String> queries = new ArrayList<String>();
-    
-    CassandraPreparedStatement(Connection con, String cql)
+
+    CassandraPreparedStatement(CassandraConnection con, String cql) throws SQLException
     {
         super(con, cql);
     }
-    
+
     // impl specific methods start here.
 
     // double quotes strings (in parameters)
-    private static String makeCqlString(String s) 
+    private static String makeCqlString(String s)
     {
         // escape any single-quotes with double single-quotes.
         return s.replaceAll("\'", "\'\'");
     }
-    
+
     // null type means just call param.toString() and quote it (default for keys).
     private static String applySimpleBindings(String q, AbstractType type, ParameterIterator params) throws SQLException
     {
@@ -113,11 +120,11 @@ public class CassandraPreparedStatement extends CassandraStatement implements Pr
             }
             else
                 sb.append(c);
-                
+
         }
         return sb.toString();
     }
-    
+
     private static String applyDualBindings(String q, AbstractType ltype, AbstractType rtype, ParameterIterator params) throws SQLException
     {
         StringBuffer sb = new StringBuffer();
@@ -131,7 +138,7 @@ public class CassandraPreparedStatement extends CassandraStatement implements Pr
                 left = false;
             if (c == ',' && !between)
                 left = true;
-            
+
             if (c == '?' && !between)
             {
                 try
@@ -153,10 +160,12 @@ public class CassandraPreparedStatement extends CassandraStatement implements Pr
         }
         return sb.toString();
     }
-    
-    /** applies current bindings to produce a string that can be sent to the server. */
+
+    /**
+     * applies current bindings to produce a string that can be sent to the server.
+     */
     public synchronized String makeCql() throws SQLException
-    { 
+    {
         // break cql up
         Matcher m;
         m = Delete.matcher(cql);
@@ -168,77 +177,79 @@ public class CassandraPreparedStatement extends CassandraStatement implements Pr
         m = Select.matcher(cql);
         if (m.matches())
             return makeSelect(m.end(1));
-        
+
         // if we made it this far, cql is not parameterizable. this isn't bad, there is just nothing to be done.
         return cql;
     }
-    
+
     // subs parameters into a delete statement.
     private String makeDelete(int pivot) throws SQLException
-    { 
-        String keyspace = connection.getKeyspace(cql);
-        String columnFamily = connection.getColumnFamily(cql);
+    {
+        String keyspace = determineCurrentKeyspace(cql, connection.currentKeyspace);
+        String columnFamily = determineCurrentColumnFamily(cql);
+        if (columnFamily == null) throw new SQLTransientException(NO_CF);
+
         ParameterIterator params = new ParameterIterator();
         String left = cql.substring(0, pivot);
         AbstractType leftType = connection.decoder.getComparator(keyspace, columnFamily);
-        if (leftType == null)
-            throw new SQLException("Could not find comparator for " + keyspace + "." + columnFamily);
+        if (leftType == null) throw new SQLDataException(String.format(NO_COMPARATOR, keyspace, columnFamily));
         left = applySimpleBindings(left, leftType, params);
+
         String right = cql.substring(pivot);
         AbstractType keyVald = connection.decoder.getKeyValidator(keyspace, columnFamily);
-        if (keyVald == null)
-            throw new SQLException("Could not find key validator for " + keyspace + "." + columnFamily);
+        if (keyVald == null) throw new SQLDataException(String.format(NO_VALIDATOR, keyspace, columnFamily));
         right = applySimpleBindings(right, keyVald, params);
         return left + right;
     }
-    
+
     // subs parameters into a select statement.
     private String makeSelect(int pivot) throws SQLException
-    { 
-        String keyspace = connection.getKeyspace(cql);
-        String columnFamily = connection.getColumnFamily(cql);
+    {
+        String keyspace = determineCurrentKeyspace(cql, connection.currentKeyspace);
+        String columnFamily = determineCurrentColumnFamily(cql);
+        if (columnFamily == null) throw new SQLTransientException(NO_CF);
+
         ParameterIterator params = new ParameterIterator();
         String left = cql.substring(0, pivot);
         AbstractType leftType = connection.decoder.getComparator(keyspace, columnFamily);
-        if (leftType == null)
-            throw new SQLException("Could not find comparator for " + keyspace + "." + columnFamily);
+        if (leftType == null) throw new SQLDataException(String.format(NO_COMPARATOR, keyspace, columnFamily));
         left = applySimpleBindings(left, leftType, params);
+
         String right = cql.substring(pivot);
         AbstractType keyVald = connection.decoder.getKeyValidator(keyspace, columnFamily);
-        if (keyVald == null)
-            throw new SQLException("Could not find key validator for " + keyspace + "." + columnFamily);
+        if (keyVald == null) throw new SQLDataException(String.format(NO_VALIDATOR, keyspace, columnFamily));
         right = applySimpleBindings(right, keyVald, params);
         return left + right;
     }
-    
+
     // subs parameters into an update statement.
     private String makeUpdate(int pivot) throws SQLException
     {
         // this one is a little bit different. left contains key=value pairs. we use the comparator for the left side,
         // the validator for the right side.  right side is treated as a key.
-        String keyspace = connection.getKeyspace(cql);
-        String columnFamily = connection.getColumnFamily(cql);
+        String keyspace = determineCurrentKeyspace(cql, connection.currentKeyspace);
+        String columnFamily = determineCurrentColumnFamily(cql);
+        if (columnFamily == null) throw new SQLTransientException(NO_CF);
+
         ParameterIterator params = new ParameterIterator();
         String left = cql.substring(0, pivot);
         AbstractType leftComp = connection.decoder.getComparator(keyspace, columnFamily);
-        if (leftComp == null)
-            throw new SQLException("Could not find comparator for " + keyspace + "." + columnFamily);
+        if (leftComp == null) throw new SQLDataException(String.format(NO_COMPARATOR, keyspace, columnFamily));
+
         AbstractType leftVald = connection.decoder.getComparator(keyspace, columnFamily);
-        if (leftVald == null)
-            throw new SQLException("Could not find validator for " + keyspace + "." + columnFamily);
+        if (leftVald == null) throw new SQLDataException(String.format(NO_VALIDATOR, keyspace, columnFamily));
         left = applyDualBindings(left, leftComp, leftVald, params);
+
         String right = cql.substring(pivot);
         AbstractType keyVald = connection.decoder.getKeyValidator(keyspace, columnFamily);
-        if (keyVald == null)
-            throw new SQLException("Could not find key validator for " + keyspace + "." + columnFamily);
+        if (keyVald == null) throw new SQLDataException(String.format(NO_VALIDATOR, keyspace, columnFamily));
         right = applySimpleBindings(right, keyVald, params);
-        return left + right; 
+        return left + right;
     }
-    
-    
-    
+
+
     // standard API methods follow.
-    
+
     public void addBatch() throws SQLException
     {
         queries.add(makeCql());
@@ -253,33 +264,28 @@ public class CassandraPreparedStatement extends CassandraStatement implements Pr
     {
         return this.cql != null && super.execute(makeCql());
     }
-    
+
     public ResultSet executeQuery() throws SQLException
     {
-        return this.cql != null ? super.executeQuery(makeCql()) : null;
+        return this.cql == null ? null : super.executeQuery(makeCql());
     }
-    
+
     public int executeUpdate() throws SQLException
     {
-        String q = makeCql();
-        if (!UpdatePattern.matcher(q).matches())
-            throw new SQLException("Not an update statement.");
-        super.execute(q);
-        // we don't know how many rows were updated.
-        return 0;
+        return this.cql == null ? 0 : super.executeUpdate(makeCql());
     }
 
     public ResultSetMetaData getMetaData() throws SQLException
     {
         // todo: current impl of RSMD relies on knowing the results. implementing this will require refactoring CRSMD into 
         // two classes: the first will be an implementation whose methods don't rely on knowing the results, the second
-        // will implement the full CRSMD interfae and extend or compose the first.
+        // will implement the full CRSMD interface and extend or compose the first.
         throw new SQLFeatureNotSupportedException("PreparedStatement.getMetaData() hasn't been implemented yet.");
     }
 
     public void setByte(int parameterIndex, byte x) throws SQLException
     {
-        setObject(parameterIndex, new byte[]{x});
+        setObject(parameterIndex, new byte[]{ x });
     }
 
     public void setBytes(int parameterIndex, byte[] x) throws SQLException
@@ -316,11 +322,11 @@ public class CassandraPreparedStatement extends CassandraStatement implements Pr
     {
         setObject(parameterIndex, x);
     }
-    
-    
+
+
     // everything below here is not implemented and will let you know about it.
-    
-    
+
+
     public ParameterMetaData getParameterMetaData() throws SQLException
     {
         throw new SQLFeatureNotSupportedException("PreparedStatement.getParameterMetaData() hasn't been implemented yet.");
@@ -328,77 +334,77 @@ public class CassandraPreparedStatement extends CassandraStatement implements Pr
 
     public void setArray(int parameterIndex, Array x) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setAsciiStream(int parameterIndex, InputStream x) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setAsciiStream(int parameterIndex, InputStream x, int length) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setAsciiStream(int parameterIndex, InputStream x, long length) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setBigDecimal(int parameterIndex, BigDecimal x) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setBinaryStream(int parameterIndex, InputStream x) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setBinaryStream(int parameterIndex, InputStream x, int length) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setBinaryStream(int parameterIndex, InputStream x, long length) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setBlob(int parameterIndex, Blob x) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setBlob(int parameterIndex, InputStream inputStream) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setBoolean(int parameterIndex, boolean x) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setCharacterStream(int parameterIndex, Reader reader) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setCharacterStream(int parameterIndex, Reader reader, int length) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setCharacterStream(int parameterIndex, Reader reader, long length) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setClob(int parameterIndex, Clob x) throws SQLException
@@ -408,142 +414,141 @@ public class CassandraPreparedStatement extends CassandraStatement implements Pr
 
     public void setClob(int parameterIndex, Reader reader) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setClob(int parameterIndex, Reader reader, long length) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setDate(int parameterIndex, Date x) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setDate(int parameterIndex, Date x, Calendar cal) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setDouble(int parameterIndex, double x) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setFloat(int parameterIndex, float x) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
-    
+
     public void setNCharacterStream(int parameterIndex, Reader value) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setNCharacterStream(int parameterIndex, Reader value, long length) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setNClob(int parameterIndex, NClob value) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setNClob(int parameterIndex, Reader reader) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setNClob(int parameterIndex, Reader reader, long length) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
-    
+
     public void setNull(int parameterIndex, int sqlType) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setNull(int parameterIndex, int sqlType, String typeName) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
-    
+
     public void setObject(int parameterIndex, Object x, int targetSqlType) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setObject(int parameterIndex, Object x, int targetSqlType, int scaleOrLength) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setRef(int parameterIndex, Ref x) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setRowId(int parameterIndex, RowId x) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setSQLXML(int parameterIndex, SQLXML xmlObject) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
-    
+
     public void setTime(int parameterIndex, Time x) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setTime(int parameterIndex, Time x, Calendar cal) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setTimestamp(int parameterIndex, Timestamp x) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setTimestamp(int parameterIndex, Timestamp x, Calendar cal) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setURL(int parameterIndex, URL x) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void setUnicodeStream(int parameterIndex, InputStream x, int length) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
-    
-    
+
+
     // done with API methods.
-    
-    
-    
+
+
     // provides a way to iterate through the parameters. it will blow up if it discovers any missing parameters.
     // not thread-safe.
     private class ParameterIterator
     {
         private Map<Integer, Object> params = new HashMap<Integer, Object>(variables);
         private int index = 1;
-        
+
         // throws SQLException if a parameter is not specified.
         private Object nextParam() throws SQLException
         {
             Object p = params.get(index++);
             if (p == null)
-                throw new SQLException("No parameter bound to " + (index-1));
+                throw new SQLException("No parameter bound to " + (index - 1));
             return p;
         }
 

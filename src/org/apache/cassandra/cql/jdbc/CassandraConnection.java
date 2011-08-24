@@ -20,639 +20,440 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
-import java.sql.Array;
-import java.sql.Blob;
-import java.sql.CallableStatement;
-import java.sql.Clob;
+import static org.apache.cassandra.cql.jdbc.Utils.ALWAYS_AUTOCOMMIT;
+import static org.apache.cassandra.cql.jdbc.Utils.BAD_TIMEOUT;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_INTERFACE;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_TRANSACTIONS;
+import static org.apache.cassandra.cql.jdbc.Utils.PROTOCOL;
+import static org.apache.cassandra.cql.jdbc.Utils.SCHEMA_MISMATCH;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_SERVER_NAME;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_DATABASE_NAME;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_PASSWORD;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_PORT_NUMBER;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_USER;
+import static org.apache.cassandra.cql.jdbc.Utils.WAS_CLOSED_CON;
+import static org.apache.cassandra.cql.jdbc.Utils.createSubName;
+import static org.apache.cassandra.cql.jdbc.Utils.determineCurrentKeyspace;
+
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
-import java.sql.NClob;
 import java.sql.PreparedStatement;
 import java.sql.SQLClientInfoException;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
+import java.sql.SQLInvalidAuthorizationSpecException;
+import java.sql.SQLNonTransientConnectionException;
+import java.sql.SQLRecoverableException;
+import java.sql.SQLSyntaxErrorException;
+import java.sql.SQLTimeoutException;
+import java.sql.SQLTransientConnectionException;
 import java.sql.SQLWarning;
-import java.sql.SQLXML;
-import java.sql.Savepoint;
 import java.sql.Statement;
-import java.sql.Struct;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
 import org.apache.cassandra.thrift.AuthenticationException;
+import org.apache.cassandra.thrift.AuthenticationRequest;
 import org.apache.cassandra.thrift.AuthorizationException;
+import org.apache.cassandra.thrift.Cassandra;
+import org.apache.cassandra.thrift.Compression;
+import org.apache.cassandra.thrift.CqlResult;
 import org.apache.cassandra.thrift.InvalidRequestException;
 import org.apache.cassandra.thrift.SchemaDisagreementException;
 import org.apache.cassandra.thrift.TimedOutException;
 import org.apache.cassandra.thrift.UnavailableException;
 import org.apache.thrift.TException;
-import org.apache.thrift.transport.TTransportException;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.protocol.TProtocol;
+import org.apache.thrift.transport.TFramedTransport;
+import org.apache.thrift.transport.TSocket;
+import org.apache.thrift.transport.TTransport;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Implementation class for {@link Connection}.
  */
-class CassandraConnection implements Connection
+class CassandraConnection extends AbstractCassandraConnection implements Connection
 {
-    
-    /** The cassandra con. */
-    private org.apache.cassandra.cql.jdbc.Connection cassandraCon;
-    
+
+    private static final Logger logger = LoggerFactory.getLogger(CassandraConnection.class);
+
+    public static final int DB_MAJOR_VERSION = 0;
+    public static final int DB_MINOR_VERSION = 8;
+    public static final String DB_PRODUCT_NAME = "Cassandra";
+
+    public static Compression defaultCompression = Compression.GZIP;
+
+    private final boolean autoCommit = true;
+
+    private final int transactionIsolation = Connection.TRANSACTION_NONE;
+
     /**
-     * Instantiates a new cassandra connection.
-     *
-     * @param url the url
+     * Client Info Properties (currently unused)
      */
-    public CassandraConnection(String url)
+    private Properties clientInfo = new Properties();
+
+    /**
+     * List of all Statements that have been created by this connection
+     */
+    private List<Statement> statements;
+
+    private Cassandra.Client client;
+    private TTransport transport;
+
+    protected long timeOfLastFailure = 0;
+    protected int numFailures = 0;
+    protected String username = null;
+    protected String url = null;
+    String currentKeyspace;
+    ColumnDecoder decoder;
+
+
+    /**
+     * Instantiates a new CassandraConnection.
+     */
+    public CassandraConnection(Properties props) throws SQLException
     {
+        statements = new ArrayList<Statement>();
+        clientInfo = new Properties();
+        url = PROTOCOL + createSubName(props);
         try
         {
-            final int splitIndex = url.indexOf('@');
-            final String usr_pwd = url.substring(0, splitIndex);
-            final String host_port = url.substring(splitIndex + 1);
-            final int usr_colonIdx = usr_pwd.lastIndexOf(':');
-            final int usr_backwardIdx = usr_pwd.indexOf('/');
-            final String userName = usr_pwd.substring(usr_colonIdx + 1, usr_backwardIdx);
-            final String password = usr_pwd.substring(usr_backwardIdx + 1);
-            final int host_colonIdx = host_port.indexOf(':');
-            final String hostName = host_port.substring(0, host_colonIdx);
-            final int host_backwardIdx = host_port.indexOf('/');
-            final String port = host_port.substring(host_colonIdx + 1, host_backwardIdx);
-            final String keyspace = host_port.substring(host_backwardIdx + 1);
-            cassandraCon = new org.apache.cassandra.cql.jdbc.Connection(hostName, Integer.valueOf(port), userName,
-                                                                                                                             password);
-            final String useQ = "USE " + keyspace;
-            cassandraCon.execute(useQ);
-        }
-        catch (NumberFormatException e)
-        {
-            throw new DriverResolverException(e.getMessage());
-        }
-        catch (TTransportException e)
-        {
-            throw new DriverResolverException(e.getMessage());
-        }
-        catch (AuthenticationException e)
-        {
-            throw new DriverResolverException(e.getMessage());
-        }
-        catch (AuthorizationException e)
-        {
-            throw new DriverResolverException(e.getMessage());
-        }
-        catch (TException e)
-        {
-            throw new DriverResolverException(e.getMessage());
-        }
-        catch (InvalidRequestException e)
-        {
-            throw new DriverResolverException(e.getMessage());
-        }
-        catch (UnavailableException e)
-        {
-            throw new DriverResolverException(e.getMessage());
-        }
-        catch (TimedOutException e)
-        {
-            throw new DriverResolverException(e.getMessage());
+            String host = props.getProperty(TAG_SERVER_NAME);
+            int port = Integer.parseInt(props.getProperty(TAG_PORT_NUMBER));
+            String keyspace = props.getProperty(TAG_DATABASE_NAME);
+            username = props.getProperty(TAG_USER);
+            String password = props.getProperty(TAG_PASSWORD);
+
+            TSocket socket = new TSocket(host, port);
+            transport = new TFramedTransport(socket);
+            TProtocol protocol = new TBinaryProtocol(transport);
+            client = new Cassandra.Client(protocol);
+            socket.open();
+            decoder = new ColumnDecoder(client.describe_keyspaces());
+
+            if (username != null)
+            {
+                Map<String, String> credentials = new HashMap<String, String>();
+                credentials.put("username", username);
+                if (password != null) credentials.put("password", password);
+                AuthenticationRequest areq = new AuthenticationRequest(credentials);
+                client.login(areq);
+
+            }
+
+            logger.info("Connected to {}:{}", host, port);
+
+
+            if (keyspace != null)
+            {
+                execute("USE " + keyspace);
+            }
         }
         catch (SchemaDisagreementException e)
         {
-            throw new DriverResolverException("schema does not match across nodes, (try again later).");
+            throw new SQLRecoverableException(SCHEMA_MISMATCH);
         }
-
+        catch (InvalidRequestException e)
+        {
+            throw new SQLSyntaxErrorException(e);
+        }
+        catch (UnavailableException e)
+        {
+            throw new SQLNonTransientConnectionException(e);
+        }
+        catch (TimedOutException e)
+        {
+            throw new SQLTransientConnectionException(e);
+        }
+        catch (TException e)
+        {
+            throw new SQLNonTransientConnectionException(e);
+        }
+        catch (AuthenticationException e)
+        {
+            throw new SQLInvalidAuthorizationSpecException(e);
+        }
+        catch (AuthorizationException e)
+        {
+            throw new SQLInvalidAuthorizationSpecException(e);
+        }
     }
-    
-    /**
-     * @param arg0
-     * @return
-     * @throws SQLException
-     */
-    public boolean isWrapperFor(Class<?> arg0) throws SQLException
+
+    private final void checkNotClosed() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        if (isClosed()) throw new SQLNonTransientConnectionException(WAS_CLOSED_CON);
     }
 
-    
-    /**
-     * @param <T>
-     * @param arg0
-     * @return
-     * @throws SQLException
-     */
-    public <T> T unwrap(Class<T> arg0) throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-
-
-    /**
-     * @throws SQLException
-     */
     public void clearWarnings() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        // This implementation does not support the collection of warnings so clearing is a no-op
+        // but it is still an exception to call this on a closed connection.
+        checkNotClosed();
     }
 
     /**
      * On close of connection.
-     *
-     * @throws SQLException the sQL exception
      */
-    public void close() throws SQLException
+    public synchronized void close() throws SQLException
     {
-        if (cassandraCon != null)
+        if (isConnected())
         {
-            cassandraCon.close();
+            // spec says to close all statements associated with this connection upon close
+            for (Statement statement : statements) statement.close();
+            // then disconnect from the transport                
+            disconnect();
         }
     }
 
-
-    /**
-     * @throws SQLException
-     */
     public void commit() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        throw new SQLFeatureNotSupportedException(ALWAYS_AUTOCOMMIT);
     }
 
-
-    /**
-     * @param arg0
-     * @param arg1
-     * @return
-     * @throws SQLException
-     */
-    public Array createArrayOf(String arg0, Object[] arg1) throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-
-    /**
-     * @return
-     * @throws SQLException
-     */
-    public Blob createBlob() throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-
-    /**
-     * @return
-     * @throws SQLException
-     */
-    public Clob createClob() throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-
-    /**
-     * @return
-     * @throws SQLException
-     */
-    public NClob createNClob() throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-
-    /**
-     * @return
-     * @throws SQLException
-     */
-    public SQLXML createSQLXML() throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-    
-    /**
-     * @return
-     * @throws SQLException
-     */
     public Statement createStatement() throws SQLException
     {
-        return new CassandraStatement(this.cassandraCon);
+        checkNotClosed();
+        statements.add(new CassandraStatement(this));
+        return statements.get(statements.size() - 1);
     }
 
-
-    /**
-     * @param arg0
-     * @param arg1
-     * @return
-     * @throws SQLException
-     */
-    public Statement createStatement(int arg0, int arg1) throws SQLException
+    public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        statements.add(new CassandraStatement(this, null, resultSetType, resultSetConcurrency));
+        return statements.get(statements.size() - 1);
     }
 
-
-    /**
-     * @param arg0
-     * @param arg1
-     * @param arg2
-     * @return
-     * @throws SQLException
-     */
-    public Statement createStatement(int arg0, int arg1, int arg2) throws SQLException
+    public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        statements.add(new CassandraStatement(this, null, resultSetType, resultSetConcurrency, resultSetHoldability));
+        return statements.get(statements.size() - 1);
     }
 
-
-    /**
-     * @param arg0
-     * @param arg1
-     * @return
-     * @throws SQLException
-     */
-    public Struct createStruct(String arg0, Object[] arg1) throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-
-    /**
-     * @return
-     * @throws SQLException
-     */
     public boolean getAutoCommit() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        return autoCommit;
     }
 
-
-    /**
-     * @return
-     * @throws SQLException
-     */
     public String getCatalog() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-
-    /**
-     * @return
-     * @throws SQLException
-     */
-    public Properties getClientInfo() throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-
-    /**
-     * @param arg0
-     * @return
-     * @throws SQLException
-     */
-    public String getClientInfo(String arg0) throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-
-    /**
-     * @return
-     * @throws SQLException
-     */
-    public int getHoldability() throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-
-    /**
-     * @return
-     * @throws SQLException
-     */
-    public DatabaseMetaData getMetaData() throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-
-    /**
-     * @return
-     * @throws SQLException
-     */
-    public int getTransactionIsolation() throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-
-    /**
-     * @return
-     * @throws SQLException
-     */
-    public Map<String, Class<?>> getTypeMap() throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-
-    /**
-     * @return
-     * @throws SQLException
-     */
-    public SQLWarning getWarnings() throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-
-    /**
-     * @return
-     * @throws SQLException
-     */
-    public boolean isClosed() throws SQLException
-    {
-        return false;
-    }
-
-
-    /**
-     * @return
-     * @throws SQLException
-     */
-    public boolean isReadOnly() throws SQLException
-    {
-        return false;
-    }
-
-
-    /**
-     * @param arg0
-     * @return
-     * @throws SQLException
-     */
-    public boolean isValid(int arg0) throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-
-    /**
-     * @param arg0
-     * @return
-     * @throws SQLException
-     */
-    public String nativeSQL(String arg0) throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-
-    /**
-     * @param arg0
-     * @return
-     * @throws SQLException
-     */
-    public CallableStatement prepareCall(String arg0) throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-
-    /**
-     * @param arg0
-     * @param arg1
-     * @param arg2
-     * @return
-     * @throws SQLException
-     */
-    public CallableStatement prepareCall(String arg0, int arg1, int arg2) throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-
-    /**
-     * @param arg0
-     * @param arg1
-     * @param arg2
-     * @param arg3
-     * @return
-     * @throws SQLException
-     */
-    public CallableStatement prepareCall(String arg0, int arg1, int arg2, int arg3) throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-    }
-
-
-    /**
-     * @param sql
-     * @return
-     * @throws SQLException
-     */
-    public PreparedStatement prepareStatement(String sql) throws SQLException
-    {
-        return new CassandraPreparedStatement(this.cassandraCon, sql);
-    }
-
-
-    /**
-     * @param arg0
-     * @param arg1
-     * @return
-     * @throws SQLException
-     */
-    public PreparedStatement prepareStatement(String arg0, int arg1) throws SQLException
-    {
+        // This implementation does not support the catalog names so null is always returned if the connection is open.
+        // but it is still an exception to call this on a closed connection.
+        checkNotClosed();
         return null;
     }
 
-
-    /**
-     * @param arg0
-     * @param arg1
-     * @return
-     * @throws SQLException
-     */
-    public PreparedStatement prepareStatement(String arg0, int[] arg1) throws SQLException
+    public Properties getClientInfo() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        return clientInfo;
     }
 
-
-    /**
-     * @param arg0
-     * @param arg1
-     * @return
-     * @throws SQLException
-     */
-    public PreparedStatement prepareStatement(String arg0, String[] arg1) throws SQLException
+    public String getClientInfo(String label) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        return clientInfo.getProperty(label);
     }
 
+    public int getHoldability() throws SQLException
+    {
+        checkNotClosed();
+        // the rationale is there are really no commits in Cassandra so no boundary...
+        return CResultSet.DEFAULT_HOLDABILITY;
+    }
 
-    /**
-     * @param arg0
-     * @param arg1
-     * @param arg2
-     * @return
-     * @throws SQLException
-     */
+    public DatabaseMetaData getMetaData() throws SQLException
+    {
+        checkNotClosed();
+        return new CassandraDatabaseMetaData(this);
+    }
+
+    public int getTransactionIsolation() throws SQLException
+    {
+        checkNotClosed();
+        return transactionIsolation;
+    }
+
+    public SQLWarning getWarnings() throws SQLException
+    {
+        checkNotClosed();
+        // the rationale is there are no warnings to return in this implementation...
+        return null;
+    }
+
+    public synchronized boolean isClosed() throws SQLException
+    {
+
+        return !isConnected();
+    }
+
+    public boolean isReadOnly() throws SQLException
+    {
+        checkNotClosed();
+        return false;
+    }
+
+    public boolean isValid(int timeout) throws SQLException
+    {
+        checkNotClosed();
+        if (timeout < 0) throw new SQLTimeoutException(BAD_TIMEOUT);
+
+        // this needs to be more robust. Some query needs to be made to verify connection is really up.
+        return !isClosed();
+    }
+
+    public boolean isWrapperFor(Class<?> arg0) throws SQLException
+    {
+        return false;
+    }
+
+    public String nativeSQL(String sql) throws SQLException
+    {
+        checkNotClosed();
+        // the rationale is there are no distinction between grammars in this implementation...
+        // so we are just return the input argument
+        return sql;
+    }
+
+    public PreparedStatement prepareStatement(String sql) throws SQLException
+    {
+        checkNotClosed();
+        statements.add(new CassandraPreparedStatement(this, sql));
+        return (PreparedStatement) statements.get(statements.size() - 1);
+    }
+
     public PreparedStatement prepareStatement(String arg0, int arg1, int arg2) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
-
-    /**
-     * @param arg0
-     * @param arg1
-     * @param arg2
-     * @param arg3
-     * @return
-     * @throws SQLException
-     */
     public PreparedStatement prepareStatement(String arg0, int arg1, int arg2, int arg3) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
-
-    /**
-     * @param arg0
-     * @throws SQLException
-     */
-    public void releaseSavepoint(Savepoint arg0) throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-
-    }
-
-
-    /**
-     * @throws SQLException
-     */ 
     public void rollback() throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
-
+        checkNotClosed();
+        throw new SQLFeatureNotSupportedException(ALWAYS_AUTOCOMMIT);
     }
 
-
-    /**
-     * @param arg0
-     * @throws SQLException
-     */
-    public void rollback(Savepoint arg0) throws SQLException
+    public void setAutoCommit(boolean autoCommit) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
-
+        checkNotClosed();
+        if (!autoCommit) throw new SQLFeatureNotSupportedException(ALWAYS_AUTOCOMMIT);
     }
 
-
-    /**
-     * @param arg0
-     * @throws SQLException
-     */
-    public void setAutoCommit(boolean arg0) throws SQLException
-    {
-        throw new UnsupportedOperationException("method not supported");
-
-    }
-
-
-    /**
-     * @param arg0
-     * @throws SQLException
-     */
     public void setCatalog(String arg0) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        // the rationale is there are no catalog name to set in this implementation...
+        // so we are "silently ignoring" the request
     }
 
-
-    /**
-     * @param arg0
-     * @throws SQLClientInfoException
-     */
-    public void setClientInfo(Properties arg0) throws SQLClientInfoException
+    public void setClientInfo(Properties props) throws SQLClientInfoException
     {
-        throw new UnsupportedOperationException("method not supported");
+        // we don't use them but we will happily collect them for now...
+        if (props != null) clientInfo = props;
     }
 
-
-    /**
-     * @param arg0
-     * @param arg1
-     * @throws SQLClientInfoException
-     */
-    public void setClientInfo(String arg0, String arg1) throws SQLClientInfoException
+    public void setClientInfo(String key, String value) throws SQLClientInfoException
     {
-        throw new UnsupportedOperationException("method not supported");
-
+        // we don't use them but we will happily collect them for now...
+        clientInfo.setProperty(key, value);
     }
 
-
-    /**
-     * @param arg0
-     * @throws SQLException
-     */
     public void setHoldability(int arg0) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        // the rationale is there are no holdability to set in this implementation...
+        // so we are "silently ignoring" the request
     }
-    
 
-    /**
-     * @param arg0
-     * @throws SQLException
-     */
     public void setReadOnly(boolean arg0) throws SQLException
     {
-        throw new UnsupportedOperationException("method not supported");
+        checkNotClosed();
+        // the rationale is all connections are read/write in the Cassandra implementation...
+        // so we are "silently ignoring" the request
     }
-    
+
+    public void setTransactionIsolation(int level) throws SQLException
+    {
+        checkNotClosed();
+        if (level != Connection.TRANSACTION_NONE) throw new SQLFeatureNotSupportedException(NO_TRANSACTIONS);
+    }
+
+    public <T> T unwrap(Class<T> iface) throws SQLException
+    {
+        throw new SQLFeatureNotSupportedException(String.format(NO_INTERFACE, iface.getSimpleName()));
+    }
 
     /**
-     * @return
-     * @throws SQLException
+     * Execute a CQL query.
+     *
+     * @param queryStr    a CQL query string
+     * @param compression query compression to use
+     * @return the query results encoded as a CqlResult structure
+     * @throws InvalidRequestException     on poorly constructed or illegal requests
+     * @throws UnavailableException        when not all required replicas could be created/read
+     * @throws TimedOutException           when a cluster operation timed out
+     * @throws SchemaDisagreementException when the client side and server side are at different versions of schema (Thrift)
+     * @throws TException                  when there is a error in Thrift processing
      */
-    public Savepoint setSavepoint() throws SQLException
+    public CqlResult execute(String queryStr, Compression compression) throws InvalidRequestException, UnavailableException, TimedOutException, SchemaDisagreementException, TException
     {
-        throw new UnsupportedOperationException("method not supported");
+        currentKeyspace = determineCurrentKeyspace(queryStr, currentKeyspace);
+
+        try
+        {
+            return client.execute_cql_query(Utils.compressQuery(queryStr, compression), compression);
+        }
+        catch (TException error)
+        {
+            numFailures++;
+            timeOfLastFailure = System.currentTimeMillis();
+            throw error;
+        }
     }
-    
 
     /**
-     * @param arg0
-     * @return
-     * @throws SQLException
+     * Execute a CQL query using the default compression methodology.
+     *
+     * @param queryStr a CQL query string
+     * @return the query results encoded as a CqlResult structure
+     * @throws InvalidRequestException     on poorly constructed or illegal requests
+     * @throws UnavailableException        when not all required replicas could be created/read
+     * @throws TimedOutException           when a cluster operation timed out
+     * @throws SchemaDisagreementException when the client side and server side are at different versions of schema (Thrift)
+     * @throws TException                  when there is a error in Thrift processing
      */
-    public Savepoint setSavepoint(String arg0) throws SQLException
+    public CqlResult execute(String queryStr) throws InvalidRequestException, UnavailableException, TimedOutException, SchemaDisagreementException, TException
     {
-        throw new UnsupportedOperationException("method not supported");
+        return execute(queryStr, defaultCompression);
     }
-    
 
     /**
-     * @param arg0
-     * @throws SQLException
+     * Shutdown the remote connection
      */
-    public void setTransactionIsolation(int arg0) throws SQLException
+    public void disconnect()
     {
-        throw new UnsupportedOperationException("method not supported");
+        transport.close();
     }
-    
 
     /**
-     * @param arg0
-     * @throws SQLException
+     * Connection state.
      */
-    public void setTypeMap(Map<String, Class<?>> arg0) throws SQLException
+    public boolean isConnected()
     {
-        throw new UnsupportedOperationException("method not supported");
+        return transport.isOpen();
     }
-
 }

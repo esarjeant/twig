@@ -20,6 +20,10 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
+import static org.apache.cassandra.cql.jdbc.Utils.PROTOCOL;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_PASSWORD;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_USER;
+
 import java.sql.Connection;
 import java.sql.Driver;
 import java.sql.DriverManager;
@@ -27,22 +31,23 @@ import java.sql.DriverPropertyInfo;
 import java.sql.SQLException;
 import java.util.Properties;
 
-/**
-  * The Class CassandraDriver.
-  */
- public class CassandraDriver implements Driver
-{
-    
-    /** The Constant MAJOR_VERSION. */
-    private static final int MAJOR_VERSION = 1;
-    
-    /** The Constant MINOR_VERSION. */
-    private static final int MINOR_VERSION = 0;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-    /** The ACCEPT s_ url. */
-    private static String ACCEPTS_URL = "jdbc:cassandra";
-    
-//    private static final Logger logger = LoggerFactory.getLogger(CassandraDriver.class); 
+/**
+ * The Class CassandraDriver.
+ */
+public class CassandraDriver implements Driver
+{
+    public static final int DVR_MAJOR_VERSION = 1;
+
+    public static final int DVR_MINOR_VERSION = 0;
+
+    public static final int DVR_PATCH_VERSION = 4;
+
+    public static final String DVR_NAME = "Cassandra JDBC Driver";
+
+    private static final Logger logger = LoggerFactory.getLogger(CassandraDriver.class);
 
     static
     {
@@ -54,81 +59,81 @@ import java.util.Properties;
         }
         catch (SQLException e)
         {
-            throw new DriverResolverException(e.getMessage());
+            throw new RuntimeException(e.getMessage());
         }
     }
 
-    
     /**
      * Method to validate whether provided connection url matches with pattern or not.
-     *
-     * @param url  connection url.
-     * @return true, if successful
-     * @throws SQLException the sQL exception
      */
     public boolean acceptsURL(String url) throws SQLException
     {
-        return url.startsWith(ACCEPTS_URL);
+        return url.startsWith(PROTOCOL);
     }
 
     /**
      * Method to return connection instance for given connection url and connection props.
-     *
-     * @param url               connection url.
-     * @param props          connection properties.
-     * @return connection connection instance.
-     * @throws SQLException the sQL exception
      */
     public Connection connect(String url, Properties props) throws SQLException
     {
+        Properties finalProps;
         if (acceptsURL(url))
         {
-            return new CassandraConnection(url);
+            // parse the URL into a set of Properties
+            finalProps = Utils.parseURL(url);
+
+            // override any matching values in finalProps with values from props
+            finalProps.putAll(props);
+
+            if (logger.isDebugEnabled()) logger.debug("Final Properties to Connection: {}", finalProps);
+
+            return new CassandraConnection(finalProps);
         }
         else
         {
-            throw new InvalidUrlException("Invalid connection url:" + url + ". should start with jdbc:cassandra");
+            return null; // signal it is the wrong driver for this protocol:subprotocol
         }
     }
 
     /**
      * Returns default major version.
-     * @return MAJOR_VERSION major version.
      */
     public int getMajorVersion()
     {
-        return MAJOR_VERSION;
+        return DVR_MAJOR_VERSION;
     }
 
     /**
      * Returns default minor version.
-     * @return MINOR_VERSION minor version.
      */
     public int getMinorVersion()
     {
-        return MINOR_VERSION;
+        return DVR_MINOR_VERSION;
     }
 
     /**
      * Returns default driver property info object.
-     *
-     * @param arg0 the arg0
-     * @param arg1 the arg1
-     * @return driverPropertyInfo
-     * @throws SQLException the sQL exception
      */
-    public DriverPropertyInfo[] getPropertyInfo(String arg0, Properties arg1) throws SQLException
+    public DriverPropertyInfo[] getPropertyInfo(String url, Properties props) throws SQLException
     {
-        return new DriverPropertyInfo[0];
+        if (props == null) props = new Properties();
+
+        DriverPropertyInfo[] info = new DriverPropertyInfo[2];
+
+        info[0] = new DriverPropertyInfo(TAG_USER, props.getProperty(TAG_USER));
+        info[0].description = "The 'user' property";
+
+        info[1] = new DriverPropertyInfo(TAG_PASSWORD, props.getProperty(TAG_PASSWORD));
+        info[1].description = "The 'password' property";
+
+        return info;
     }
 
-   /**
-    * Returns true, if it is jdbc compliant.    
-    * @return value true, if it is jdbc compliant.
-    */
+    /**
+     * Returns true, if it is jdbc compliant.
+     */
     public boolean jdbcCompliant()
     {
         return false;
     }
-
 }
