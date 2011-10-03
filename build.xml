@@ -32,6 +32,7 @@
   <property name="javadoc.dir" value="${build.dir}/javadoc" />
   <property name="javadoc.jars.dir" value="${build.dir}/javadocs" />
   <property name="debuglevel" value="source,lines,vars" />
+  <property name="test.name" value="*Test" />
   <property name="test.timeout" value="60000" />
   <property name="base.version" value="1.0.5" />
 
@@ -61,8 +62,8 @@
     <element name="filesets" />
     <sequential>
       <javadoc destdir="@{destdir}" author="true" version="true" use="true"
-	       windowtitle="${ant.project.name} API" classpathref="javadoc.classpath"
-	       useexternalfile="yes" maxmemory="256m"
+               windowtitle="${ant.project.name} API" classpathref="javadoc.classpath"
+               useexternalfile="yes" maxmemory="256m"
                bottom="Copyright &amp;copy; ${YEAR} The Apache Software Foundation">
         <filesets />
       </javadoc>
@@ -103,7 +104,7 @@
 
   <target name="test" depends="build-test">
     <junit fork="on" forkmode="perTest" timeout="${test.timeout}"
-           showoutput="true" maxmemory="1024m">
+           showoutput="true" maxmemory="1024m" failureproperty="test.failed">
       <formatter type="brief" usefile="false"/>
       <jvmarg value="-Dstorage-config=${test.dir}/conf" />
       <jvmarg value="-Dlog4j.configuration=log4j-junit.properties" />
@@ -117,9 +118,14 @@
         <pathelement location="${test.dir}/conf" />
       </classpath>
       <batchtest todir="${build.test/output}">
-        <fileset dir="${test.dir}" includes="**/*Test.java" />
+        <fileset dir="${test.dir}" includes="**/${test.name}.java" />
       </batchtest>
     </junit>
+    <fail message="Some test(s) failed.">
+      <condition>
+        <isset property="test.failed" />
+      </condition>
+    </fail>
   </target>
 
   <target name="jar" depends="build">
@@ -157,6 +163,6 @@
   </target>
 
   <target name="build-all" depends="clean,build,jar,javadoc-jar,sources-jar"
-	  description="Build all (non-test) artifacts">
+          description="Build all (non-test) artifacts">
   </target>
 </project>
