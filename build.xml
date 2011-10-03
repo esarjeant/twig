@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ ~ Licensed to the Apache Software Foundation (ASF) under one
+ ~ or more contributor license agreements.  See the NOTICE file
+ ~ distributed with this work for additional information
+ ~ regarding copyright ownership.  The ASF licenses this file
+ ~ to you under the Apache License, Version 2.0 (the
+ ~ "License"); you may not use this file except in compliance
+ ~ with the License.  You may obtain a copy of the License at
+ ~
+ ~    http://www.apache.org/licenses/LICENSE-2.0
+ ~
+ ~ Unless required by applicable law or agreed to in writing,
+ ~ software distributed under the License is distributed on an
+ ~ "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ ~ KIND, either express or implied.  See the License for the
+ ~ specific language governing permissions and limitations
+ ~ under the License.
+ -->
+<project basedir="." default="jar" name="cassandra-jdbc">
+  <property environment="env" />
+  <property file="build.properties" />
+  <property file="build.properties.default" />
+
+  <property name="src.dir" value="${basedir}/src" />
+  <property name="test.dir" value="${basedir}/test" />
+  <property name="library.dir" value="${basedir}/lib" />
+  <property name="build.dir" value="${basedir}/build" />
+  <property name="build.main.classes" value="${build.dir}/main/classes" />
+  <property name="build.test" value="${build.dir}/test" />
+  <property name="build.test.classes" value="${build.test}/classes" />
+  <property name="javadoc.dir" value="${build.dir}/javadoc" />
+  <property name="javadoc.jars.dir" value="${build.dir}/javadocs" />
+  <property name="debuglevel" value="source,lines,vars" />
+  <property name="test.timeout" value="60000" />
+  <property name="base.version" value="1.0.5" />
+
+  <condition property="version" value="${base.version}">
+    <isset property="release" />
+  </condition>
+  <property name="version" value="${base.version}-SNAPSHOT" />
+  <property name="final.name" value="${ant.project.name}-${version}" />
+
+  <path id="cassandra.classpath">
+    <fileset dir="${library.dir}">
+      <include name="**/*.jar" />
+    </fileset>
+  </path>
+
+  <path id="cassandra.test.classpath">
+    <!-- FIXME: what now? -->
+  </path>
+
+  <path id="javadoc.classpath">
+    <pathelement location="${build.main.classes}" />
+    <path refid="cassandra.classpath" />
+  </path>
+
+  <macrodef name="create-javadoc">
+    <attribute name="destdir" />
+    <element name="filesets" />
+    <sequential>
+      <javadoc destdir="@{destdir}" author="true" version="true" use="true"
+	       windowtitle="${ant.project.name} API" classpathref="javadoc.classpath"
+	       useexternalfile="yes" maxmemory="256m"
+               bottom="Copyright &amp;copy; ${YEAR} The Apache Software Foundation">
+        <filesets />
+      </javadoc>
+    </sequential>
+  </macrodef>
+
+  <target name="clean">
+    <delete dir="${build.dir}" />
+  </target>
+
+  <target name="init">
+    <mkdir dir="${build.main.classes}" />
+    <mkdir dir="${build.test.classes}" />
+    <mkdir dir="${build.test}/cassandra" />
+    <mkdir dir="${build.test}/logs" />
+  </target>
+
+  <target name="build" depends="init">
+    <echo message="${ant.project.name}: ${ant.file}" />
+    <javac debug="true" debuglevel="${debuglevel}"
+           destdir="${build.main.classes}" includeantruntime="false">
+      <src path="${src.dir}" />
+      <classpath refid="cassandra.classpath" />
+    </javac>
+  </target>
+
+  <target name="build-test" depends="init,build">
+    <javac debug="true" debuglevel="${debuglevel}"
+           destdir="${build.test.classes}" includeantruntime="false">
+      <src path="${test.dir}" />
+      <classpath>
+        <path refid="cassandra.classpath" />
+        <path refid="cassandra.test.classpath" />
+        <pathelement location="${build.main.classes}" />
+      </classpath>
+    </javac>
+  </target>
+
+  <target name="test" depends="build-test">
+    <junit fork="on" forkmode="perTest" timeout="${test.timeout}"
+           showoutput="true" maxmemory="1024m">
+      <formatter type="brief" usefile="false"/>
+      <jvmarg value="-Dstorage-config=${test.dir}/conf" />
+      <jvmarg value="-Dlog4j.configuration=log4j-junit.properties" />
+      <jvmarg value="-Dlegacy-sstable-root=${test.data}/legacy-sstables" />
+      <jvmarg value="-ea" />
+      <classpath>
+        <path refid="cassandra.classpath" />
+        <path refid="cassandra.test.classpath" />
+        <pathelement location="${build.main.classes}" />
+        <pathelement location="${build.test.classes}" />
+        <pathelement location="${test.dir}/conf" />
+      </classpath>
+      <batchtest todir="${build.test/output}">
+        <fileset dir="${test.dir}" includes="**/*Test.java" />
+      </batchtest>
+    </junit>
+  </target>
+
+  <target name="jar" depends="build">
+    <manifest file="${build.dir}/MANIFEST.MF">
+      <attribute name="Built-By" value="${builder.name}" />
+    </manifest>
+
+    <mkdir dir="${build.main.classes}/META-INF" />
+
+    <jar destfile="${build.dir}/${final.name}.jar" manifest="${build.dir}/MANIFEST.MF">
+      <fileset dir="${build.main.classes}" />
+    </jar>
+  </target>
+
+  <target name="javadoc" depends="init" description="Create javadoc">
+    <create-javadoc destdir="${javadoc.dir}">
+      <filesets>
+        <fileset dir="${src.dir}" defaultexcludes="yes">
+          <include name="org/apache/**/*.java" />
+        </fileset>
+      </filesets>
+    </create-javadoc>
+  </target>
+
+  <target name="sources-jar" depends="init" description="Assemble JDBC Sources JAR file">
+    <jar jarfile="${build.dir}/${final.name}-sources.jar">
+      <fileset dir="${src.dir}" defaultexcludes="yes">
+        <include name="org/apache/**/*.java" />
+      </fileset>
+    </jar>
+  </target>
+
+  <target name="javadoc-jar" depends="init,javadoc" description="Assemble JDBC Javadoc JAR file">
+    <jar jarfile="${build.dir}/${final.name}-javadoc.jar" basedir="${javadoc.dir}" />
+  </target>
+
+  <target name="build-all" depends="clean,build,jar,javadoc-jar,sources-jar"
+	  description="Build all (non-test) artifacts">
+  </target>
+</project>
