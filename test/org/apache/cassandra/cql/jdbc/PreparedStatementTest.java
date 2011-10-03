@@ -21,8 +21,6 @@ package org.apache.cassandra.cql.jdbc;
  */
 
 
-import org.apache.cassandra.cql.EmbeddedServiceBase;
-import org.apache.cassandra.utils.FBUtilities;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -30,21 +28,23 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
+import org.apache.cassandra.cql.Schema;
+
+import static org.apache.cassandra.utils.Hex.bytesToHex;
 
 
-public class PreparedStatementTest extends EmbeddedServiceBase
+public class PreparedStatementTest
 { 
     private static java.sql.Connection con = null;
+    private static final Schema schema = new Schema("localhost", 9170);
     
     @BeforeClass
     public static void waxOn() throws Exception
     {
-        startCassandraServer();
+        schema.createSchema();
         Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
-        con = DriverManager.getConnection("jdbc:cassandra://localhost:9170/Keyspace1");
+        con = DriverManager.getConnection("jdbc:cassandra://localhost:9170/" + Schema.KEYSPACE_NAME);
     }
     
     @Test
@@ -55,10 +55,10 @@ public class PreparedStatementTest extends EmbeddedServiceBase
         for (int i = 0; i < 5; i++)
         {
             byte[] key = Integer.toString(i).getBytes();
-            stmt.setBytes(1, FBUtilities.toByteArray(i));
-            stmt.setBytes(2, FBUtilities.toByteArray((i+1)*10));
-            stmt.setBytes(3, FBUtilities.toByteArray(i+100));
-            stmt.setBytes(4, FBUtilities.toByteArray((i+1)*10+1));
+            stmt.setBytes(1, toByteArray(i));
+            stmt.setBytes(2, toByteArray((i+1)*10));
+            stmt.setBytes(3, toByteArray(i+100));
+            stmt.setBytes(4, toByteArray((i+1)*10+1));
             stmt.setBytes(5, key);
             stmt.executeUpdate();
         }
@@ -68,15 +68,15 @@ public class PreparedStatementTest extends EmbeddedServiceBase
         for (int i = 0; i < 5; i++)
         {
             byte[] key = Integer.toString(i).getBytes();
-            stmt.setBytes(1, FBUtilities.toByteArray(i));
-            stmt.setBytes(2, FBUtilities.toByteArray(i+100));
+            stmt.setBytes(1, toByteArray(i));
+            stmt.setBytes(2, toByteArray(i+100));
             stmt.setBytes(3, key);
             ResultSet rs = stmt.executeQuery();
             assert rs.next();
-            assert Arrays.equals(rs.getBytes(FBUtilities.bytesToHex(FBUtilities.toByteArray(i))), FBUtilities.toByteArray((i+1)*10));
-            assert Arrays.equals(rs.getBytes(FBUtilities.bytesToHex(FBUtilities.toByteArray(i+100))), FBUtilities.toByteArray((i+1)*10+1));
-            assert Arrays.equals(rs.getBytes(1), FBUtilities.toByteArray((i+1)*10));
-            assert Arrays.equals(rs.getBytes(2), FBUtilities.toByteArray((i+1)*10+1));
+            assert Arrays.equals(rs.getBytes(bytesToHex(toByteArray(i))), toByteArray((i+1)*10));
+            assert Arrays.equals(rs.getBytes(bytesToHex(toByteArray(i+100))), toByteArray((i+1)*10+1));
+            assert Arrays.equals(rs.getBytes(1), toByteArray((i+1)*10));
+            assert Arrays.equals(rs.getBytes(2), toByteArray((i+1)*10+1));
             assert !rs.next();
             rs.close();
         }
@@ -86,8 +86,8 @@ public class PreparedStatementTest extends EmbeddedServiceBase
         for (int i = 0; i < 5; i++)
         {
             byte[] key = Integer.toString(i).getBytes();
-            stmt.setBytes(1, FBUtilities.toByteArray(i));
-            stmt.setBytes(2, FBUtilities.toByteArray(i+100));
+            stmt.setBytes(1, toByteArray(i));
+            stmt.setBytes(2, toByteArray(i+100));
             stmt.setBytes(3, key);
             stmt.execute();
         }
@@ -97,8 +97,8 @@ public class PreparedStatementTest extends EmbeddedServiceBase
         for (int i = 0; i < 5; i++)
         {
             byte[] key = Integer.toString(i).getBytes();
-            stmt.setBytes(1, FBUtilities.toByteArray(i));
-            stmt.setBytes(2, FBUtilities.toByteArray(i+100));
+            stmt.setBytes(1, toByteArray(i));
+            stmt.setBytes(2, toByteArray(i+100));
             stmt.setBytes(3, key);
             ResultSet rs = stmt.executeQuery();
             rs.next();
@@ -380,5 +380,30 @@ public class PreparedStatementTest extends EmbeddedServiceBase
         stmt.setBytes(3, key);
         qq = stmt.makeCql();
         assert qq.equals("DELETE 'on''?''', 'two' FROM JdbcUtf8 WHERE KEY='6b6579'");
+    }
+
+    /**
+     * Copy bytes from int into bytes starting from offset.
+     * @param bytes Target array
+     * @param offset Offset into the array
+     * @param i Value to write
+     */
+    public static void copyIntoBytes(byte[] bytes, int offset, int i)
+    {
+        bytes[offset]   = (byte)( ( i >>> 24 ) & 0xFF );
+        bytes[offset+1] = (byte)( ( i >>> 16 ) & 0xFF );
+        bytes[offset+2] = (byte)( ( i >>> 8  ) & 0xFF );
+        bytes[offset+3] = (byte)(   i          & 0xFF );
+    }
+
+    /**
+     * @param i Write this int to an array
+     * @return 4-byte array containing the int
+     */
+    public static byte[] toByteArray(int i)
+    {
+        byte[] bytes = new byte[4];
+        copyIntoBytes(bytes, 0, i);
+        return bytes;
     }
 }

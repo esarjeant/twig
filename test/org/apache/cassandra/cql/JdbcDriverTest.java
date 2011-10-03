@@ -40,29 +40,30 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import org.apache.cassandra.utils.FBUtilities;
-
 import static junit.framework.Assert.assertEquals;
+import static org.apache.cassandra.utils.Hex.bytesToHex;
+import static org.apache.cassandra.utils.Hex.hexToBytes;
 
 /**
  * Test case for unit test of various methods of JDBC implementation.
  */
-public class JdbcDriverTest extends EmbeddedServiceBase
+public class JdbcDriverTest
 {
     private static java.sql.Connection con = null;
-    private static final String first = FBUtilities.bytesToHex("first".getBytes());
-    private static final String firstrec = FBUtilities.bytesToHex("firstrec".getBytes());
-    private static final String last = FBUtilities.bytesToHex("last".getBytes());
-    private static final String lastrec = FBUtilities.bytesToHex("lastrec".getBytes());
-    private static final String jsmith = FBUtilities.bytesToHex("jsmith".getBytes());
+    private static final String first = bytesToHex("first".getBytes());
+    private static final String firstrec = bytesToHex("firstrec".getBytes());
+    private static final String last = bytesToHex("last".getBytes());
+    private static final String lastrec = bytesToHex("lastrec".getBytes());
+    private static final String jsmith = bytesToHex("jsmith".getBytes());
+    private static final Schema schema = new Schema("localhost", 9170);
 
     /** SetUp */
     @BeforeClass
     public static void startServer() throws Exception
     {
-        startCassandraServer();
+        schema.createSchema();
         Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
-        con = DriverManager.getConnection("jdbc:cassandra://localhost:9170/Keyspace1");
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://localhost:9170/%s", Schema.KEYSPACE_NAME));
         String[] inserts = 
         {
             String.format("UPDATE Standard1 SET '%s' = '%s', '%s' = '%s' WHERE KEY = '%s'", first, firstrec, last, lastrec, jsmith),    
@@ -130,7 +131,7 @@ public class JdbcDriverTest extends EmbeddedServiceBase
     @Test
     public void testNonDefaultColumnValidators() throws SQLException
     {
-        String key = FBUtilities.bytesToHex("Integer".getBytes());
+        String key = bytesToHex("Integer".getBytes());
         Statement stmt = con.createStatement();
         stmt.executeUpdate("update JdbcInteger set 1=36893488147419103232, 42='fortytwofortytwo' where key='" + key + "'");
         ResultSet rs = stmt.executeQuery("select 1, 2, 42 from JdbcInteger where key='" + key + "'");
@@ -140,13 +141,13 @@ public class JdbcDriverTest extends EmbeddedServiceBase
         
         ResultSetMetaData md = rs.getMetaData();
         assert md.getColumnCount() == 3;
-        expectedMetaData(md, 1, BigInteger.class.getName(), "JdbcInteger", "Keyspace1", "1", Types.BIGINT, JdbcInteger.class.getSimpleName(), true, false);
-        expectedMetaData(md, 2, BigInteger.class.getName(), "JdbcInteger", "Keyspace1", "2", Types.BIGINT, JdbcInteger.class.getSimpleName(), true, false);
-        expectedMetaData(md, 3, String.class.getName(), "JdbcInteger", "Keyspace1", "42", Types.VARCHAR, JdbcUTF8.class.getSimpleName(), false, true);
+        expectedMetaData(md, 1, BigInteger.class.getName(), "JdbcInteger", Schema.KEYSPACE_NAME, "1", Types.BIGINT, JdbcInteger.class.getSimpleName(), true, false);
+        expectedMetaData(md, 2, BigInteger.class.getName(), "JdbcInteger", Schema.KEYSPACE_NAME, "2", Types.BIGINT, JdbcInteger.class.getSimpleName(), true, false);
+        expectedMetaData(md, 3, String.class.getName(), "JdbcInteger", Schema.KEYSPACE_NAME, "42", Types.VARCHAR, JdbcUTF8.class.getSimpleName(), false, true);
         
         rs = stmt.executeQuery("select key, 1, 2, 42 from JdbcInteger where key='" + key + "'");
         assert rs.next();
-        assert Arrays.equals(rs.getBytes("key"), FBUtilities.hexToBytes(key));
+        assert Arrays.equals(rs.getBytes("key"), hexToBytes(key));
         assert rs.getObject("1").equals(new BigInteger("36893488147419103232"));
         assert rs.getString("42").equals("fortytwofortytwo") : rs.getString("42");
 
@@ -158,15 +159,15 @@ public class JdbcDriverTest extends EmbeddedServiceBase
         assert rs.getInt("fortytwo") == 4242L;
         
         md = rs.getMetaData();
-        expectedMetaData(md, 1, String.class.getName(), "JdbcUtf8", "Keyspace1", "a", Types.VARCHAR, JdbcUTF8.class.getSimpleName(), false, true);
-        expectedMetaData(md, 2, String.class.getName(), "JdbcUtf8", "Keyspace1", "b", Types.VARCHAR, JdbcUTF8.class.getSimpleName(), false, true);
-        expectedMetaData(md, 3, BigInteger.class.getName(), "JdbcUtf8", "Keyspace1", "fortytwo", Types.BIGINT, JdbcInteger.class.getSimpleName(), true, false);
+        expectedMetaData(md, 1, String.class.getName(), "JdbcUtf8", Schema.KEYSPACE_NAME, "a", Types.VARCHAR, JdbcUTF8.class.getSimpleName(), false, true);
+        expectedMetaData(md, 2, String.class.getName(), "JdbcUtf8", Schema.KEYSPACE_NAME, "b", Types.VARCHAR, JdbcUTF8.class.getSimpleName(), false, true);
+        expectedMetaData(md, 3, BigInteger.class.getName(), "JdbcUtf8", Schema.KEYSPACE_NAME, "fortytwo", Types.BIGINT, JdbcInteger.class.getSimpleName(), true, false);
     }
         
     @Test
     public void testLongMetadata() throws SQLException
     {
-        String key = FBUtilities.bytesToHex("Long".getBytes());
+        String key = bytesToHex("Long".getBytes());
         Statement stmt = con.createStatement();
         stmt.executeUpdate("UPDATE JdbcLong SET 1=111, 2=222 WHERE KEY = '" + key + "'");
         ResultSet rs = stmt.executeQuery("SELECT 1, 2 from JdbcLong WHERE KEY = '" + key + "'");
@@ -176,8 +177,8 @@ public class JdbcDriverTest extends EmbeddedServiceBase
         
         ResultSetMetaData md = rs.getMetaData();
         assert md.getColumnCount() == 2;
-        expectedMetaData(md, 1, Long.class.getName(), "JdbcLong", "Keyspace1", "1", Types.BIGINT, JdbcLong.class.getSimpleName(), true, false);
-        expectedMetaData(md, 2, Long.class.getName(), "JdbcLong", "Keyspace1", "2", Types.BIGINT, JdbcLong.class.getSimpleName(), true, false);
+        expectedMetaData(md, 1, Long.class.getName(), "JdbcLong", Schema.KEYSPACE_NAME, "1", Types.BIGINT, JdbcLong.class.getSimpleName(), true, false);
+        expectedMetaData(md, 2, Long.class.getName(), "JdbcLong", Schema.KEYSPACE_NAME, "2", Types.BIGINT, JdbcLong.class.getSimpleName(), true, false);
         
         for (int i = 0; i < md.getColumnCount(); i++)
             expectedMetaData(md, i + 1, Long.class.getName(), Types.BIGINT, JdbcLong.class.getSimpleName(), true, false);
@@ -186,8 +187,8 @@ public class JdbcDriverTest extends EmbeddedServiceBase
     @Test
     public void testStringMetadata() throws SQLException
     {
-        String aKey = FBUtilities.bytesToHex("ascii".getBytes());
-        String uKey = FBUtilities.bytesToHex("utf8".getBytes());
+        String aKey = bytesToHex("ascii".getBytes());
+        String uKey = bytesToHex("utf8".getBytes());
         Statement stmt = con.createStatement();
         stmt.executeUpdate("UPDATE JdbcAscii SET a='aa', b='bb' WHERE KEY = '" + aKey + "'");
         stmt.executeUpdate("UPDATE JdbcUtf8 SET a='aa', b='bb' WHERE KEY = '" + uKey + "'");
@@ -202,12 +203,12 @@ public class JdbcDriverTest extends EmbeddedServiceBase
         
         ResultSetMetaData md = rs0.getMetaData();
         assert md.getColumnCount() == 2;
-        expectedMetaData(md, 1, String.class.getName(), "JdbcAscii", "Keyspace1", "a", Types.VARCHAR, JdbcAscii.class.getSimpleName(), false, true);
-        expectedMetaData(md, 2, String.class.getName(), "JdbcAscii", "Keyspace1", "b", Types.VARCHAR, JdbcAscii.class.getSimpleName(), false, true);
+        expectedMetaData(md, 1, String.class.getName(), "JdbcAscii", Schema.KEYSPACE_NAME, "a", Types.VARCHAR, JdbcAscii.class.getSimpleName(), false, true);
+        expectedMetaData(md, 2, String.class.getName(), "JdbcAscii", Schema.KEYSPACE_NAME, "b", Types.VARCHAR, JdbcAscii.class.getSimpleName(), false, true);
         md = rs1.getMetaData();
         assert md.getColumnCount() == 2;
-        expectedMetaData(md, 1, String.class.getName(), "JdbcUtf8", "Keyspace1", "a", Types.VARCHAR, JdbcUTF8.class.getSimpleName(), false, true);
-        expectedMetaData(md, 2, String.class.getName(), "JdbcUtf8", "Keyspace1", "b", Types.VARCHAR, JdbcUTF8.class.getSimpleName(), false, true);
+        expectedMetaData(md, 1, String.class.getName(), "JdbcUtf8", Schema.KEYSPACE_NAME, "a", Types.VARCHAR, JdbcUTF8.class.getSimpleName(), false, true);
+        expectedMetaData(md, 2, String.class.getName(), "JdbcUtf8", Schema.KEYSPACE_NAME, "b", Types.VARCHAR, JdbcUTF8.class.getSimpleName(), false, true);
 
         for (int i = 0; i < 2; i++)
         {
@@ -232,7 +233,7 @@ public class JdbcDriverTest extends EmbeddedServiceBase
     @Test
     public void testBytesMetadata() throws SQLException 
     {
-        String key = FBUtilities.bytesToHex("bytes".getBytes());
+        String key = bytesToHex("bytes".getBytes());
         Statement stmt = con.createStatement();
         byte[] a = "a_".getBytes();
         byte[] b = "b_".getBytes();
@@ -240,23 +241,23 @@ public class JdbcDriverTest extends EmbeddedServiceBase
         byte[] bb = "_bb_".getBytes();
         stmt.executeUpdate(String.format(
                 "UPDATE JdbcBytes set '%s'='%s', '%s'='%s' WHERE KEY = '" + key + "'",
-                FBUtilities.bytesToHex(a),
-                FBUtilities.bytesToHex(aa),
-                FBUtilities.bytesToHex(b),
-                FBUtilities.bytesToHex(bb)));
+                bytesToHex(a),
+                bytesToHex(aa),
+                bytesToHex(b),
+                bytesToHex(bb)));
         ResultSet rs = stmt.executeQuery(String.format(
                 "SELECT '%s', '%s' from JdbcBytes WHERE KEY = '" + key + "'",
-                FBUtilities.bytesToHex(a),
-                FBUtilities.bytesToHex(b)));
+                bytesToHex(a),
+                bytesToHex(b)));
         assert rs.next();
         assert Arrays.equals(aa, rs.getBytes(1));
         assert Arrays.equals(bb, rs.getBytes(2));
-        assert Arrays.equals(aa, rs.getBytes(FBUtilities.bytesToHex(a)));
-        assert Arrays.equals(bb, rs.getBytes(FBUtilities.bytesToHex(b)));
+        assert Arrays.equals(aa, rs.getBytes(bytesToHex(a)));
+        assert Arrays.equals(bb, rs.getBytes(bytesToHex(b)));
         ResultSetMetaData md = rs.getMetaData();
         assert md.getColumnCount() == 2;
-        expectedMetaData(md, 1, ByteBuffer.class.getName(), "JdbcBytes", "Keyspace1", FBUtilities.bytesToHex(a), Types.BINARY, JdbcBytes.class.getSimpleName(), false, false);
-        expectedMetaData(md, 2, ByteBuffer.class.getName(), "JdbcBytes", "Keyspace1", FBUtilities.bytesToHex(b), Types.BINARY, JdbcBytes.class.getSimpleName(), false, false);
+        expectedMetaData(md, 1, ByteBuffer.class.getName(), "JdbcBytes", Schema.KEYSPACE_NAME, bytesToHex(a), Types.BINARY, JdbcBytes.class.getSimpleName(), false, false);
+        expectedMetaData(md, 2, ByteBuffer.class.getName(), "JdbcBytes", Schema.KEYSPACE_NAME, bytesToHex(b), Types.BINARY, JdbcBytes.class.getSimpleName(), false, false);
         
         for (int i = 0; i < md.getColumnCount(); i++)
             expectedMetaData(md, i + 1, ByteBuffer.class.getName(), Types.BINARY, JdbcBytes.class.getSimpleName(), false, false);
@@ -301,7 +302,7 @@ public class JdbcDriverTest extends EmbeddedServiceBase
         selectQ = "SELECT 'first', last FROM JdbcUtf8 WHERE KEY='" + jsmith + "'";
         checkResultSet(stmt.executeQuery(selectQ), "String", 1, keys, "first", "last");
 
-        String badKey = FBUtilities.bytesToHex(String.format("jsmith-%s", System.currentTimeMillis()).getBytes());
+        String badKey = bytesToHex(String.format("jsmith-%s", System.currentTimeMillis()).getBytes());
         selectQ = "SELECT 1, 2 FROM JdbcInteger WHERE KEY IN ('" + badKey + "', '" + jsmith + "')";
         checkResultSet(stmt.executeQuery(selectQ), "Int", 1, keys, "1", "2");
     }
@@ -346,7 +347,7 @@ public class JdbcDriverTest extends EmbeddedServiceBase
         selectQ = "SELECT 'first', last FROM JdbcUtf8 WHERE KEY='" + jsmith + "'";
         checkResultSet(executePreparedStatementWithResults(con, selectQ), "String", 1, keys, "first", "last");
 
-        String badKey = FBUtilities.bytesToHex(String.format("jsmith-%s", System.currentTimeMillis()).getBytes());
+        String badKey = bytesToHex(String.format("jsmith-%s", System.currentTimeMillis()).getBytes());
         selectQ = "SELECT 1, 2 FROM JdbcInteger WHERE KEY IN ('" + badKey + "', '" + jsmith + "')";
         checkResultSet(executePreparedStatementWithResults(con, selectQ), "Int", 1, keys, "1", "2");
     }
@@ -359,12 +360,12 @@ public class JdbcDriverTest extends EmbeddedServiceBase
         String[] statements = 
         {
                 String.format("DELETE '%s', '%s' FROM Standard1 WHERE KEY='%s'",
-                              FBUtilities.bytesToHex("firstN".getBytes()),
-                              FBUtilities.bytesToHex("lastN".getBytes()),
+                              bytesToHex("firstN".getBytes()),
+                              bytesToHex("lastN".getBytes()),
                               jsmith),
                 String.format("SELECT '%s', '%s' FROM Standard1 WHERE KEY='%s'",
-                              FBUtilities.bytesToHex("firstN".getBytes()),
-                              FBUtilities.bytesToHex("lastN".getBytes()),
+                              bytesToHex("firstN".getBytes()),
+                              bytesToHex("lastN".getBytes()),
                               jsmith),
                 String.format("SELECT '%s' FROM Standard1 WHERE KEY='%s'",
                               first,
@@ -430,6 +431,7 @@ public class JdbcDriverTest extends EmbeddedServiceBase
                     throw new SQLException(stmt, ex);
                 }
             }
+            schema.dropSchema();
             con.close();
             con = null;
         }

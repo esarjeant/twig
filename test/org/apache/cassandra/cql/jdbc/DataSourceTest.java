@@ -27,24 +27,15 @@ import java.sql.SQLFeatureNotSupportedException;
 
 import javax.sql.DataSource;
 
-import org.apache.cassandra.cql.EmbeddedServiceBase;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
-public class DataSourceTest extends EmbeddedServiceBase
+public class DataSourceTest
 {
     private static final String HOST = "localhost";
     private static final int PORT = 9170;
     private static final String KEYSPACE = "Test";
     private static final String USER = "JohnDoe";
     private static final String PASSWORD = "secret";
-
-
-    @BeforeClass
-    public static void setUpBeforeClass() throws Exception
-    {
-        startCassandraServer();
-    }
 
     @Test
     public void testConstructor() throws Exception

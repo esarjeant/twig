@@ -39,7 +39,7 @@ import java.util.Map;
 class ColumnDecoder
 {
     public final static ByteBuffer DEFAULT_KEY_NAME = ByteBufferUtil.bytes("KEY");
-//    private static final Logger logger = LoggerFactory.getLogger(ColumnDecoder.class);
+    //private static final Logger logger = LoggerFactory.getLogger(ColumnDecoder.class);
 
     private class CFamMeta
     {
@@ -58,6 +58,16 @@ class ColumnDecoder
             
             for (ColumnDef colDef : cf.getColumn_metadata())
                 columnMeta.put(colDef.name, colDef.getValidation_class());
+        }
+
+        public String toString()
+        {
+            return String.format("CFamMeta(comparator=%s, defaultValidator=%s, keyAlias=%s, keyValidator=%s, columnMeta=%s)",
+                                 comparator,
+                                 defaultValidator,
+                                 keyAlias,
+                                 keyValidator,
+                                 columnMeta);
         }
     }
 
