@@ -27,12 +27,13 @@ import java.sql.SQLFeatureNotSupportedException;
 
 import javax.sql.DataSource;
 
+import org.apache.cassandra.cql.ConnectionDetails;
 import org.junit.Test;
 
 public class DataSourceTest
 {
-    private static final String HOST = "localhost";
-    private static final int PORT = 9170;
+    private static final String HOST = ConnectionDetails.getHost();
+    private static final int PORT = ConnectionDetails.getPort();
     private static final String KEYSPACE = "Test";
     private static final String USER = "JohnDoe";
     private static final String PASSWORD = "secret";

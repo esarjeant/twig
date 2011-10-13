@@ -55,7 +55,7 @@ public class JdbcDriverTest
     private static final String last = bytesToHex("last".getBytes());
     private static final String lastrec = bytesToHex("lastrec".getBytes());
     private static final String jsmith = bytesToHex("jsmith".getBytes());
-    private static final Schema schema = new Schema("localhost", 9170);
+    private static final Schema schema = new Schema(ConnectionDetails.getHost(), ConnectionDetails.getPort());
 
     /** SetUp */
     @BeforeClass
@@ -63,7 +63,7 @@ public class JdbcDriverTest
     {
         schema.createSchema();
         Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://localhost:9170/%s", Schema.KEYSPACE_NAME));
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s", ConnectionDetails.getHost(), ConnectionDetails.getPort(), Schema.KEYSPACE_NAME));
         String[] inserts = 
         {
             String.format("UPDATE Standard1 SET '%s' = '%s', '%s' = '%s' WHERE KEY = '%s'", first, firstrec, last, lastrec, jsmith),    

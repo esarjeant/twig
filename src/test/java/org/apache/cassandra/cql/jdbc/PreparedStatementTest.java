@@ -21,6 +21,7 @@ package org.apache.cassandra.cql.jdbc;
  */
 
 
+import org.apache.cassandra.cql.ConnectionDetails;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -37,14 +38,14 @@ import static org.apache.cassandra.utils.Hex.bytesToHex;
 public class PreparedStatementTest
 { 
     private static java.sql.Connection con = null;
-    private static final Schema schema = new Schema("localhost", 9170);
+    private static final Schema schema = new Schema(ConnectionDetails.getHost(), ConnectionDetails.getPort());
     
     @BeforeClass
     public static void waxOn() throws Exception
     {
         schema.createSchema();
         Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
-        con = DriverManager.getConnection("jdbc:cassandra://localhost:9170/" + Schema.KEYSPACE_NAME);
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s", ConnectionDetails.getHost(), ConnectionDetails.getPort(), Schema.KEYSPACE_NAME));
     }
     
     @Test
