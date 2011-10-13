@@ -91,6 +91,7 @@ under the License.
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <sourceReleaseAssemblyDescriptor>source-release</sourceReleaseAssemblyDescriptor>
     <gpg.useagent>true</gpg.useagent>
+    <cassandra.host>localhost</cassandra.host>
   </properties>
 
   <dependencies>
@@ -241,45 +242,6 @@ under the License.
         </configuration>
       </plugin>
       <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>build-helper-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>reserve-network-port</id>
-            <goals>
-              <goal>reserve-network-port</goal>
-            </goals>
-            <phase>validate</phase>
-            <configuration>
-              <portNames>
-                <portName>cassandra.rpc.port</portName>
-                <portName>cassandra.jmx.port</portName>
-                <portName>cassandra.storage.port</portName>
-                <portName>cassandra.stop.port</portName>
-              </portNames>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>cassandra-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>start</goal>
-              <goal>stop</goal>
-            </goals>
-          </execution>
-        </executions>
-        <configuration>
-          <rpcPort>${cassandra.rpc.port}</rpcPort>
-          <jmxPort>${cassandra.jmx.port}</jmxPort>
-          <storagePort>${cassandra.storage.port}</storagePort>
-          <stopPort>${cassandra.stop.port}</stopPort>
-        </configuration>
-      </plugin>
-      <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <includes>
@@ -339,7 +301,6 @@ under the License.
           <plugin>
             <groupId>org.codehaus.mojo</groupId>
             <artifactId>animal-sniffer-maven-plugin</artifactId>
-            <version>1.7</version>
             <executions>
               <execution>
                 <id>check-java15</id>
@@ -356,6 +317,69 @@ under the License.
                 </configuration>
               </execution>
             </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>local-test</id>
+      <activation>
+        <property>
+          <name>cassandra.rpc.port</name>
+        </property>
+      </activation>
+      <build>
+        <defaultGoal>verify</defaultGoal>
+      </build>
+    </profile>
+    <profile>
+      <id>internal-test</id>
+      <activation>
+        <property>
+          <name>!cassandra.rpc.port</name>
+        </property>
+      </activation>
+      <build>
+        <defaultGoal>verify</defaultGoal>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>build-helper-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>reserve-network-port</id>
+                <goals>
+                  <goal>reserve-network-port</goal>
+                </goals>
+                <phase>validate</phase>
+                <configuration>
+                  <portNames>
+                    <portName>cassandra.rpc.port</portName>
+                    <portName>cassandra.jmx.port</portName>
+                    <portName>cassandra.storage.port</portName>
+                    <portName>cassandra.stop.port</portName>
+                  </portNames>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>cassandra-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>start</goal>
+                  <goal>stop</goal>
+                </goals>
+              </execution>
+            </executions>
+            <configuration>
+              <rpcPort>${cassandra.rpc.port}</rpcPort>
+              <jmxPort>${cassandra.jmx.port}</jmxPort>
+              <storagePort>${cassandra.storage.port}</storagePort>
+              <stopPort>${cassandra.stop.port}</stopPort>
+            </configuration>
           </plugin>
         </plugins>
       </build>
