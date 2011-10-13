@@ -63,6 +63,27 @@ under the License.
         <role>packager</role>
       </roles>
     </developer>
+    <developer>
+      <id>eevans</id>
+      <name>Eric Evans</name>
+      <roles>
+        <role>developer</role>
+      </roles>
+    </developer>
+    <developer>
+      <id>gdusbabek</id>
+      <name>Gary Dusbabek</name>
+      <roles>
+        <role>developer</role>
+      </roles>
+    </developer>
+    <developer>
+      <id>jbellis</id>
+      <name>Jonathan Ellis</name>
+      <roles>
+        <role>developer</role>
+      </roles>
+    </developer>
   </developers>
 
   <dependencies>
