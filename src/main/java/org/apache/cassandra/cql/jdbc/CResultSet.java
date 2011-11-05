@@ -349,7 +349,7 @@ class CResultSet extends AbstractResultSet implements CassandraResultSet
     {
         checkIndex(index);
         checkNotClosed();
-        return values.get(index);
+        return values.get(index - 1);
     }
 
     public TypedColumn getColumn(String name) throws SQLException
