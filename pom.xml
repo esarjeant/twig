@@ -98,7 +98,7 @@ under the License.
     <dependency>
       <groupId>org.apache.cassandra</groupId>
       <artifactId>cassandra-thrift</artifactId>
-      <version>1.0.0</version>
+      <version>1.0.2</version>
       <exclusions>
         <exclusion>
           <groupId>javax.servlet</groupId>
@@ -113,7 +113,7 @@ under the License.
     <dependency>
       <groupId>org.apache.cassandra</groupId>
       <artifactId>cassandra-clientutil</artifactId>
-      <version>1.0.0-rc2-SNAPSHOT</version>
+      <version>1.0.2</version>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
