@@ -45,7 +45,7 @@ public class CassandraDriver implements Driver
 
     public static final int DVR_MINOR_VERSION = 0;
 
-    public static final int DVR_PATCH_VERSION = 4;
+    public static final int DVR_PATCH_VERSION = 5;
 
     public static final String DVR_NAME = "Cassandra JDBC Driver";
 
