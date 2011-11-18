@@ -46,7 +46,7 @@ import org.apache.thrift.TException;
  * Cassandra statement: implementation class for {@link PreparedStatement}.
  */
 
-class CassandraStatement extends AbstractStatement implements Statement
+class CassandraStatement extends AbstractStatement implements Statement, Comparable
 {
     /**
      * The connection.
@@ -424,5 +424,12 @@ class CassandraStatement extends AbstractStatement implements Statement
     public <T> T unwrap(Class<T> iface) throws SQLException
     {
         throw new SQLFeatureNotSupportedException(String.format(NO_INTERFACE, iface.getSimpleName()));
+    }
+
+    public int compareTo(Object target)
+    {
+        if (this.equals(target)) return 0;
+        if (this.hashCode()< target.hashCode()) return -1;
+        else return 1;
     }
 }
