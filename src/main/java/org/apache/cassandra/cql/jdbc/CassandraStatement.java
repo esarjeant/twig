@@ -41,16 +41,13 @@ import org.apache.cassandra.thrift.SchemaDisagreementException;
 import org.apache.cassandra.thrift.TimedOutException;
 import org.apache.cassandra.thrift.UnavailableException;
 import org.apache.thrift.TException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Cassandra statement: implementation class for {@link PreparedStatement}.
  */
 
-class CassandraStatement extends AbstractStatement implements Statement, Comparable<Object>
+class CassandraStatement extends AbstractStatement implements Statement, Comparable
 {
-    private static final Logger logger = LoggerFactory.getLogger(CassandraStatement.class);
     /**
      * The connection.
      */
@@ -156,8 +153,6 @@ class CassandraStatement extends AbstractStatement implements Statement, Compara
     {
         try
         {
-            if (logger.isTraceEnabled()) logger.trace("CQL: "+ sql);
-            
             resetResults();
             CqlResult rSet = connection.execute(sql);
             String keyspace = connection.currentKeyspace;

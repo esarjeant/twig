@@ -90,13 +90,6 @@ class ColumnDecoder
         return (type == null) ? null : type;
     }
 
-    protected AbstractJdbcType<?> getDefaultValidator(String keyspace, String columnFamily)
-    {
-        CFamMeta cf = metadata.get(String.format("%s.%s", keyspace, columnFamily));
-        AbstractJdbcType<?> type = (cf != null) ? TypesMap.getTypeForComparator(cf.defaultValidator) : null;
-        return (type == null) ? null : type;
-    }
-
     private AbstractJdbcType<?> getNameType(String keyspace, String columnFamily, ByteBuffer name)
     {
         CFamMeta cf = metadata.get(String.format("%s.%s", keyspace, columnFamily));
