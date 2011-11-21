@@ -233,8 +233,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         String left = cql.substring(0, pivot);
         AbstractJdbcType leftComp = connection.decoder.getComparator(keyspace, columnFamily);
         if (leftComp == null) throw new SQLDataException(String.format(NO_COMPARATOR, keyspace, columnFamily));
-
-        AbstractJdbcType leftVald = connection.decoder.getComparator(keyspace, columnFamily);
+        AbstractJdbcType leftVald = connection.decoder.getDefaultValidator(keyspace, columnFamily);
         if (leftVald == null) throw new SQLDataException(String.format(NO_VALIDATOR, keyspace, columnFamily));
         left = applyDualBindings(left, leftComp, leftVald, params);
 
