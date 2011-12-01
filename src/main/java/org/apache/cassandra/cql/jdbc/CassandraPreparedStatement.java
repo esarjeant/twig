@@ -1,4 +1,3 @@
-package org.apache.cassandra.cql.jdbc;
 /*
  * 
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -19,14 +18,23 @@ package org.apache.cassandra.cql.jdbc;
  * under the License.
  * 
  */
+package org.apache.cassandra.cql.jdbc;
 
+import static org.apache.cassandra.cql.jdbc.Utils.NO_RESULTSET;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_SERVER;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_UPDATE_COUNT;
+import static org.apache.cassandra.cql.jdbc.Utils.SCHEMA_MISMATCH;
 import static org.apache.cassandra.cql.jdbc.Utils.determineCurrentKeyspace;
 import static org.apache.cassandra.cql.jdbc.Utils.determineCurrentColumnFamily;
 import static org.apache.cassandra.cql.jdbc.Utils.NO_CF;
 import static org.apache.cassandra.cql.jdbc.Utils.NO_COMPARATOR;
 import static org.apache.cassandra.cql.jdbc.Utils.NO_VALIDATOR;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectOutput;
+import java.io.ObjectOutputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -46,6 +54,11 @@ import java.sql.RowId;
 import java.sql.SQLDataException;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
+import java.sql.SQLNonTransientConnectionException;
+import java.sql.SQLNonTransientException;
+import java.sql.SQLRecoverableException;
+import java.sql.SQLSyntaxErrorException;
+import java.sql.SQLTransientConnectionException;
 import java.sql.SQLTransientException;
 import java.sql.SQLXML;
 import java.sql.Time;
@@ -53,500 +66,398 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.cassandra.thrift.CqlBindValue;
+import org.apache.cassandra.thrift.CqlPreparedResult;
+import org.apache.cassandra.thrift.CqlResult;
+import org.apache.cassandra.thrift.CqlStatementType;
+import org.apache.cassandra.thrift.InvalidRequestException;
+import org.apache.cassandra.thrift.SchemaDisagreementException;
+import org.apache.cassandra.thrift.TimedOutException;
+import org.apache.cassandra.thrift.UnavailableException;
+import org.apache.cassandra.utils.ByteBufferUtil;
+import org.apache.thrift.TException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 class CassandraPreparedStatement extends CassandraStatement implements PreparedStatement
 {
-    //    private static final Pattern Parameterizable = Pattern.compile("(SELECT|DELETE|UPDATE)\\s+.*", Pattern.CASE_INSENSITIVE);
-    private static final Pattern Select = Pattern.compile("SELECT[\\s+FIRST\\s+\\d+]?[\\s+REVERSED]?\\s+(.*)WHERE\\s+(.*)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern Update = Pattern.compile("UPDATE\\s+\\w+.*\\s+SET\\s+(.*)\\s+WHERE KEY(.*)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern Delete = Pattern.compile("DELETE\\s+(.*)\\s+FROM\\s+\\w+\\s+WHERE KEY(.*)", Pattern.CASE_INSENSITIVE);
+    private static final Logger LOG = LoggerFactory.getLogger(CassandraPreparedStatement.class);
+    
+    /** the statement type (SELECT,INSERT,..) from the parse of the CQL in the server-side */
+    private CqlStatementType type;
+    
+    /** the key token passed back from server-side to identify the prepared statement */
+    private int itemId;
+    
+    /** the count of bound variable markers (?) encountered in the parse o the CQL server-side */    
+    private int count;
+    
+    /** a Map of the current bound values encountered in setXXX methods */    
+    private Map<Integer,CqlBindValue> bindValues = new LinkedHashMap<Integer,CqlBindValue>();
 
-    // current set of bound variables.
-    private final Map<Integer, Object> variables = new HashMap<Integer, Object>();
-
-    // for batching. These are the queries that have been batched and not executed.
-    private final List<String> queries = new ArrayList<String>();
-
+    
     CassandraPreparedStatement(CassandraConnection con, String cql) throws SQLException
     {
         super(con, cql);
-    }
-
-    // impl specific methods start here.
-
-    // double quotes strings (in parameters)
-    private static String makeCqlString(String s)
-    {
-        // escape any single-quotes with double single-quotes.
-        return s.replaceAll("\'", "\'\'");
-    }
-
-    // null type means just call param.toString() and quote it (default for keys).
-    private static String applySimpleBindings(String q, AbstractJdbcType type, ParameterIterator params) throws SQLException
-    {
-        assert type != null;
-        // we need to keep track of whether or not we are between quotes and ignore any question marks within them
-        // so that they are not substituted.  
-        StringBuffer sb = new StringBuffer();
-        boolean between = false;
-        for (char c : q.toCharArray())
+        if (LOG.isTraceEnabled()) LOG.trace("CQL: "+ this.cql);
+        try
         {
-            if (c == '\'')
-                between = !between;
-            if (between)
-                sb.append(c);
-            else if (c == '?') // !between if we got here.
-            {
-                try
-                {
-                    // perform substitution!
-                    Object param = params.nextParam();
-                    String stringParam = type == null ? param.toString() : type.toString(param);
-                    stringParam = makeCqlString(stringParam);
-                    if (type == null || type.needsQuotes())
-                        stringParam = "'" + stringParam + "'";
-                    sb.append(stringParam);
-                }
-                catch (ClassCastException ex)
-                {
-                    throw new SQLException("Mismatched types: " + ex.getLocalizedMessage());
-                }
-            }
-            else
-                sb.append(c);
-
+            CqlPreparedResult result = con.prepare(cql);
+            
+            type = result.type;
+            itemId = result.itemId;
+            count = result.count;
         }
-        return sb.toString();
-    }
-
-    private static String applyDualBindings(String q, AbstractJdbcType ltype, AbstractJdbcType rtype, ParameterIterator params) throws SQLException
-    {
-        StringBuffer sb = new StringBuffer();
-        boolean between = false;
-        boolean left = true; // we always start on the left-hand side of a statement. we switch state if we reach a comma and we are not between.
-        for (char c : q.toCharArray())
+        catch (InvalidRequestException e)
         {
-            if (c == '\'')
-                between = !between;
-            if (c == '=' && !between)
-                left = false;
-            if (c == ',' && !between)
-                left = true;
-
-            if (c == '?' && !between)
-            {
-                try
-                {
-                    Object param = params.nextParam();
-                    AbstractJdbcType type = left ? ltype : rtype;
-                    String stringParam = makeCqlString(type.toString(param));
-                    if (type.needsQuotes())
-                        stringParam = "'" + stringParam + "'";
-                    sb.append(stringParam);
-                }
-                catch (ClassCastException ex)
-                {
-                    throw new SQLException("Mismatched types: " + ex.getLocalizedMessage());
-                }
-            }
-            else
-                sb.append(c);
+            throw new SQLSyntaxErrorException(e);
         }
-        return sb.toString();
+         catch (TException e)
+        {
+            throw new SQLNonTransientConnectionException(e);
+        }
     }
 
-    /**
-     * applies current bindings to produce a string that can be sent to the server.
-     */
-    public synchronized String makeCql() throws SQLException
+    private final void checkIndex(int index) throws SQLException
     {
-        // break cql up
-        Matcher m;
-        m = Delete.matcher(cql);
-        if (m.matches())
-            return makeDelete(m.end(1));
-        m = Update.matcher(cql);
-        if (m.matches())
-            return makeUpdate(m.end(1));
-        m = Select.matcher(cql);
-        if (m.matches())
-            return makeSelect(m.end(1));
-
-        // if we made it this far, cql is not parameterizable. this isn't bad, there is just nothing to be done.
-        return cql;
+        if (index > count ) throw new SQLRecoverableException(String.format("the column index : %d is greater than the count of bound variable markers in the CQL: %d", index,count));
+        if (index < 1 ) throw new SQLRecoverableException(String.format("the column index must be a positive number : %d", index));
     }
-
-    // subs parameters into a delete statement.
-    private String makeDelete(int pivot) throws SQLException
+    
+    private List<CqlBindValue> getBindValues() throws SQLException
     {
-        String keyspace = determineCurrentKeyspace(cql, connection.currentKeyspace);
-        String columnFamily = determineCurrentColumnFamily(cql);
-        if (columnFamily == null) throw new SQLTransientException(NO_CF);
+        List<CqlBindValue> values = new ArrayList<CqlBindValue>();
+//        System.out.println("bindValues.size() = "+bindValues.size());
+//        System.out.println("count             = "+count);
+        if (bindValues.size() != count )
+            throw new SQLRecoverableException(String.format("the number of bound variables: %d must match the count of bound variable markers in the CQL: %d", bindValues.size(),count));
 
-        ParameterIterator params = new ParameterIterator();
-        String left = cql.substring(0, pivot);
-        AbstractJdbcType leftType = connection.decoder.getComparator(keyspace, columnFamily);
-        if (leftType == null) throw new SQLDataException(String.format(NO_COMPARATOR, keyspace, columnFamily));
-        left = applySimpleBindings(left, leftType, params);
-
-        String right = cql.substring(pivot);
-        AbstractJdbcType keyVald = connection.decoder.getKeyValidator(keyspace, columnFamily);
-        if (keyVald == null) throw new SQLDataException(String.format(NO_VALIDATOR, keyspace, columnFamily));
-        right = applySimpleBindings(right, keyVald, params);
-        return left + right;
+        for (int i = 1; i <= count ; i++)
+        {
+            CqlBindValue value = bindValues.get(i);
+            if (value==null) throw new SQLRecoverableException(String.format("the bound value for index: %d was not set", i));
+           values.add(value);
+        }
+        return values;
     }
 
-    // subs parameters into a select statement.
-    private String makeSelect(int pivot) throws SQLException
+    public void close() throws SQLException
     {
-        String keyspace = determineCurrentKeyspace(cql, connection.currentKeyspace);
-        String columnFamily = determineCurrentColumnFamily(cql);
-        if (columnFamily == null) throw new SQLTransientException(NO_CF);
-
-        ParameterIterator params = new ParameterIterator();
-        String left = cql.substring(0, pivot);
-        AbstractJdbcType leftType = connection.decoder.getComparator(keyspace, columnFamily);
-        if (leftType == null) throw new SQLDataException(String.format(NO_COMPARATOR, keyspace, columnFamily));
-        left = applySimpleBindings(left, leftType, params);
-
-        String right = cql.substring(pivot);
-        AbstractJdbcType keyVald = connection.decoder.getKeyValidator(keyspace, columnFamily);
-        if (keyVald == null) throw new SQLDataException(String.format(NO_VALIDATOR, keyspace, columnFamily));
-        right = applySimpleBindings(right, keyVald, params);
-        return left + right;
+        connection.removeStatement(this);
+        try
+        {
+            connection.release(itemId);
+        }
+        catch (InvalidRequestException e)
+        {
+            throw new SQLSyntaxErrorException(e);
+        }
+         catch (TException e)
+        {
+            throw new SQLNonTransientConnectionException(e);
+        }
+        
+        connection = null;
     }
-
-    // subs parameters into an update statement.
-    private String makeUpdate(int pivot) throws SQLException
+        
+    private void doExecute() throws SQLException
     {
-        // this one is a little bit different. left contains key=value pairs. we use the comparator for the left side,
-        // the validator for the right side.  right side is treated as a key.
-        String keyspace = determineCurrentKeyspace(cql, connection.currentKeyspace);
-        String columnFamily = determineCurrentColumnFamily(cql);
-        if (columnFamily == null) throw new SQLTransientException(NO_CF);
+        if (LOG.isTraceEnabled()) LOG.trace("CQL: "+ cql);
+       try
+        {
+            resetResults();
+            CqlResult result = connection.execute(itemId, getBindValues());
+            String keyspace = connection.currentKeyspace;
 
-        ParameterIterator params = new ParameterIterator();
-        String left = cql.substring(0, pivot);
-        AbstractJdbcType leftComp = connection.decoder.getComparator(keyspace, columnFamily);
-        if (leftComp == null) throw new SQLDataException(String.format(NO_COMPARATOR, keyspace, columnFamily));
-        AbstractJdbcType leftVald = connection.decoder.getDefaultValidator(keyspace, columnFamily);
-        if (leftVald == null) throw new SQLDataException(String.format(NO_VALIDATOR, keyspace, columnFamily));
-        left = applyDualBindings(left, leftComp, leftVald, params);
-
-        String right = cql.substring(pivot);
-        AbstractJdbcType keyVald = connection.decoder.getKeyValidator(keyspace, columnFamily);
-        if (keyVald == null) throw new SQLDataException(String.format(NO_VALIDATOR, keyspace, columnFamily));
-        right = applySimpleBindings(right, keyVald, params);
-        return left + right;
+            switch (result.getType())
+            {
+                case ROWS:
+                    currentResultSet = new CResultSet(this, result, keyspace);
+                    break;
+                case INT:
+                    updateCount = result.getNum();
+                    break;
+                case VOID:
+                    updateCount = 0;
+                    break;
+            }
+        }
+        catch (InvalidRequestException e)
+        {
+            throw new SQLSyntaxErrorException(e.getWhy());
+        }
+        catch (UnavailableException e)
+        {
+            throw new SQLNonTransientConnectionException(NO_SERVER, e);
+        }
+        catch (TimedOutException e)
+        {
+            throw new SQLTransientConnectionException(e.getMessage());
+        }
+        catch (SchemaDisagreementException e)
+        {
+            throw new SQLRecoverableException(SCHEMA_MISMATCH);
+        }
+        catch (TException e)
+        {
+            throw new SQLNonTransientConnectionException(e.getMessage());
+        }
     }
-
-
-    // standard API methods follow.
-
+    
     public void addBatch() throws SQLException
     {
-        queries.add(makeCql());
+        // TODO Auto-generated method stub
+        
     }
 
-    public synchronized void clearParameters() throws SQLException
+
+    public void clearParameters() throws SQLException
     {
-        variables.clear();
+        checkNotClosed();
+        bindValues.clear();
     }
+
 
     public boolean execute() throws SQLException
     {
-        return this.cql != null && super.execute(makeCql());
+        checkNotClosed();
+        doExecute();
+        return !(currentResultSet == null);
     }
+
 
     public ResultSet executeQuery() throws SQLException
     {
-        return this.cql == null ? null : super.executeQuery(makeCql());
+        checkNotClosed();
+        doExecute();
+        if (currentResultSet == null) throw new SQLNonTransientException(NO_RESULTSET);
+        return currentResultSet;
     }
+
 
     public int executeUpdate() throws SQLException
     {
-        return this.cql == null ? 0 : super.executeUpdate(makeCql());
-    }
+        checkNotClosed();
+        doExecute();
+        if (currentResultSet != null) throw new SQLNonTransientException(NO_UPDATE_COUNT);
+        return updateCount;
+     }
+
 
     public ResultSetMetaData getMetaData() throws SQLException
     {
-        // todo: current impl of RSMD relies on knowing the results. implementing this will require refactoring CRSMD into 
-        // two classes: the first will be an implementation whose methods don't rely on knowing the results, the second
-        // will implement the full CRSMD interface and extend or compose the first.
-        throw new SQLFeatureNotSupportedException("PreparedStatement.getMetaData() hasn't been implemented yet.");
+        // TODO Auto-generated method stub
+        return null;
     }
-
-    public void setByte(int parameterIndex, byte x) throws SQLException
-    {
-        setObject(parameterIndex, new byte[]{ x });
-    }
-
-    public void setBytes(int parameterIndex, byte[] x) throws SQLException
-    {
-        setObject(parameterIndex, ByteBuffer.wrap(x));
-    }
-
-    public void setInt(int parameterIndex, int x) throws SQLException
-    {
-        setObject(parameterIndex, new BigInteger(Integer.toString(x)));
-    }
-
-    public void setLong(int parameterIndex, long x) throws SQLException
-    {
-        setObject(parameterIndex, x);
-    }
-
-    public void setNString(int parameterIndex, String value) throws SQLException
-    {
-        setString(parameterIndex, value);
-    }
-
-    public void setObject(int parameterIndex, Object x) throws SQLException
-    {
-        variables.put(parameterIndex, x);
-    }
-
-    public void setRowId(int parameterIndex, RowId rowid) throws SQLException
-    {
-        setObject(parameterIndex, ByteBuffer.wrap(rowid.getBytes()));
-    }
-
-    public void setShort(int parameterIndex, short x) throws SQLException
-    {
-        setInt(parameterIndex, x);
-    }
-
-    public void setString(int parameterIndex, String x) throws SQLException
-    {
-        setObject(parameterIndex, x);
-    }
-
-
-    // everything below here is not implemented and will let you know about it.
 
 
     public ParameterMetaData getParameterMetaData() throws SQLException
     {
-        throw new SQLFeatureNotSupportedException("PreparedStatement.getParameterMetaData() hasn't been implemented yet.");
+        // TODO Auto-generated method stub
+        return null;
     }
 
-    public void setArray(int parameterIndex, Array x) throws SQLException
+
+    public void setBigDecimal(int parameterIndex, BigDecimal decimal) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
+        checkNotClosed();
+        checkIndex(parameterIndex);
+        bindValues.put(parameterIndex, new CqlBindValue(false, ByteBufferUtil.bytes(decimal.toPlainString())));
     }
 
-    public void setAsciiStream(int parameterIndex, InputStream x) throws SQLException
+
+    public void setBoolean(int parameterIndex, boolean truth) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
+        checkNotClosed();
+        checkIndex(parameterIndex);
+        bindValues.put(parameterIndex, new CqlBindValue(false, ByteBufferUtil.bytes(Boolean.valueOf(truth).toString())));
     }
 
-    public void setAsciiStream(int parameterIndex, InputStream x, int length) throws SQLException
+
+    public void setByte(int parameterIndex, byte b) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
+        checkNotClosed();
+        checkIndex(parameterIndex);
+        bindValues.put(parameterIndex, new CqlBindValue(false, ByteBufferUtil.bytes(Byte.valueOf(b).toString())));
     }
 
-    public void setAsciiStream(int parameterIndex, InputStream x, long length) throws SQLException
+
+    public void setBytes(int parameterIndex, byte[] bytes) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
+        checkNotClosed();
+        checkIndex(parameterIndex);
+        bindValues.put(parameterIndex, new CqlBindValue(true, ByteBuffer.wrap(bytes)));
     }
 
-    public void setBigDecimal(int parameterIndex, BigDecimal x) throws SQLException
+
+    public void setDate(int parameterIndex, Date value) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
+        checkNotClosed();
+        checkIndex(parameterIndex);
+        // date type data is handled as an 8 byte Long value of milliseconds since the epoch
+        String millis = Long.valueOf(value.getTime()).toString();
+        bindValues.put(parameterIndex, new CqlBindValue(false, ByteBufferUtil.bytes(millis)));
     }
 
-    public void setBinaryStream(int parameterIndex, InputStream x) throws SQLException
+
+    public void setDate(int parameterIndex, Date date, Calendar cal) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
+        // silently ignore the calendar argument it is not useful for the Cassandra implementation
+        setDate(parameterIndex,date);
     }
 
-    public void setBinaryStream(int parameterIndex, InputStream x, int length) throws SQLException
+
+    public void setDouble(int parameterIndex, double decimal) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
+        checkNotClosed();
+        checkIndex(parameterIndex);
+        bindValues.put(parameterIndex, new CqlBindValue(false, ByteBufferUtil.bytes(Double.valueOf(decimal).toString())));
     }
 
-    public void setBinaryStream(int parameterIndex, InputStream x, long length) throws SQLException
+
+    public void setFloat(int parameterIndex, float decimal) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
+        checkNotClosed();
+        checkIndex(parameterIndex);
+        bindValues.put(parameterIndex, new CqlBindValue(false, ByteBufferUtil.bytes(Float.valueOf(decimal).toString())));
     }
 
-    public void setBlob(int parameterIndex, Blob x) throws SQLException
+
+    public void setInt(int parameterIndex, int integer) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
+        checkNotClosed();
+        checkIndex(parameterIndex);
+        bindValues.put(parameterIndex, new CqlBindValue(false, ByteBufferUtil.bytes(Integer.valueOf(integer).toString())));
     }
 
-    public void setBlob(int parameterIndex, InputStream inputStream) throws SQLException
+
+    public void setLong(int parameterIndex, long bigint) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
+        checkNotClosed();
+        checkIndex(parameterIndex);
+        bindValues.put(parameterIndex, new CqlBindValue(false, ByteBufferUtil.bytes(Long.valueOf(bigint).toString())));
     }
 
-    public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException
+
+    public void setNString(int parameterIndex, String value) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
+        // treat like a String
+        setString(parameterIndex,value);
     }
 
-    public void setBoolean(int parameterIndex, boolean x) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setCharacterStream(int parameterIndex, Reader reader) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setCharacterStream(int parameterIndex, Reader reader, int length) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setCharacterStream(int parameterIndex, Reader reader, long length) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setClob(int parameterIndex, Clob x) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException("method not supported");
-    }
-
-    public void setClob(int parameterIndex, Reader reader) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setClob(int parameterIndex, Reader reader, long length) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setDate(int parameterIndex, Date x) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setDate(int parameterIndex, Date x, Calendar cal) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setDouble(int parameterIndex, double x) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setFloat(int parameterIndex, float x) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setNCharacterStream(int parameterIndex, Reader value) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setNCharacterStream(int parameterIndex, Reader value, long length) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setNClob(int parameterIndex, NClob value) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setNClob(int parameterIndex, Reader reader) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setNClob(int parameterIndex, Reader reader, long length) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
 
     public void setNull(int parameterIndex, int sqlType) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
+        checkNotClosed();
+        checkIndex(parameterIndex);
+        // silently ignore type for cassandra... just store an empty BB
+        bindValues.put(parameterIndex, new CqlBindValue(false, ByteBufferUtil.EMPTY_BYTE_BUFFER));
     }
+
 
     public void setNull(int parameterIndex, int sqlType, String typeName) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setObject(int parameterIndex, Object x, int targetSqlType) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setObject(int parameterIndex, Object x, int targetSqlType, int scaleOrLength) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setRef(int parameterIndex, Ref x) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setSQLXML(int parameterIndex, SQLXML xmlObject) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setTime(int parameterIndex, Time x) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setTime(int parameterIndex, Time x, Calendar cal) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setTimestamp(int parameterIndex, Timestamp x) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setTimestamp(int parameterIndex, Timestamp x, Calendar cal) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setURL(int parameterIndex, URL x) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setUnicodeStream(int parameterIndex, InputStream x, int length) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
+        // silently ignore type and type name for cassandra... just store an empty BB
+        setNull(parameterIndex,sqlType);
     }
 
 
-    // done with API methods.
-
-
-    // provides a way to iterate through the parameters. it will blow up if it discovers any missing parameters.
-    // not thread-safe.
-    private class ParameterIterator
+    public void setObject(int parameterIndex, Object object) throws SQLException
     {
-        private Map<Integer, Object> params = new HashMap<Integer, Object>(variables);
-        private int index = 1;
-
-        // throws SQLException if a parameter is not specified.
-        private Object nextParam() throws SQLException
+        checkNotClosed();
+        checkIndex(parameterIndex);
+        
+        byte[] bytes = null;
+        try
         {
-            Object p = params.get(index++);
-            if (p == null)
-                throw new SQLException("No parameter bound to " + (index - 1));
-            return p;
+            // Serialize to a byte array
+            ByteArrayOutputStream bos = new ByteArrayOutputStream() ;
+            ObjectOutput out = new ObjectOutputStream(bos) ;
+            out.writeObject(object);
+            out.close();
+
+            // Get the bytes of the serialized object
+            bytes = bos.toByteArray();
+        } 
+        catch (IOException e)
+        {
+            throw new SQLNonTransientException("Problem serializing the object", e);
         }
+        
+        bindValues.put(parameterIndex, new CqlBindValue(true, ByteBuffer.wrap(bytes)));        
+    }
+
+
+    public void setRowId(int parameterIndex, RowId value) throws SQLException
+    {
+        checkNotClosed();
+        checkIndex(parameterIndex);
+        bindValues.put(parameterIndex, new CqlBindValue(true, ByteBuffer.wrap(value.getBytes())));
+    }
+
+
+    public void setShort(int parameterIndex, short smallint) throws SQLException
+    {
+        checkNotClosed();
+        checkIndex(parameterIndex);
+        bindValues.put(parameterIndex, new CqlBindValue(false, ByteBufferUtil.bytes(Short.valueOf(smallint).toString())));
+    }
+
+
+    public void setString(int parameterIndex, String value) throws SQLException
+    {
+        checkNotClosed();
+        checkIndex(parameterIndex);
+        bindValues.put(parameterIndex, new CqlBindValue(false, ByteBufferUtil.bytes(value)));
+    }
+
+
+    public void setTime(int parameterIndex, Time value) throws SQLException
+    {
+        checkNotClosed();
+        checkIndex(parameterIndex);
+        // time type data is handled as an 8 byte Long value of milliseconds since the epoch
+        String millis = Long.valueOf(value.getTime()).toString();
+        bindValues.put(parameterIndex, new CqlBindValue(false, ByteBufferUtil.bytes(millis)));
+    }
+
+
+    public void setTime(int parameterIndex, Time value, Calendar cal) throws SQLException
+    {
+        // silently ignore the calendar argument it is not useful for the Cassandra implementation
+        setTime(parameterIndex,value);
+    }
+
+
+    public void setTimestamp(int parameterIndex, Timestamp value) throws SQLException
+    {
+        checkNotClosed();
+        checkIndex(parameterIndex);
+        // timestamp type data is handled as an 8 byte Long value of milliseconds since the epoch
+        String millis = Long.valueOf(value.getTime()).toString();
+        bindValues.put(parameterIndex, new CqlBindValue(false, ByteBufferUtil.bytes(millis)));
+    }
+
+
+    public void setTimestamp(int parameterIndex, Timestamp value, Calendar cal) throws SQLException
+    {
+        // silently ignore the calendar argument it is not useful for the Cassandra implementation
+        setTimestamp(parameterIndex,value);
+    }
+
+
+    public void setURL(int parameterIndex, URL value) throws SQLException
+    {
+        checkNotClosed();
+        checkIndex(parameterIndex);
+        // URl type data is handled as an string
+        String url = value.toString();
+        bindValues.put(parameterIndex, new CqlBindValue(false, ByteBufferUtil.bytes(url)));
     }
 }
