@@ -99,7 +99,6 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
             TProtocol protocol = new TBinaryProtocol(transport);
             client = new Cassandra.Client(protocol);
             socket.open();
-            decoder = new ColumnDecoder(client.describe_keyspaces());
 
             if (username != null)
             {
@@ -110,6 +109,8 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
                 client.login(areq);
 
             }
+
+            decoder = new ColumnDecoder(client.describe_keyspaces());
 
             logger.info("Connected to {}:{}", host, port);
 
