@@ -414,7 +414,7 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
         return execute(queryStr, defaultCompression);
     }
 
-    protected CqlResult execute(int itemId, List<CqlBindValue> values)
+    protected CqlResult execute(int itemId, List<String> values)
               throws InvalidRequestException, UnavailableException, TimedOutException, SchemaDisagreementException, TException
     {
         try
@@ -448,20 +448,6 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
         try
         {
             return prepare(queryStr, defaultCompression);
-        }
-        catch (TException error)
-        {
-            numFailures++;
-            timeOfLastFailure = System.currentTimeMillis();
-            throw error;
-        }
-    }
-    
-    protected void release(int itemId)  throws InvalidRequestException, TException
-    {
-        try
-        {
-            client.remove_prepared_cql_query(itemId);
         }
         catch (TException error)
         {
