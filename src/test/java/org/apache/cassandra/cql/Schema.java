@@ -33,8 +33,10 @@ public class Schema
     private static final String createKeyspace = String.format("CREATE KEYSPACE %s WITH " + 
             "strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1", KEYSPACE_NAME);
     private static final String[] createColumnFamilies = {
-        "CREATE COLUMNFAMILY JdbcInteger (KEY blob PRIMARY KEY, 42 text) WITH comparator = varint " + 
+        "CREATE COLUMNFAMILY JdbcInteger0 (KEY blob PRIMARY KEY, 42 text) WITH comparator = varint " + 
                 "AND default_validation = varint",
+        "CREATE COLUMNFAMILY JdbcInteger1 (id text PRIMARY KEY, 99 text) WITH comparator = varint " +
+                "AND default_validation = text",
         "CREATE COLUMNFAMILY JdbcUtf8    (KEY blob PRIMARY KEY, fortytwo varint) WITH comparator = text",
         "CREATE COLUMNFAMILY JdbcLong    (KEY blob PRIMARY KEY) WITH comparator = bigint AND default_validation = bigint",
         "CREATE COLUMNFAMILY JdbcBytes   (KEY blob PRIMARY KEY) WITH comparator = blob AND default_validation = blob",

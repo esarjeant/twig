@@ -67,8 +67,9 @@ public class JdbcDriverTest
         String[] inserts = 
         {
             String.format("UPDATE Standard1 SET '%s' = '%s', '%s' = '%s' WHERE KEY = '%s'", first, firstrec, last, lastrec, jsmith),    
-            "UPDATE JdbcInteger SET 1 = 11, 2 = 22, 42='fortytwo' WHERE KEY = '" + jsmith + "'",
-            "UPDATE JdbcInteger SET 3 = 33, 4 = 44 WHERE KEY = '" + jsmith + "'",
+            "UPDATE JdbcInteger0 SET 1 = 11, 2 = 22, 42='fortytwo' WHERE KEY = '" + jsmith + "'",
+            "UPDATE JdbcInteger0 SET 3 = 33, 4 = 44 WHERE KEY = '" + jsmith + "'",
+            "UPDATE JdbcInteger1 SET 1 = 'One', 2 = 'Two', 3 = 'Three' WHERE id = rowOne",
             "UPDATE JdbcLong SET 1 = 11, 2 = 22 WHERE KEY = '" + jsmith + "'",
             "UPDATE JdbcAscii SET 'first' = 'firstrec', last = 'lastrec' WHERE key = '" + jsmith + "'",
             String.format("UPDATE JdbcBytes SET '%s' = '%s', '%s' = '%s' WHERE key = '%s'", first, firstrec, last, lastrec, jsmith),
@@ -133,8 +134,8 @@ public class JdbcDriverTest
     {
         String key = bytesToHex("Integer".getBytes());
         Statement stmt = con.createStatement();
-        stmt.executeUpdate("update JdbcInteger set 1=36893488147419103232, 42='fortytwofortytwo' where key='" + key + "'");
-        ResultSet rs = stmt.executeQuery("select 1, 2, 42 from JdbcInteger where key='" + key + "'");
+        stmt.executeUpdate("update JdbcInteger0 set 1=36893488147419103232, 42='fortytwofortytwo' where key='" + key + "'");
+        ResultSet rs = stmt.executeQuery("select 1, 2, 42 from JdbcInteger0 where key='" + key + "'");
         assert rs.next();
         assert rs.getObject("1").equals(new BigInteger("36893488147419103232"));
         assert rs.getString("42").equals("fortytwofortytwo") : rs.getString("42");
@@ -145,7 +146,7 @@ public class JdbcDriverTest
         expectedMetaData(md, 2, BigInteger.class.getName(), "JdbcInteger", Schema.KEYSPACE_NAME, "2", Types.BIGINT, JdbcInteger.class.getSimpleName(), true, false);
         expectedMetaData(md, 3, String.class.getName(), "JdbcInteger", Schema.KEYSPACE_NAME, "42", Types.VARCHAR, JdbcUTF8.class.getSimpleName(), false, true);
         
-        rs = stmt.executeQuery("select key, 1, 2, 42 from JdbcInteger where key='" + key + "'");
+        rs = stmt.executeQuery("select key, 1, 2, 42 from JdbcInteger0 where key='" + key + "'");
         assert rs.next();
         assert Arrays.equals(rs.getBytes("key"), hexToBytes(key));
         assert rs.getObject("1").equals(new BigInteger("36893488147419103232"));
@@ -281,13 +282,13 @@ public class JdbcDriverTest
     {
         Statement stmt = con.createStatement();
         List<String> keys = Arrays.asList(jsmith);
-        String selectQ = "SELECT 1, 2 FROM JdbcInteger WHERE KEY='" + jsmith + "'";
+        String selectQ = "SELECT 1, 2 FROM JdbcInteger0 WHERE KEY='" + jsmith + "'";
         checkResultSet(stmt.executeQuery(selectQ), "Int", 1, keys, "1", "2");
         
-        selectQ = "SELECT 3, 4 FROM JdbcInteger WHERE KEY='" + jsmith + "'";
+        selectQ = "SELECT 3, 4 FROM JdbcInteger0 WHERE KEY='" + jsmith + "'";
         checkResultSet(stmt.executeQuery(selectQ), "Int", 1, keys, "3", "4");
         
-        selectQ = "SELECT 1, 2, 3, 4 FROM JdbcInteger WHERE KEY='" + jsmith + "'";
+        selectQ = "SELECT 1, 2, 3, 4 FROM JdbcInteger0 WHERE KEY='" + jsmith + "'";
         checkResultSet(stmt.executeQuery(selectQ), "Int", 1, keys, "1", "2", "3", "4");
         
         selectQ = "SELECT 1, 2 FROM JdbcLong WHERE KEY='" + jsmith + "'";
@@ -302,9 +303,8 @@ public class JdbcDriverTest
         selectQ = "SELECT 'first', last FROM JdbcUtf8 WHERE KEY='" + jsmith + "'";
         checkResultSet(stmt.executeQuery(selectQ), "String", 1, keys, "first", "last");
 
-        String badKey = bytesToHex(String.format("jsmith-%s", System.currentTimeMillis()).getBytes());
-        selectQ = "SELECT 1, 2 FROM JdbcInteger WHERE KEY IN ('" + badKey + "', '" + jsmith + "')";
-        checkResultSet(stmt.executeQuery(selectQ), "Int", 1, keys, "1", "2");
+        selectQ = "SELECT 1, 2 FROM JdbcInteger1 WHERE id IN (rowOne, badRow)";
+        checkResultSet(stmt.executeQuery(selectQ), "String", 1, keys, "1", "2");
     }
     
     @Test
@@ -326,13 +326,13 @@ public class JdbcDriverTest
         String selectQ = String.format("SELECT '%s', '%s' FROM Standard1 WHERE KEY='%s'", first, last, jsmith);
         checkResultSet(executePreparedStatementWithResults(con, selectQ), "Bytes", 1, keys, first, last);
         
-        selectQ = "SELECT 1, 2 FROM JdbcInteger WHERE KEY='" + jsmith + "'";
+        selectQ = "SELECT 1, 2 FROM JdbcInteger0 WHERE KEY='" + jsmith + "'";
         checkResultSet(executePreparedStatementWithResults(con, selectQ), "Int", 1, keys, "1", "2");
         
-        selectQ = "SELECT 3, 4 FROM JdbcInteger WHERE KEY='" + jsmith + "'";
+        selectQ = "SELECT 3, 4 FROM JdbcInteger0 WHERE KEY='" + jsmith + "'";
         checkResultSet(executePreparedStatementWithResults(con, selectQ), "Int", 1, keys, "3", "4");
         
-        selectQ = "SELECT 1, 2, 3, 4 FROM JdbcInteger WHERE KEY='" + jsmith + "'";
+        selectQ = "SELECT 1, 2, 3, 4 FROM JdbcInteger0 WHERE KEY='" + jsmith + "'";
         checkResultSet(executePreparedStatementWithResults(con, selectQ), "Int", 1, keys, "1", "2", "3", "4");
         
         selectQ = "SELECT 1, 2 FROM JdbcLong WHERE KEY='" + jsmith + "'";
@@ -347,9 +347,8 @@ public class JdbcDriverTest
         selectQ = "SELECT 'first', last FROM JdbcUtf8 WHERE KEY='" + jsmith + "'";
         checkResultSet(executePreparedStatementWithResults(con, selectQ), "String", 1, keys, "first", "last");
 
-        String badKey = bytesToHex(String.format("jsmith-%s", System.currentTimeMillis()).getBytes());
-        selectQ = "SELECT 1, 2 FROM JdbcInteger WHERE KEY IN ('" + badKey + "', '" + jsmith + "')";
-        checkResultSet(executePreparedStatementWithResults(con, selectQ), "Int", 1, keys, "1", "2");
+        selectQ = "SELECT 1, 2 FROM JdbcInteger1 WHERE id IN (rowOne, badRow)";
+        checkResultSet(executePreparedStatementWithResults(con, selectQ), "String", 1, keys, "1", "2");
     }
 
     /* Method to test with Delete statement. */
@@ -371,9 +370,9 @@ public class JdbcDriverTest
                               first,
                               jsmith),
                 
-                "DELETE 1, 3 FROM JdbcInteger WHERE KEY='" + jsmith + "'",
-                "SELECT 1, 3 FROM JdbcInteger WHERE KEY='" + jsmith + "'",
-                "SELECT 2, 4 FROM JdbcInteger WHERE KEY='" + jsmith + "'",
+                "DELETE 1, 3 FROM JdbcInteger0 WHERE KEY='" + jsmith + "'",
+                "SELECT 1, 3 FROM JdbcInteger0 WHERE KEY='" + jsmith + "'",
+                "SELECT 2, 4 FROM JdbcInteger0 WHERE KEY='" + jsmith + "'",
                 
                 "DELETE 1 FROM JdbcLong WHERE KEY='" + jsmith + "'",
                 "SELECT 1 FROM JdbcLong WHERE KEY='" + jsmith + "'",
@@ -415,7 +414,8 @@ public class JdbcDriverTest
             {
                 "TRUNCATE Standard1",
                 "TRUNCATE JdbcAscii", // todo: this one is broken for some reason.
-                "TRUNCATE JdbcInteger",
+                "TRUNCATE JdbcInteger0",
+                "TRUNCATE JdbcInteger1",
                 "TRUNCATE JdbcLong",
                 "TRUNCATE JdbcBytes",
                 "TRUNCATE JdbcUtf8",

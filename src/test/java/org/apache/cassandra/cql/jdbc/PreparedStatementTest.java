@@ -292,7 +292,7 @@ public class PreparedStatementTest
     @Test
     public void testInteger() throws SQLException
     {
-        PreparedStatement stmt = con.prepareStatement("update JdbcInteger set ?=?, ?=? where key = ?");
+        PreparedStatement stmt = con.prepareStatement("update JdbcInteger0 set ?=?, ?=? where key = ?");
         for (int i = 0; i < 5; i++)
         {
             byte[] key = Integer.toString(i).getBytes();
@@ -306,7 +306,7 @@ public class PreparedStatementTest
         stmt.close();
         
         // verify.
-        stmt = con.prepareStatement("select ?, ? from JdbcInteger where key = ?");
+        stmt = con.prepareStatement("select ?, ? from JdbcInteger0 where key = ?");
         for (int i = 0; i < 5; i++)
         {
             byte[] key = Integer.toString(i).getBytes();
@@ -324,7 +324,7 @@ public class PreparedStatementTest
         }
         
         // delete
-        stmt = con.prepareStatement("delete ?, ? from JdbcInteger where key = ?");
+        stmt = con.prepareStatement("delete ?, ? from JdbcInteger0 where key = ?");
         for (int i = 0; i < 5; i++)
         {
             byte[] key = Integer.toString(i).getBytes();
@@ -335,7 +335,7 @@ public class PreparedStatementTest
         }
         
         // verify.
-        stmt = con.prepareStatement("select ?, ? from JdbcInteger where key = ?");
+        stmt = con.prepareStatement("select ?, ? from JdbcInteger0 where key = ?");
         for (int i = 0; i < 5; i++)
         {
             byte[] key = Integer.toString(i).getBytes();
