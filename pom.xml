@@ -132,6 +132,11 @@ under the License.
       <version>1.6.1</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.thrift</groupId>
+      <artifactId>libthrift</artifactId>
+      <version>0.6.1</version>
+    </dependency>
   </dependencies>
 
   <build>
