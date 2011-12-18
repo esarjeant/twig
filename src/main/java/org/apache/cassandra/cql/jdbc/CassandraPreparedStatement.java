@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.sql.Date;
@@ -39,6 +40,7 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.RowId;
 import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLNonTransientConnectionException;
 import java.sql.SQLNonTransientException;
 import java.sql.SQLRecoverableException;
@@ -46,6 +48,7 @@ import java.sql.SQLSyntaxErrorException;
 import java.sql.SQLTransientConnectionException;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.LinkedHashMap;
@@ -121,6 +124,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         return values;
     }
 
+    
     public void close() throws SQLException
     {
         connection.removeStatement(this);
@@ -174,8 +178,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
     
     public void addBatch() throws SQLException
     {
-        // TODO Auto-generated method stub
-        
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
 
@@ -214,15 +217,13 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
 
     public ResultSetMetaData getMetaData() throws SQLException
     {
-        // TODO Auto-generated method stub
-        return null;
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
 
     public ParameterMetaData getParameterMetaData() throws SQLException
     {
-        // TODO Auto-generated method stub
-        return null;
+        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
 
@@ -332,29 +333,26 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
 
     public void setObject(int parameterIndex, Object object) throws SQLException
     {
+        // For now all objects are forced to String type
+        setObject(parameterIndex,object,Types.VARCHAR,0);
+    }
+    
+    public void setObject(int parameterIndex, Object object, int targetSqlType) throws SQLException
+    {
+        setObject(parameterIndex,object,targetSqlType,0);
+    }
+
+    public final void setObject(int parameterIndex, Object object, int targetSqlType, int scaleOrLength) throws SQLException
+    {
         checkNotClosed();
         checkIndex(parameterIndex);
         
-        byte[] bytes = null;
-        try
-        {
-            // Serialize to a byte array
-            ByteArrayOutputStream bos = new ByteArrayOutputStream() ;
-            ObjectOutput out = new ObjectOutputStream(bos) ;
-            out.writeObject(object);
-            out.close();
-
-            // Get the bytes of the serialized object
-            bytes = bos.toByteArray();
-        } 
-        catch (IOException e)
-        {
-            throw new SQLNonTransientException("Problem serializing the object", e);
-        }
+        String variable = HandleObjects.makeString(object, targetSqlType, scaleOrLength);
         
-        bindValues.put(parameterIndex, ByteBufferUtil.bytesToHex(ByteBuffer.wrap(bytes)));
+        if (variable==null) throw new SQLNonTransientException("Problem mapping object to JDBC Type");
+        
+        bindValues.put(parameterIndex, variable);
     }
-
 
     public void setRowId(int parameterIndex, RowId value) throws SQLException
     {

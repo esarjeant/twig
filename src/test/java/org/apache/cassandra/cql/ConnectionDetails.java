@@ -29,6 +29,10 @@ public final class ConnectionDetails {
                 // ignore
             }
         }
+        Properties sys = System.getProperties();
+//        for (Object key : sys.keySet())
+//            System.out.printf("%s => %s%n",key,sys.get(key));
+        
         host = p.getProperty("host", "localhost");
         int port;
         try {

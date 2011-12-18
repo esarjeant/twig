@@ -51,23 +51,23 @@ public class DataSourceTest
         DataSource ds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD);
         assertNotNull(ds);
         
-        PrintWriter pw = new PrintWriter(System.err);
+//        PrintWriter pw = new PrintWriter(System.err);
         
         // null username and password
         java.sql.Connection cnx = ds.getConnection(null, null);
         assertFalse(cnx.isClosed());
         ds.setLoginTimeout(5);
         assertEquals(5, ds.getLoginTimeout());
-        ds.setLogWriter(pw);
-        assertNotNull(ds.getLogWriter());
+//        ds.setLogWriter(pw);
+//        assertNotNull(ds.getLogWriter());
         
         // no username and password
         cnx = ds.getConnection();
         assertFalse(cnx.isClosed());
         ds.setLoginTimeout(5);
         assertEquals(5, ds.getLoginTimeout());
-        ds.setLogWriter(pw);
-        assertNotNull(ds.getLogWriter());
+//        ds.setLogWriter(pw);
+//        assertNotNull(ds.getLogWriter());
     }
 
     

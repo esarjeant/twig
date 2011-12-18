@@ -190,10 +190,9 @@
 
   <target name="test" depends="build-test">
     <junit fork="on" forkmode="perTest" timeout="${test.timeout}"
-           showoutput="true" maxmemory="1024m" failureproperty="test.failed">
+           showoutput="false" maxmemory="1024m" failureproperty="test.failed">
       <formatter type="brief" usefile="false"/>
       <jvmarg value="-Dstorage-config=${test.dir}/conf" />
-      <jvmarg value="-Dlog4j.configuration=log4j-junit.properties" />
       <jvmarg value="-Dlegacy-sstable-root=${test.data}/legacy-sstables" />
       <jvmarg value="-ea" />
       <classpath>

@@ -198,16 +198,16 @@ abstract class AbstractStatement
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
-    public void setObject(int parameterIndex, Object x, int targetSqlType) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
+//    public void setObject(int parameterIndex, Object x, int targetSqlType) throws SQLException
+//    {
+//        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
+//    }
 
 
-    public void setObject(int parameterIndex, Object x, int targetSqlType, int scaleOrLength) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
+//    public void setObject(int parameterIndex, Object x, int targetSqlType, int scaleOrLength) throws SQLException
+//    {
+//        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
+//    }
 
 
 
