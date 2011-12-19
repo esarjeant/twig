@@ -58,16 +58,12 @@ public class DataSourceTest
         assertFalse(cnx.isClosed());
         ds.setLoginTimeout(5);
         assertEquals(5, ds.getLoginTimeout());
-        ds.setLogWriter(pw);
-        assertNotNull(ds.getLogWriter());
         
         // no username and password
         cnx = ds.getConnection();
         assertFalse(cnx.isClosed());
         ds.setLoginTimeout(5);
         assertEquals(5, ds.getLoginTimeout());
-        ds.setLogWriter(pw);
-        assertNotNull(ds.getLogWriter());
     }
 
     

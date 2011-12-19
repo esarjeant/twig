@@ -36,6 +36,27 @@ import org.apache.cassandra.thrift.CqlResult;
 import org.apache.cassandra.thrift.CqlRow;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
+/**
+ * <p>The Supported Data types in CQL are as follows:</p>
+ * <table>
+ * <tr><th>type</th><th>java type</th><th>description</th></tr>
+ * <tr><td>ascii</td><td>String</td><td>ASCII character string</td></tr>
+ * <tr><td>bigint</td><td>Long</td><td>64-bit signed long</td></tr>
+ * <tr><td>blob</td><td>ByteBuffer</td><td>Arbitrary bytes (no validation)</td></tr>
+ * <tr><td>boolean</td><td>Boolean</td><td>true or false</td></tr>
+ * <tr><td>counter</td><td>Long</td><td>Counter column (64-bit long)</td></tr>
+ * <tr><td>decimal</td><td>BigDecimal</td><td>Variable-precision decimal</td></tr>
+ * <tr><td>double</td><td>Double</td><td>64-bit IEEE-754 floating point</td></tr>
+ * <tr><td>float</td><td>Float</td><td>32-bit IEEE-754 floating point</td></tr>
+ * <tr><td>int</td><td>Integer</td><td>32-bit signed int</td></tr>
+ * <tr><td>text</td><td>String</td><td>UTF8 encoded string</td></tr>
+ * <tr><td>timestamp</td><td>Date</td><td>A timestamp</td></tr>
+ * <tr><td>uuid</td><td>UUID</td><td>Type 1 or type 4 UUID</td></tr>
+ * <tr><td>varchar</td><td>String</td><td>UTF8 encoded string</td></tr>
+ * <tr><td>varint</td><td>BigInteger</td><td>Arbitrary-precision integer</td></tr>
+ * </table>
+ *
+ */
 class CResultSet extends AbstractResultSet implements CassandraResultSet
 {
     public static final int DEFAULT_TYPE = ResultSet.TYPE_FORWARD_ONLY;
@@ -127,7 +148,7 @@ class CResultSet extends AbstractResultSet implements CassandraResultSet
     {
         // 1 <= index <= size()
         if (index < 1 || index > values.size())
-            throw new SQLSyntaxErrorException(String.format(MUST_BE_POSITIVE, String.valueOf(index)));
+            throw new SQLSyntaxErrorException(String.format(MUST_BE_POSITIVE, String.valueOf(index))+" "+values.size());
     }
 
     private final void checkName(String name) throws SQLException
@@ -239,9 +260,11 @@ class CResultSet extends AbstractResultSet implements CassandraResultSet
 
         if (wasNull) return BigInteger.ZERO;
 
-        if (value instanceof Long) return BigInteger.valueOf((Long) value);
-
         if (value instanceof BigInteger) return (BigInteger) value;
+
+        if (value instanceof Integer) return BigInteger.valueOf((Integer) value);
+
+        if (value instanceof Long) return BigInteger.valueOf((Long) value);
 
         try
         {
@@ -275,6 +298,10 @@ class CResultSet extends AbstractResultSet implements CassandraResultSet
 
         if (wasNull) return false;
 
+        if (value instanceof Boolean) return (Boolean)value;
+
+        if (value instanceof Integer) return Boolean.valueOf(((Integer) value) == 0 ? false : true);
+        
         if (value instanceof Long) return Boolean.valueOf(((Long) value) == 0 ? false : true);
 
         if (value instanceof BigInteger) return Boolean.valueOf(((BigInteger) value).intValue() == 0 ? false : true);
@@ -311,6 +338,8 @@ class CResultSet extends AbstractResultSet implements CassandraResultSet
 
         if (wasNull) return 0;
 
+        if (value instanceof Integer) return ((Integer) value).byteValue();
+
         if (value instanceof Long) return ((Long) value).byteValue();
 
         if (value instanceof BigInteger) return ((BigInteger) value).byteValue();
@@ -340,7 +369,7 @@ class CResultSet extends AbstractResultSet implements CassandraResultSet
     private byte[] getBytes(TypedColumn column) throws SQLException
     {
         checkNotClosed();
-        ByteBuffer value = (ByteBuffer) column.getValue();
+        ByteBuffer value = (ByteBuffer) column.getRawColumn().value;
         wasNull = value == null;
         return value == null ? null : ByteBufferUtil.clone(value).array();
     }
@@ -435,13 +464,15 @@ class CResultSet extends AbstractResultSet implements CassandraResultSet
 
         if (wasNull) return 0.0;
 
-        if (value instanceof Long) return new Double((Long) value);
-
-        if (value instanceof BigInteger) return new Double(((BigInteger) value).doubleValue());
-
         if (value instanceof Double) return ((Double) value);
 
         if (value instanceof Float) return ((Float) value).doubleValue();
+
+        if (value instanceof Integer) return new Double((Integer) value);
+
+        if (value instanceof Long) return new Double((Long) value);
+
+        if (value instanceof BigInteger) return new Double(((BigInteger) value).doubleValue());
 
         try
         {
@@ -487,13 +518,15 @@ class CResultSet extends AbstractResultSet implements CassandraResultSet
 
         if (wasNull) return (float) 0.0;
 
-        if (value instanceof Long) return new Float((Long) value);
-
-        if (value instanceof BigInteger) return new Float(((BigInteger) value).floatValue());
-
         if (value instanceof Float) return ((Float) value);
 
         if (value instanceof Double) return ((Double) value).floatValue();
+
+        if (value instanceof Integer) return new Float((Integer) value);
+
+        if (value instanceof Long) return new Float((Long) value);
+
+        if (value instanceof BigInteger) return new Float(((BigInteger) value).floatValue());
 
         try
         {
@@ -533,10 +566,11 @@ class CResultSet extends AbstractResultSet implements CassandraResultSet
 
         if (wasNull) return 0;
 
-        // bit of a hack, this, but asking for getInt seems so common that we should accommodate it
-        if (value instanceof BigInteger) return ((BigInteger) value).intValue();
-
+        if (value instanceof Integer) return ((Integer) value);
+        
         if (value instanceof Long) return ((Long) value).intValue();
+
+        if (value instanceof BigInteger) return ((BigInteger) value).intValue();
 
         try
         {
@@ -574,6 +608,10 @@ class CResultSet extends AbstractResultSet implements CassandraResultSet
         wasNull = value == null;
 
         if (wasNull) return 0L;
+
+        if (value instanceof Long) return (Long) value;
+
+        if (value instanceof Integer) return Long.valueOf((Integer) value);
 
         if (value instanceof BigInteger) return getBigInteger(column).longValue();
 
@@ -663,6 +701,8 @@ class CResultSet extends AbstractResultSet implements CassandraResultSet
         wasNull = value == null;
 
         if (wasNull) return 0;
+
+        if (value instanceof Integer) return ((Integer) value).shortValue();
 
         if (value instanceof Long) return ((Long) value).shortValue();
 
