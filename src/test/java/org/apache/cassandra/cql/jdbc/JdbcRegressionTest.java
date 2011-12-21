@@ -81,13 +81,19 @@ public class JdbcRegressionTest
         Thread.sleep(3000);
         
         statement = con.createStatement();
-        ResultSet result = statement.executeQuery("SELECT bValue,iValue FROM RegressionTest WHERE KEY=key0;");
+        ResultSet result = statement.executeQuery("SELECT bValue,notThere,iValue FROM RegressionTest WHERE KEY=key0;");
         result.next();
+        
         boolean b = result.getBoolean(1);
-        System.out.println("b ="+ b);
+        System.out.println("b = "+ b);
         assertTrue(b);
-        int i = result.getInt(2);
-        System.out.println("i ="+ i);
+        
+        long l = result.getLong("notThere");
+        assertEquals(0,l);
+        System.out.println("l = "+ l + " ... wasNull() = "+ result.wasNull());
+        
+        int i = result.getInt(3);
+        System.out.println("i ="+ i + " ... wasNull() = "+ result.wasNull());
         assertEquals(2000, i);
    }
 

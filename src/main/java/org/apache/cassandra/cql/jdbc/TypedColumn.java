@@ -21,7 +21,10 @@ package org.apache.cassandra.cql.jdbc;
  */
 
 
+import java.nio.charset.CharacterCodingException;
+
 import org.apache.cassandra.thrift.Column;
+import org.apache.cassandra.utils.ByteBufferUtil;
 
 
 public class TypedColumn
@@ -72,5 +75,29 @@ public class TypedColumn
     public AbstractJdbcType getValueType()
     {
         return valueType;
+    }
+
+    public String toString()
+    {
+        return String.format("TypedColumn [rawColumn=%s, value=%s, nameString=%s, nameType=%s, valueType=%s]",
+            displayRawColumn(rawColumn),
+            value,
+            nameString,
+            nameType,
+            valueType);
+    }
+    private String displayRawColumn(Column column)
+    {
+        String name;
+        try
+        {
+            name = ByteBufferUtil.string(column.name);
+        }
+        catch (CharacterCodingException e)
+        {
+            name = "<binary>";
+        }
+        String value = (column.value==null)? "<null>" :ByteBufferUtil.bytesToHex(column.value);
+        return String.format("Column[name=%s, value=%s]",name,value);
     }
 }
