@@ -111,22 +111,43 @@ public class JdbcDriverTest
         assertEquals(valuCaseSense, md.isCaseSensitive(col));
     }
 
-    @Test(expected=SQLNonTransientConnectionException.class)
+    @Test
     public void testNoHost() throws SQLException
     {
-        DriverManager.getConnection("jdbc:cassandra:localhost");
+        try
+        {
+            DriverManager.getConnection("jdbc:cassandra:localhost");
+        }
+        catch (Exception e)
+        {
+            assertEquals(SQLNonTransientConnectionException.class, e.getClass());
+        }
     }
 
-    @Test(expected=SQLNonTransientConnectionException.class)
+    @Test
     public void testBadKeyspace() throws SQLException
     {
-        DriverManager.getConnection("jdbc:cassandra://localhost/Keysp@ce");
+        try
+        {
+            DriverManager.getConnection("jdbc:cassandra://localhost/Keysp@ce");
+        }
+        catch (Exception e)
+        {
+            assertEquals(SQLNonTransientConnectionException.class, e.getClass());
+        }
     }
 
-    @Test(expected=SQLNonTransientConnectionException.class)
+    @Test
     public void testBadUserinfo() throws SQLException
     {
-        DriverManager.getConnection("jdbc:cassandra://root;root@localhost");
+        try
+        {
+            DriverManager.getConnection("jdbc:cassandra://root;root@localhost");
+        }
+        catch (Exception e)
+        {
+            assertEquals(SQLNonTransientConnectionException.class, e.getClass());
+        }
     }
 
     @Test
@@ -305,6 +326,10 @@ public class JdbcDriverTest
 
         selectQ = "SELECT 1, 2 FROM JdbcInteger1 WHERE id IN (rowOne, badRow)";
         checkResultSet(stmt.executeQuery(selectQ), "String", 1, keys, "1", "2");
+
+//        String badKey = bytesToHex(String.format("jsmith-%s", System.currentTimeMillis()).getBytes());
+//        selectQ = "SELECT 1, 2 FROM JdbcInteger WHERE KEY IN ('" + badKey + "', '" + jsmith + "')";
+//        checkResultSet(stmt.executeQuery(selectQ), "Int", 0, keys, "1", "2");
     }
     
     @Test
@@ -349,6 +374,10 @@ public class JdbcDriverTest
 
         selectQ = "SELECT 1, 2 FROM JdbcInteger1 WHERE id IN (rowOne, badRow)";
         checkResultSet(executePreparedStatementWithResults(con, selectQ), "String", 1, keys, "1", "2");
+
+//        String badKey = bytesToHex(String.format("jsmith-%s", System.currentTimeMillis()).getBytes());
+//        selectQ = "SELECT 1, 2 FROM JdbcInteger WHERE KEY IN ('" + badKey + "', '" + jsmith + "')";
+//        checkResultSet(executePreparedStatementWithResults(con, selectQ), "Int", 0, keys, "1", "2");
     }
 
     /* Method to test with Delete statement. */

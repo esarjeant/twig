@@ -30,7 +30,7 @@ under the License.
 
   <groupId>org.apache-extras.cassandra-jdbc</groupId>
   <artifactId>cassandra-jdbc</artifactId>
-  <version>1.0.5-SNAPSHOT</version>
+  <version>1.1-dev-SNAPSHOT</version>
 
   <name>JDBC driver for Cassandra/CQL</name>
   <description>A JDBC-compliant driver for Cassandra using CQL.</description>
@@ -98,7 +98,7 @@ under the License.
     <dependency>
       <groupId>org.apache.cassandra</groupId>
       <artifactId>cassandra-thrift</artifactId>
-      <version>1.0.6</version>
+      <version>1.1-dev-SNAPSHOT</version>
       <exclusions>
         <exclusion>
           <groupId>javax.servlet</groupId>
@@ -113,7 +113,7 @@ under the License.
     <dependency>
       <groupId>org.apache.cassandra</groupId>
       <artifactId>cassandra-clientutil</artifactId>
-      <version>1.0.6</version>
+      <version>1.1-dev-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>

@@ -22,6 +22,7 @@ package org.apache.cassandra.cql.jdbc;
 
 import java.sql.*;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -408,11 +409,55 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
      * @throws SchemaDisagreementException when the client side and server side are at different versions of schema (Thrift)
      * @throws TException                  when there is a error in Thrift processing
      */
-    protected CqlResult execute(String queryStr) throws InvalidRequestException, UnavailableException, TimedOutException, SchemaDisagreementException, TException
+    protected CqlResult execute(String queryStr)
+              throws InvalidRequestException, UnavailableException, TimedOutException, SchemaDisagreementException, TException
     {
         return execute(queryStr, defaultCompression);
     }
 
+    protected CqlResult execute(int itemId, List<String> values)
+              throws InvalidRequestException, UnavailableException, TimedOutException, SchemaDisagreementException, TException
+    {
+        try
+        {
+            return client.execute_prepared_cql_query(itemId, values);
+        }
+        catch (TException error)
+        {
+            numFailures++;
+            timeOfLastFailure = System.currentTimeMillis();
+            throw error;
+        }
+    }
+    
+    protected CqlPreparedResult prepare(String queryStr, Compression compression)throws InvalidRequestException, TException
+    {
+        try
+        {
+            return client.prepare_cql_query(Utils.compressQuery(queryStr, compression), compression);
+        }
+        catch (TException error)
+        {
+            numFailures++;
+            timeOfLastFailure = System.currentTimeMillis();
+            throw error;
+        }
+    }
+    
+    protected CqlPreparedResult prepare(String queryStr) throws InvalidRequestException, TException
+    {
+        try
+        {
+            return prepare(queryStr, defaultCompression);
+        }
+        catch (TException error)
+        {
+            numFailures++;
+            timeOfLastFailure = System.currentTimeMillis();
+            throw error;
+        }
+    }
+    
     /**
      * Remove a Statement from the Open Statements List
      */

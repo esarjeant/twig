@@ -38,7 +38,9 @@ import static org.apache.cassandra.utils.Hex.bytesToHex;
 public class PreparedStatementTest
 { 
     private static java.sql.Connection con = null;
-    private static final Schema schema = new Schema(ConnectionDetails.getHost(), ConnectionDetails.getPort());
+    
+//    private static final Schema schema = new Schema(ConnectionDetails.getHost(), ConnectionDetails.getPort());
+    private static final Schema schema = new Schema("localhost", 9160);
     
     @BeforeClass
     public static void waxOn() throws Exception
@@ -46,6 +48,7 @@ public class PreparedStatementTest
         schema.createSchema();
         Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
         con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s", ConnectionDetails.getHost(), ConnectionDetails.getPort(), Schema.KEYSPACE_NAME));
+//        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s", "localhost", 9160, Schema.KEYSPACE_NAME));
     }
     
     @Test
@@ -350,38 +353,6 @@ public class PreparedStatementTest
         }
     }
     
-    @Test
-    public void testParamSubstitution() throws SQLException
-    {
-        byte[] key = "key".getBytes();
-        String q = "SELECT 'fo??est', ?, ? from JdbcUtf8 WHERE KEY = ?";
-        CassandraPreparedStatement stmt = (CassandraPreparedStatement)con.prepareStatement(q);
-        stmt.setString(1, "pathological param: ?'make it?? '' sto'p?'");
-        stmt.setString(2, "simple");
-        stmt.setBytes(3, key);
-        String qq = stmt.makeCql();
-        assert qq.equals("SELECT 'fo??est', 'pathological param: ?''make it?? '''' sto''p?''', 'simple' from JdbcUtf8 WHERE KEY = '6b6579'");
-        
-        q = "UPDATE JdbcUtf8 USING CONSISTENCY ONE SET 'fru??us'=?, ?='gr''d?', ?=?, ?=? WHERE key=?";
-        stmt = (CassandraPreparedStatement)con.prepareStatement(q);
-        stmt.setString(1, "o?e");
-        stmt.setString(2, "tw'o");
-        stmt.setString(3, "thr'?'ee");
-        stmt.setString(4, "fo''?'ur");
-        stmt.setString(5, "five");
-        stmt.setString(6, "six");
-        stmt.setBytes(7, key);
-        qq = stmt.makeCql();
-        assert qq.equals("UPDATE JdbcUtf8 USING CONSISTENCY ONE SET 'fru??us'='o?e', 'tw''o'='gr''d?', 'thr''?''ee'='fo''''?''ur', 'five'='six' WHERE key='6b6579'");
-        
-        q = "DELETE ?, ? FROM JdbcUtf8 WHERE KEY=?";
-        stmt = (CassandraPreparedStatement)con.prepareStatement(q);
-        stmt.setString(1, "on'?'");
-        stmt.setString(2, "two");
-        stmt.setBytes(3, key);
-        qq = stmt.makeCql();
-        assert qq.equals("DELETE 'on''?''', 'two' FROM JdbcUtf8 WHERE KEY='6b6579'");
-    }
 
     /**
      * Copy bytes from int into bytes starting from offset.

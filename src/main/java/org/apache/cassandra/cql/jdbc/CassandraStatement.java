@@ -125,7 +125,7 @@ class CassandraStatement extends AbstractStatement implements Statement, Compara
         throw new SQLFeatureNotSupportedException(NO_BATCH);
     }
 
-    private final void checkNotClosed() throws SQLException
+    protected final void checkNotClosed() throws SQLException
     {
         if (isClosed()) throw new SQLRecoverableException(WAS_CLOSED_STMT);
     }
@@ -149,8 +149,7 @@ class CassandraStatement extends AbstractStatement implements Statement, Compara
         connection = null;
         cql = null;
     }
-    
-    
+        
 
     private void doExecute(String sql) throws SQLException
     {
@@ -368,7 +367,7 @@ class CassandraStatement extends AbstractStatement implements Statement, Compara
         return false;
     }
 
-    private final void resetResults()
+    protected final void resetResults()
     {
         currentResultSet = null;
         updateCount = -1;

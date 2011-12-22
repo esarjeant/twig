@@ -29,6 +29,7 @@ public final class ConnectionDetails {
                 // ignore
             }
         }
+        
         host = p.getProperty("host", "localhost");
         int port;
         try {
