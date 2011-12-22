@@ -24,7 +24,7 @@ import java.math.BigInteger;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-public interface CassandraResultSet extends ResultSet
+public interface CassandraResultSetExtras extends ResultSet
 {
     /**
      * @return the current row key

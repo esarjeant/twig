@@ -57,7 +57,7 @@ import org.apache.cassandra.utils.ByteBufferUtil;
  * </table>
  *
  */
-class CResultSet extends AbstractResultSet implements CassandraResultSet
+class CResultSet extends AbstractResultSet implements CassandraResultSetExtras
 {
     public static final int DEFAULT_TYPE = ResultSet.TYPE_FORWARD_ONLY;
     public static final int DEFAULT_CONCURRENCY = ResultSet.CONCUR_READ_ONLY;
@@ -906,7 +906,7 @@ class CResultSet extends AbstractResultSet implements CassandraResultSet
 
     public boolean isWrapperFor(Class<?> iface) throws SQLException
     {
-        return CassandraResultSet.class.isAssignableFrom(iface);
+        return CassandraResultSetExtras.class.isAssignableFrom(iface);
     }
 
     // Navigation between rows within the returned set of rows
@@ -988,7 +988,7 @@ class CResultSet extends AbstractResultSet implements CassandraResultSet
 
     public <T> T unwrap(Class<T> iface) throws SQLException
     {
-        if (iface.equals(CassandraResultSet.class)) return (T) this;
+        if (iface.equals(CassandraResultSetExtras.class)) return (T) this;
 
         throw new SQLFeatureNotSupportedException(String.format(NO_INTERFACE, iface.getSimpleName()));
     }

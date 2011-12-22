@@ -30,7 +30,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.cassandra.cql.jdbc.CassandraResultSet;
+import org.apache.cassandra.cql.jdbc.CassandraResultSetExtras;
 import org.apache.cassandra.cql.jdbc.JdbcAscii;
 import org.apache.cassandra.cql.jdbc.JdbcBytes;
 import org.apache.cassandra.cql.jdbc.JdbcInteger;
@@ -484,7 +484,7 @@ public class JdbcDriverTest
         int actualRows = 0;
         assert rs != null;
         Iterator<String> keyIter = (keys == null) ? null : keys.iterator();
-        CassandraResultSet cassandraRs = (CassandraResultSet)rs;
+        CassandraResultSetExtras cassandraRs = (CassandraResultSetExtras)rs;
         while (rs.next())
         {
             actualRows++;
