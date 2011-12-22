@@ -144,7 +144,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
             switch (result.getType())
             {
                 case ROWS:
-                    currentResultSet = new CResultSet(this, result, keyspace);
+                    currentResultSet = new CassandraResultSet(this, result, keyspace);
                     break;
                 case INT:
                     updateCount = result.getNum();

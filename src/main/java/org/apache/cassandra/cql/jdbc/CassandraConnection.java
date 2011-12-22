@@ -240,7 +240,7 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
     {
         checkNotClosed();
         // the rationale is there are really no commits in Cassandra so no boundary...
-        return CResultSet.DEFAULT_HOLDABILITY;
+        return CassandraResultSet.DEFAULT_HOLDABILITY;
     }
 
     public DatabaseMetaData getMetaData() throws SQLException

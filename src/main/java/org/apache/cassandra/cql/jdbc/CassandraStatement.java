@@ -69,11 +69,11 @@ class CassandraStatement extends AbstractStatement implements Statement, Compara
 
     protected int maxRows = 0;
 
-    protected int resultSetType = CResultSet.DEFAULT_TYPE;
+    protected int resultSetType = CassandraResultSet.DEFAULT_TYPE;
 
-    protected int resultSetConcurrency = CResultSet.DEFAULT_CONCURRENCY;
+    protected int resultSetConcurrency = CassandraResultSet.DEFAULT_CONCURRENCY;
 
-    protected int resultSetHoldability = CResultSet.DEFAULT_HOLDABILITY;
+    protected int resultSetHoldability = CassandraResultSet.DEFAULT_HOLDABILITY;
 
     protected ResultSet currentResultSet = null;
 
@@ -164,7 +164,7 @@ class CassandraStatement extends AbstractStatement implements Statement, Compara
             switch (rSet.getType())
             {
                 case ROWS:
-                    currentResultSet = new CResultSet(this, rSet, keyspace);
+                    currentResultSet = new CassandraResultSet(this, rSet, keyspace);
                     break;
                 case INT:
                     updateCount = rSet.getNum();

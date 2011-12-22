@@ -87,12 +87,12 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public ResultSet getAttributes(String arg0, String arg1, String arg2, String arg3) throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public ResultSet getBestRowIdentifier(String arg0, String arg1, String arg2, int arg3, boolean arg4) throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public String getCatalogSeparator() throws SQLException
@@ -107,22 +107,22 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public ResultSet getCatalogs() throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public ResultSet getClientInfoProperties() throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public ResultSet getColumnPrivileges(String arg0, String arg1, String arg2, String arg3) throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public ResultSet getColumns(String arg0, String arg1, String arg2, String arg3) throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public Connection getConnection() throws SQLException
@@ -132,7 +132,7 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public ResultSet getCrossReference(String arg0, String arg1, String arg2, String arg3, String arg4, String arg5) throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public int getDatabaseMajorVersion() throws SQLException
@@ -182,7 +182,7 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public ResultSet getExportedKeys(String arg0, String arg1, String arg2) throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public String getExtraNameCharacters() throws SQLException
@@ -192,12 +192,12 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public ResultSet getFunctionColumns(String arg0, String arg1, String arg2, String arg3) throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public ResultSet getFunctions(String arg0, String arg1, String arg2) throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public String getIdentifierQuoteString() throws SQLException
@@ -207,12 +207,12 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public ResultSet getImportedKeys(String arg0, String arg1, String arg2) throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public ResultSet getIndexInfo(String arg0, String arg1, String arg2, boolean arg3, boolean arg4) throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public int getJDBCMajorVersion() throws SQLException
@@ -333,12 +333,12 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public ResultSet getPrimaryKeys(String arg0, String arg1, String arg2) throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public ResultSet getProcedureColumns(String arg0, String arg1, String arg2, String arg3) throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public String getProcedureTerm() throws SQLException
@@ -348,12 +348,12 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public ResultSet getProcedures(String arg0, String arg1, String arg2) throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public int getResultSetHoldability() throws SQLException
     {
-        return CResultSet.DEFAULT_HOLDABILITY;
+        return CassandraResultSet.DEFAULT_HOLDABILITY;
     }
 
     public RowIdLifetime getRowIdLifetime() throws SQLException
@@ -378,12 +378,12 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public ResultSet getSchemas() throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public ResultSet getSchemas(String arg0, String arg1) throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public String getSearchStringEscape() throws SQLException
@@ -398,12 +398,12 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public ResultSet getSuperTables(String arg0, String arg1, String arg2) throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public ResultSet getSuperTypes(String arg0, String arg1, String arg2) throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public String getSystemFunctions() throws SQLException
@@ -413,17 +413,17 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public ResultSet getTablePrivileges(String arg0, String arg1, String arg2) throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public ResultSet getTableTypes() throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public ResultSet getTables(String arg0, String arg1, String arg2, String[] arg3) throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public String getTimeDateFunctions() throws SQLException
@@ -433,12 +433,12 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public ResultSet getTypeInfo() throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public ResultSet getUDTs(String arg0, String arg1, String arg2, int[] arg3) throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public String getURL() throws SQLException
@@ -453,7 +453,7 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public ResultSet getVersionColumns(String arg0, String arg1, String arg2) throws SQLException
     {
-        return new CResultSet();
+        return new CassandraResultSet();
     }
 
     public boolean insertsAreDetected(int arg0) throws SQLException

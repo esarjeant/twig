@@ -57,7 +57,7 @@ import org.apache.cassandra.utils.ByteBufferUtil;
  * </table>
  *
  */
-class CResultSet extends AbstractResultSet implements CassandraResultSetExtras
+class CassandraResultSet extends AbstractResultSet implements CassandraResultSetExtras
 {
     public static final int DEFAULT_TYPE = ResultSet.TYPE_FORWARD_ONLY;
     public static final int DEFAULT_CONCURRENCY = ResultSet.CONCUR_READ_ONLY;
@@ -106,7 +106,7 @@ class CResultSet extends AbstractResultSet implements CassandraResultSetExtras
     /**
      * no argument constructor.
      */
-    CResultSet()
+    CassandraResultSet()
     {
         keyspace = null;
         statement = null;
@@ -116,7 +116,7 @@ class CResultSet extends AbstractResultSet implements CassandraResultSetExtras
     /**
      * Instantiates a new cassandra result set.
      */
-    CResultSet(Statement statement, CqlResult resultSet, String keyspace) throws SQLException
+    CassandraResultSet(Statement statement, CqlResult resultSet, String keyspace) throws SQLException
     {
         this.statement = statement;
         this.keyspace = keyspace;
