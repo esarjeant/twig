@@ -25,10 +25,6 @@ import static org.apache.cassandra.cql.jdbc.Utils.NO_SERVER;
 import static org.apache.cassandra.cql.jdbc.Utils.NO_UPDATE_COUNT;
 import static org.apache.cassandra.cql.jdbc.Utils.SCHEMA_MISMATCH;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutput;
-import java.io.ObjectOutputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.URL;
@@ -77,7 +73,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
     private int count;
     
     /** a Map of the current bound values encountered in setXXX methods */    
-    private Map<Integer,String> bindValues = new LinkedHashMap<Integer,String>();
+    private Map<Integer,ByteBuffer> bindValues = new LinkedHashMap<Integer,ByteBuffer>();
 
     
     CassandraPreparedStatement(CassandraConnection con, String cql) throws SQLException
@@ -107,9 +103,9 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         if (index < 1 ) throw new SQLRecoverableException(String.format("the column index must be a positive number : %d", index));
     }
     
-    private List<String> getBindValues() throws SQLException
+    private List<ByteBuffer> getBindValues() throws SQLException
     {
-        List<String> values = new ArrayList<String>();
+        List<ByteBuffer> values = new ArrayList<ByteBuffer>();
 //        System.out.println("bindValues.size() = "+bindValues.size());
 //        System.out.println("count             = "+count);
         if (bindValues.size() != count )
@@ -117,7 +113,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
 
         for (int i = 1; i <= count ; i++)
         {
-            String value = bindValues.get(i);
+            ByteBuffer value = bindValues.get(i);
             if (value==null) throw new SQLRecoverableException(String.format("the bound value for index: %d was not set", i));
            values.add(value);
         }
@@ -231,7 +227,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
     {
         checkNotClosed();
         checkIndex(parameterIndex);
-        bindValues.put(parameterIndex, decimal.toPlainString());
+        bindValues.put(parameterIndex, JdbcDecimal.instance.decompose(decimal));
     }
 
 
@@ -239,7 +235,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
     {
         checkNotClosed();
         checkIndex(parameterIndex);
-        bindValues.put(parameterIndex, Boolean.valueOf(truth).toString());
+        bindValues.put(parameterIndex, JdbcBoolean.instance.decompose(truth));
     }
 
 
@@ -247,7 +243,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
     {
         checkNotClosed();
         checkIndex(parameterIndex);
-        bindValues.put(parameterIndex, Byte.valueOf(b).toString());
+        bindValues.put(parameterIndex, JdbcInteger.instance.decompose(BigInteger.valueOf(b)));
     }
 
 
@@ -255,7 +251,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
     {
         checkNotClosed();
         checkIndex(parameterIndex);
-        bindValues.put(parameterIndex, ByteBufferUtil.bytesToHex(ByteBuffer.wrap(bytes)));
+        bindValues.put(parameterIndex, ByteBuffer.wrap(bytes));
     }
 
 
@@ -263,9 +259,8 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
     {
         checkNotClosed();
         checkIndex(parameterIndex);
-        // date type data is handled as an 8 byte Long value of milliseconds since the epoch
-        String millis = Long.valueOf(value.getTime()).toString();
-        bindValues.put(parameterIndex, millis);
+        // date type data is handled as an 8 byte Long value of milliseconds since the epoch (handled in decompose() )
+        bindValues.put(parameterIndex, JdbcDate.instance.decompose(value));
     }
 
 
@@ -280,7 +275,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
     {
         checkNotClosed();
         checkIndex(parameterIndex);
-        bindValues.put(parameterIndex, Double.valueOf(decimal).toString());
+        bindValues.put(parameterIndex, JdbcDouble.instance.decompose(decimal));
     }
 
 
@@ -288,7 +283,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
     {
         checkNotClosed();
         checkIndex(parameterIndex);
-        bindValues.put(parameterIndex, Float.valueOf(decimal).toString());
+        bindValues.put(parameterIndex, JdbcFloat.instance.decompose(decimal));
     }
 
 
@@ -296,7 +291,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
     {
         checkNotClosed();
         checkIndex(parameterIndex);
-        bindValues.put(parameterIndex, Integer.valueOf(integer).toString());
+        bindValues.put(parameterIndex, JdbcInt32.instance.decompose(integer));
     }
 
 
@@ -304,7 +299,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
     {
         checkNotClosed();
         checkIndex(parameterIndex);
-        bindValues.put(parameterIndex, Long.valueOf(bigint).toString());
+        bindValues.put(parameterIndex, JdbcLong.instance.decompose(bigint));
     }
 
 
@@ -320,7 +315,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         checkNotClosed();
         checkIndex(parameterIndex);
         // silently ignore type for cassandra... just store an empty String
-        bindValues.put(parameterIndex, "");
+        bindValues.put(parameterIndex, ByteBufferUtil.EMPTY_BYTE_BUFFER);
     }
 
 
@@ -347,7 +342,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         checkNotClosed();
         checkIndex(parameterIndex);
         
-        String variable = HandleObjects.makeString(object, targetSqlType, scaleOrLength);
+        ByteBuffer variable = HandleObjects.makeBytes(object, targetSqlType, scaleOrLength);
         
         if (variable==null) throw new SQLNonTransientException("Problem mapping object to JDBC Type");
         
@@ -358,7 +353,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
     {
         checkNotClosed();
         checkIndex(parameterIndex);
-        bindValues.put(parameterIndex, ByteBufferUtil.bytesToHex(ByteBuffer.wrap(value.getBytes())));
+        bindValues.put(parameterIndex, ByteBuffer.wrap(value.getBytes()));
     }
 
 
@@ -366,7 +361,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
     {
         checkNotClosed();
         checkIndex(parameterIndex);
-        bindValues.put(parameterIndex, Short.valueOf(smallint).toString());
+        bindValues.put(parameterIndex, JdbcInteger.instance.decompose(BigInteger.valueOf(smallint)));
     }
 
 
@@ -374,7 +369,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
     {
         checkNotClosed();
         checkIndex(parameterIndex);
-        bindValues.put(parameterIndex, value);
+        bindValues.put(parameterIndex, ByteBufferUtil.bytes(value));
     }
 
 
@@ -383,8 +378,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         checkNotClosed();
         checkIndex(parameterIndex);
         // time type data is handled as an 8 byte Long value of milliseconds since the epoch
-        String millis = Long.valueOf(value.getTime()).toString();
-        bindValues.put(parameterIndex, millis);
+        bindValues.put(parameterIndex, JdbcLong.instance.decompose(Long.valueOf(value.getTime())));
     }
 
 
@@ -399,9 +393,8 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
     {
         checkNotClosed();
         checkIndex(parameterIndex);
-        // timestamp type data is handled as an 8 byte Long value of milliseconds since the epoch
-        String millis = Long.valueOf(value.getTime()).toString();
-        bindValues.put(parameterIndex, millis);
+        // timestamp type data is handled as an 8 byte Long value of milliseconds since the epoch. Nanos are not supported and are ignored
+        bindValues.put(parameterIndex, JdbcLong.instance.decompose(Long.valueOf(value.getTime())));
     }
 
 
@@ -418,6 +411,6 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         checkIndex(parameterIndex);
         // URl type data is handled as an string
         String url = value.toString();
-        bindValues.put(parameterIndex, url);
+        bindValues.put(parameterIndex, ByteBufferUtil.bytes(url));
     }
 }

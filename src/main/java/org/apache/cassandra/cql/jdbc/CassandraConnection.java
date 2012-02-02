@@ -20,6 +20,7 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
+import java.nio.ByteBuffer;
 import java.sql.*;
 import java.util.HashMap;
 import java.util.List;
@@ -415,7 +416,7 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
         return execute(queryStr, defaultCompression);
     }
 
-    protected CqlResult execute(int itemId, List<String> values)
+    protected CqlResult execute(int itemId, List<ByteBuffer> values)
               throws InvalidRequestException, UnavailableException, TimedOutException, SchemaDisagreementException, TException
     {
         try
