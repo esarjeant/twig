@@ -33,23 +33,31 @@ import org.junit.Test;
 
 public class JdbcRegressionTest
 {
+    private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
+    private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort()+""));
+    private static final String KEYSPACE = "JdbcTestKeyspace";
+    
     private static java.sql.Connection con = null;
+    
 
     @BeforeClass
     public static void setUpBeforeClass() throws Exception
     {
         Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",
-            ConnectionDetails.getHost(),
-            ConnectionDetails.getPort(),
-            "JdbcTestKeyspace"));
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
         Statement stmt = con.createStatement();
         
+        // Drop Keyspace
+        String dropKS = String.format("DROP KEYSPACE %s;",KEYSPACE);
+        
+        try { stmt.execute(dropKS);}
+        catch (Exception e){/* Exception on DROP is OK */}
+        
         // Create KeySpace
-        String createKS = "CREATE KEYSPACE 'JdbcTestKeyspace' WITH "
-                        + "strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1;";
+        String createKS = String.format("CREATE KEYSPACE %s WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1;",KEYSPACE);
+        stmt = con.createStatement();
         stmt.execute(createKS);
-
+        
         // Create the target Column family
         String createCF = "CREATE COLUMNFAMILY RegressionTest (KEY text PRIMARY KEY," 
                         + "bValue boolean, "
@@ -62,11 +70,7 @@ public class JdbcRegressionTest
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",
-            ConnectionDetails.getHost(),
-            ConnectionDetails.getPort(),
-            "JdbcTestKeyspace"));
-
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
     }
 
     @Test
@@ -90,10 +94,10 @@ public class JdbcRegressionTest
         
         long l = result.getLong("notThere");
         assertEquals(0,l);
-        System.out.println("l = "+ l + " ... wasNull() = "+ result.wasNull());
+//        System.out.println("l = "+ l + " ... wasNull() = "+ result.wasNull());
         
         int i = result.getInt(3);
-        System.out.println("i ="+ i + " ... wasNull() = "+ result.wasNull());
+//        System.out.println("i ="+ i + " ... wasNull() = "+ result.wasNull());
         assertEquals(2000, i);
    }
 

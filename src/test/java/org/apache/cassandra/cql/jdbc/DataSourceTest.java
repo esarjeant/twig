@@ -23,21 +23,44 @@ package org.apache.cassandra.cql.jdbc;
 import static org.junit.Assert.*;
 
 import java.io.PrintWriter;
+import java.sql.DriverManager;
 import java.sql.SQLFeatureNotSupportedException;
+import java.sql.Statement;
 
 import javax.sql.DataSource;
 
 import org.apache.cassandra.cql.ConnectionDetails;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class DataSourceTest
 {
-    private static final String HOST = ConnectionDetails.getHost();
-    private static final int PORT = ConnectionDetails.getPort();
-    private static final String KEYSPACE = "Test";
+    private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
+    private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort()+""));
+    private static final String KEYSPACE = "JdbcTestKeyspace";
     private static final String USER = "JohnDoe";
     private static final String PASSWORD = "secret";
+    
+    private static java.sql.Connection con = null;
 
+
+    @BeforeClass
+    public static void setUpBeforeClass() throws Exception
+    {
+        Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,"system"));
+        Statement stmt = con.createStatement();
+        
+        // Drop Keyspace
+        String dropKS = String.format("DROP KEYSPACE %s;",KEYSPACE);
+        
+        try { stmt.execute(dropKS);}
+        catch (Exception e){/* Exception on DROP is OK */}
+        
+        // Create KeySpace
+        String createKS = String.format("CREATE KEYSPACE %s WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1;",KEYSPACE);
+        stmt.execute(createKS);
+    }
     @Test
     public void testConstructor() throws Exception
     {
@@ -51,25 +74,17 @@ public class DataSourceTest
         DataSource ds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD);
         assertNotNull(ds);
         
-//        PrintWriter pw = new PrintWriter(System.err);
-        
         // null username and password
         java.sql.Connection cnx = ds.getConnection(null, null);
         assertFalse(cnx.isClosed());
         ds.setLoginTimeout(5);
         assertEquals(5, ds.getLoginTimeout());
 
-//        ds.setLogWriter(pw);
-//        assertNotNull(ds.getLogWriter());
-        
         // no username and password
         cnx = ds.getConnection();
         assertFalse(cnx.isClosed());
         ds.setLoginTimeout(5);
         assertEquals(5, ds.getLoginTimeout());
-
-//        ds.setLogWriter(pw);
-//        assertNotNull(ds.getLogWriter());
     }
 
     

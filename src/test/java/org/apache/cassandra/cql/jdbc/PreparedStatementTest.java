@@ -38,17 +38,17 @@ import static org.apache.cassandra.utils.Hex.bytesToHex;
 public class PreparedStatementTest
 { 
     private static java.sql.Connection con = null;
+    private static String host = System.getProperty("host", ConnectionDetails.getHost());
+    private static int port = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort()+""));
     
-//    private static final Schema schema = new Schema(ConnectionDetails.getHost(), ConnectionDetails.getPort());
-    private static final Schema schema = new Schema("localhost", 9160);
+    private static final Schema schema = new Schema(host, port);
     
     @BeforeClass
     public static void waxOn() throws Exception
     {
         schema.createSchema();
         Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s", ConnectionDetails.getHost(), ConnectionDetails.getPort(), Schema.KEYSPACE_NAME));
-//        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s", "localhost", 9160, Schema.KEYSPACE_NAME));
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s", host, port, Schema.KEYSPACE_NAME));
     }
     
     @Test
