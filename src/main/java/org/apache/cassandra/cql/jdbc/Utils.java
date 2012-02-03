@@ -60,6 +60,10 @@ class Utils
     public static final String TAG_DATABASE_NAME = "databaseName";
     public static final String TAG_SERVER_NAME = "serverName";
     public static final String TAG_PORT_NUMBER = "portNumber";
+    public static final String TAG_ACTIVE_CQL_VERSION = "activeCqlVersion";
+    public static final String TAG_CQL_VERSION = "cqlVersion";
+    public static final String TAG_BUILD_VERSION = "buildVersion";
+    public static final String TAG_THRIFT_VERSION = "thriftVersion";
 
     protected static final String WAS_CLOSED_CON = "method was called on a closed Connection";
     protected static final String WAS_CLOSED_STMT = "method was called on a closed Statement";
@@ -93,7 +97,8 @@ class Utils
     protected static final String HOST_IN_URL = "Connection url must specify a host, e.g., jdbc:cassandra://localhost:9170/Keyspace1";
     protected static final String HOST_REQUIRED = "a 'host' name is required to build a Connection";
     protected static final String BAD_KEYSPACE = "Keyspace names must be composed of alphanumerics and underscores (parsed: '%s')";
-    protected static final String URI_IS_SIMPLE = "Connection url may only include host, port, and keyspace, e.g., jdbc:cassandra://localhost:9170/Keyspace1";
+    protected static final String URI_IS_SIMPLE = "Connection url may only include host, port, and keyspace and version option, e.g., jdbc:cassandra://localhost:9170/Keyspace1?version=2.0.0";
+    protected static final String NOT_OPTION = "Connection url only support the 'version' option";
 
     protected static final Logger logger = LoggerFactory.getLogger(Utils.class);
 
@@ -172,6 +177,18 @@ class Utils
 
             if (uri.getUserInfo() != null)
                 throw new SQLNonTransientConnectionException(URI_IS_SIMPLE);
+            
+            String query = uri.getQuery();
+            if ((query != null) && (!query.isEmpty()))
+            {
+               String[] items = query.split("&");
+               if (items.length != 1) throw new SQLNonTransientConnectionException(URI_IS_SIMPLE);
+               
+               String[] option = query.split("=");
+               if (!option[0].equalsIgnoreCase("version")) throw new SQLNonTransientConnectionException(NOT_OPTION);
+               if (option.length!=2) throw new SQLNonTransientConnectionException(NOT_OPTION);
+               props.setProperty(TAG_CQL_VERSION, option[1]);
+            }
         }
 
         if (logger.isTraceEnabled()) logger.trace("URL : '{}' parses to: {}", url, props);
@@ -183,7 +200,7 @@ class Utils
      * Create a "Subname" portion of a JDBC URL from properties.
      * 
      * @param props A Properties file containing all the properties to be considered.
-     * @return A constructed "Subname" portion of a JDBC URL in the form of a CLI (ie: //myhost:9160/Test1 )
+     * @return A constructed "Subname" portion of a JDBC URL in the form of a CLI (ie: //myhost:9160/Test1?version=3.0.0 )
      * @throws SQLException
      */
     public static final String createSubName(Properties props)throws SQLException
@@ -198,6 +215,8 @@ class Utils
         String host = props.getProperty(TAG_SERVER_NAME);
         if (host==null)throw new SQLNonTransientConnectionException(HOST_REQUIRED);
         
+        String version = (props.getProperty(TAG_CQL_VERSION)==null)? null : "version="+ props.getProperty(TAG_CQL_VERSION);
+        
         // construct a valid URI from parts... 
         URI uri;
         try
@@ -208,7 +227,7 @@ class Utils
                 host,
                 props.getProperty(TAG_PORT_NUMBER)==null ? DEFAULT_PORT : Integer.parseInt(props.getProperty(TAG_PORT_NUMBER)),
                 keyspace,
-                null,
+                version,
                 null);
         }
         catch (Exception e)
