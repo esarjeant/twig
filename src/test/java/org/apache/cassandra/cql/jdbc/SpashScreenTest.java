@@ -28,34 +28,56 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 
 import org.apache.cassandra.cql.ConnectionDetails;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class SpashScreenTest
 {
+    private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
+    private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort()+""));
+    private static final String KEYSPACE = "TestKS";
+    
     private static java.sql.Connection con = null;
 
     @BeforeClass
-    public static void waxOn() throws Exception
+    public static void setUpBeforeClass() throws Exception
     {
         Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",
-            ConnectionDetails.getHost(),
-            ConnectionDetails.getPort(),
-            "JdbcTestKeyspace"));
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,"system"));
+        Statement stmt = con.createStatement();
 
+        // Drop Keyspace
+        String dropKS = String.format("DROP KEYSPACE %s;",KEYSPACE);
+        
+        try { stmt.execute(dropKS);}
+        catch (Exception e){/* Exception on DROP is OK */}
+        
+        // Create KeySpace
+        String createKS = String.format("CREATE KEYSPACE %s WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1;",KEYSPACE);
+        stmt = con.createStatement();
+        stmt.execute(createKS);
+        
+        // Use Keyspace
+        String useKS = String.format("USE %s;",KEYSPACE);
+        stmt.execute(useKS);
+        
+               
         // Create the target Column family
         String create = "CREATE COLUMNFAMILY Test (KEY text PRIMARY KEY) WITH comparator = ascii AND default_validation = bigint;";
-        Statement stmt = con.createStatement();
+        stmt = con.createStatement();
         stmt.execute(create);
         stmt.close();
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",
-            ConnectionDetails.getHost(),
-            ConnectionDetails.getPort(),
-            "JdbcTestKeyspace"));
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+    }
+
+    @AfterClass
+    public static void tearDownAfterClass() throws Exception
+    {
+        if (con!=null) con.close();
     }
 
 

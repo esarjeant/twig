@@ -49,13 +49,16 @@ import static org.apache.cassandra.utils.Hex.hexToBytes;
  */
 public class JdbcDriverTest
 {
+    private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
+    private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort()+""));
+    
     private static java.sql.Connection con = null;
     private static final String first = bytesToHex("first".getBytes());
     private static final String firstrec = bytesToHex("firstrec".getBytes());
     private static final String last = bytesToHex("last".getBytes());
     private static final String lastrec = bytesToHex("lastrec".getBytes());
     private static final String jsmith = bytesToHex("jsmith".getBytes());
-    private static final Schema schema = new Schema(ConnectionDetails.getHost(), ConnectionDetails.getPort());
+    private static final Schema schema = new Schema(HOST, PORT);
 
     /** SetUp */
     @BeforeClass
@@ -63,7 +66,7 @@ public class JdbcDriverTest
     {
         schema.createSchema();
         Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s", ConnectionDetails.getHost(), ConnectionDetails.getPort(), Schema.KEYSPACE_NAME));
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST, PORT, Schema.KEYSPACE_NAME));
         String[] inserts = 
         {
             String.format("UPDATE Standard1 SET '%s' = '%s', '%s' = '%s' WHERE KEY = '%s'", first, firstrec, last, lastrec, jsmith),    

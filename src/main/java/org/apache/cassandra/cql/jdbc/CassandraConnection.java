@@ -50,15 +50,21 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
 
     private static final Logger logger = LoggerFactory.getLogger(CassandraConnection.class);
 
-    public static final int DB_MAJOR_VERSION = 0;
-    public static final int DB_MINOR_VERSION = 8;
+    public static final int DB_MAJOR_VERSION = 1;
+    public static final int DB_MINOR_VERSION = 1;
     public static final String DB_PRODUCT_NAME = "Cassandra";
+    public static final String DEFAULT_CQL_VERSION = "2.0.0";
 
     public static Compression defaultCompression = Compression.GZIP;
 
     private final boolean autoCommit = true;
 
     private final int transactionIsolation = Connection.TRANSACTION_NONE;
+
+    /**
+     * Connection Properties
+     */
+    private Properties connectionProps;
 
     /**
      * Client Info Properties (currently unused)
@@ -86,15 +92,17 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
      */
     public CassandraConnection(Properties props) throws SQLException
     {
+        connectionProps = (Properties)props.clone();
         clientInfo = new Properties();
         url = PROTOCOL + createSubName(props);
         try
         {
             String host = props.getProperty(TAG_SERVER_NAME);
             int port = Integer.parseInt(props.getProperty(TAG_PORT_NUMBER));
-            String keyspace = props.getProperty(TAG_DATABASE_NAME);
+            currentKeyspace = props.getProperty(TAG_DATABASE_NAME,"system");
             username = props.getProperty(TAG_USER);
             String password = props.getProperty(TAG_PASSWORD);
+            String version = props.getProperty(TAG_CQL_VERSION);
 
             TSocket socket = new TSocket(host, port);
             transport = new TFramedTransport(socket);
@@ -109,34 +117,26 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
                 if (password != null) credentials.put("password", password);
                 AuthenticationRequest areq = new AuthenticationRequest(credentials);
                 client.login(areq);
-
             }
-
-            decoder = new ColumnDecoder(client.describe_keyspaces());
-
-            logger.info("Connected to {}:{}", host, port);
-
-
-            if (keyspace != null)
+            
+            if (version != null)
             {
-                execute("USE " + keyspace);
+                client.set_cql_version(version);
+                connectionProps.setProperty(TAG_ACTIVE_CQL_VERSION, version);
             }
-        }
-        catch (SchemaDisagreementException e)
-        {
-            throw new SQLRecoverableException(SCHEMA_MISMATCH);
+            
+            decoder = new ColumnDecoder(client.describe_keyspaces());
+                    
+            client.set_keyspace("system");
+
+            client.set_keyspace(currentKeyspace);
+
+            Object[] args = {host, port,currentKeyspace,(version==null) ? DEFAULT_CQL_VERSION: version};
+            logger.info("Connected to {}:{} using Keyspace {} and CQL version {}",args);                       
         }
         catch (InvalidRequestException e)
         {
             throw new SQLSyntaxErrorException(e);
-        }
-        catch (UnavailableException e)
-        {
-            throw new SQLNonTransientConnectionException(e);
-        }
-        catch (TimedOutException e)
-        {
-            throw new SQLTransientConnectionException(e);
         }
         catch (TException e)
         {
@@ -482,4 +482,13 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
     {
         return transport.isOpen();
     }
+
+    public String toString()
+    {
+        StringBuilder builder = new StringBuilder();
+        builder.append("CassandraConnection [connectionProps=");
+        builder.append(connectionProps);
+        builder.append("]");
+        return builder.toString();
+    }    
 }

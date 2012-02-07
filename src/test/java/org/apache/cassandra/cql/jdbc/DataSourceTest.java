@@ -30,6 +30,7 @@ import java.sql.Statement;
 import javax.sql.DataSource;
 
 import org.apache.cassandra.cql.ConnectionDetails;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -37,7 +38,7 @@ public class DataSourceTest
 {
     private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
     private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort()+""));
-    private static final String KEYSPACE = "JdbcTestKeyspace";
+    private static final String KEYSPACE = "TestKS";
     private static final String USER = "JohnDoe";
     private static final String PASSWORD = "secret";
     
@@ -61,6 +62,14 @@ public class DataSourceTest
         String createKS = String.format("CREATE KEYSPACE %s WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1;",KEYSPACE);
         stmt.execute(createKS);
     }
+
+    @AfterClass
+    public static void tearDownAfterClass() throws Exception
+    {
+        if (con!=null) con.close();
+    }
+
+
     @Test
     public void testConstructor() throws Exception
     {

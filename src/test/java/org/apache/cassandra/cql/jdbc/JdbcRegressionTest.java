@@ -28,6 +28,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 
 import org.apache.cassandra.cql.ConnectionDetails;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -35,8 +36,9 @@ public class JdbcRegressionTest
 {
     private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
     private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort()+""));
-    private static final String KEYSPACE = "JdbcTestKeyspace";
-    
+    private static final String KEYSPACE = "TestKS";
+    private static final String CQLV3 = "3.0.0";
+      
     private static java.sql.Connection con = null;
     
 
@@ -44,7 +46,7 @@ public class JdbcRegressionTest
     public static void setUpBeforeClass() throws Exception
     {
         Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,"system"));
         Statement stmt = con.createStatement();
         
         // Drop Keyspace
@@ -58,8 +60,12 @@ public class JdbcRegressionTest
         stmt = con.createStatement();
         stmt.execute(createKS);
         
+        // Use Keyspace
+        String useKS = String.format("USE %s;",KEYSPACE);
+        stmt.execute(useKS);
+        
         // Create the target Column family
-        String createCF = "CREATE COLUMNFAMILY RegressionTest (KEY text PRIMARY KEY," 
+        String createCF = "CREATE COLUMNFAMILY RegressionTest (keyname text PRIMARY KEY," 
                         + "bValue boolean, "
                         + "iValue int "
                         + ") WITH comparator = ascii AND default_validation = bigint;";
@@ -71,12 +77,22 @@ public class JdbcRegressionTest
 
         // open it up again to see the new CF
         con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+        System.out.println(con);
+
     }
+    
+    @AfterClass
+    public static void tearDownAfterClass() throws Exception
+    {
+        if (con!=null) con.close();
+    }
+
+
 
     @Test
     public void testIssue10() throws Exception
     {
-        String insert = "INSERT INTO RegressionTest (KEY,bValue,iValue) VALUES( 'key0',true, 2000);";
+        String insert = "INSERT INTO RegressionTest (keyname,bValue,iValue) VALUES( 'key0',true, 2000);";
         Statement statement = con.createStatement();
 
         statement.executeUpdate(insert);
@@ -85,20 +101,32 @@ public class JdbcRegressionTest
         Thread.sleep(3000);
         
         statement = con.createStatement();
-        ResultSet result = statement.executeQuery("SELECT bValue,notThere,iValue FROM RegressionTest WHERE KEY=key0;");
+        ResultSet result = statement.executeQuery("SELECT bValue,notThere,iValue FROM RegressionTest WHERE keyname=key0;");
         result.next();
         
         boolean b = result.getBoolean(1);
-        System.out.println("b = "+ b);
         assertTrue(b);
         
         long l = result.getLong("notThere");
         assertEquals(0,l);
-//        System.out.println("l = "+ l + " ... wasNull() = "+ result.wasNull());
         
         int i = result.getInt(3);
-//        System.out.println("i ="+ i + " ... wasNull() = "+ result.wasNull());
         assertEquals(2000, i);
    }
+
+    @Test
+    public void testIssue15() throws Exception
+    {
+//        con.close();
+//
+//        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?version=%s",HOST,PORT,KEYSPACE,CQLV3));
+//        System.out.println(con);
+//        con.close();
+
+//        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+//        System.out.println(con);
+//        con.close();
+
+    }
 
 }
