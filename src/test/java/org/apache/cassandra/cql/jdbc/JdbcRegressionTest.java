@@ -25,6 +25,8 @@ import static org.junit.Assert.*;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 import java.sql.Statement;
 
 import org.apache.cassandra.cql.ConnectionDetails;
@@ -128,5 +130,59 @@ public class JdbcRegressionTest
 //        con.close();
 
     }
+    @Test
+    public void testIssue18() throws Exception
+    {
+       Statement statement = con.createStatement();
 
+       String truncate = "TRUNCATE RegressionTest;";
+       statement.execute(truncate);
+       
+       String insert1 = "INSERT INTO RegressionTest (keyname,bValue,iValue) VALUES( 'key0',true, 2000);";
+       statement.executeUpdate(insert1);
+       
+       String insert2 = "INSERT INTO RegressionTest (keyname,bValue) VALUES( 'key1',false);";
+       statement.executeUpdate(insert2);
+       
+       
+       
+       String select = "SELECT * from RegressionTest;";
+       
+       ResultSet result = statement.executeQuery(select);
+       
+       ResultSetMetaData metadata = result.getMetaData();
+       
+       int colCount = metadata.getColumnCount();
+       
+       System.out.println("Before doing a next()");
+       System.out.printf("(%d) ",result.getRow());
+       for (int i = 1; i <= colCount; i++)
+       {
+           System.out.print(showColumn(i,result)+ " "); 
+       }
+       System.out.println();
+       
+       
+       System.out.println("Fetching each row with a next()");
+       while (result.next())
+       {
+           metadata = result.getMetaData();
+           colCount = metadata.getColumnCount();
+           System.out.printf("(%d) ",result.getRow());
+           for (int i = 1; i <= colCount; i++)
+           {
+               System.out.print(showColumn(i,result)+ " "); 
+           }
+           System.out.println();
+       }
+    }
+    
+    
+    private final String  showColumn(int index, ResultSet result) throws SQLException
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("[").append(index).append("]");
+        sb.append(result.getObject(index));
+        return sb.toString();
+    }
 }

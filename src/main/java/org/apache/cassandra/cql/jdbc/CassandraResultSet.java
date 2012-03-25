@@ -66,9 +66,9 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     private final String keyspace;
 
     /**
-     * The r set iter.
+     * The rows iterator.
      */
-    private Iterator<CqlRow> rSetIter;
+    private Iterator<CqlRow> rowsIterator;
 
     int rowNumber = 0;
     // the current row key when iterating through results.
@@ -78,11 +78,6 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
      * The values.
      */
     private List<TypedColumn> values = new ArrayList<TypedColumn>();
-
-    /**
-     * The value map.
-     */
-    private Map<String, TypedColumn> valueMap = new HashMap<String, TypedColumn>();
 
     /**
      * The index map.
@@ -125,10 +120,46 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
         this.fetchSize = statement.getFetchSize();
         this.schema = resultSet.schema;
 
-        rSetIter = resultSet.getRowsIterator();
+        rowsIterator = resultSet.getRowsIterator();
+        
+        // Initialize to column values from the first row
+        // NOTE: that the first call to next() will HARMLESSLY re-write these values for the columns
+        // NOTE: the row cursor is not advanced and sits before the first row
+        if (hasMoreRows())
+        {
+            populateColumns();
+            // reset the iterator back to the beginning.
+            rowsIterator = resultSet.getRowsIterator();
+        }
+                
         meta = new CResultSetMetaData();
     }
+    
+    private final boolean hasMoreRows()
+    {
+        return (rowsIterator !=null && rowsIterator.hasNext());
+    }
 
+    private final void populateColumns()
+    {
+        // clear column value tables
+        values.clear();
+        indexMap.clear();
+        
+        CqlRow row = rowsIterator.next();
+        curRowKey = row.getKey();
+        List<Column> cols = row.getColumns();
+        
+        // loop through the columns 
+        for (Column col : cols)
+        {
+            TypedColumn c = createColumn(col);
+            String columnName = c.getNameString();
+            values.add(c);
+            indexMap.put(columnName, values.size()); // one greater than 0 based index of a list
+        }
+    }
+    
     public boolean absolute(int arg0) throws SQLException
     {
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
@@ -153,7 +184,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
 
     private final void checkName(String name) throws SQLException
     {
-        if (valueMap.get(name) == null) throw new SQLSyntaxErrorException(String.format(VALID_LABELS, name));
+        if (indexMap.get(name) == null) throw new SQLSyntaxErrorException(String.format(VALID_LABELS, name));
     }
 
     private final void checkNotClosed() throws SQLException
@@ -170,7 +201,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
 
     public void close() throws SQLException
     {
-        valueMap = null;
+        indexMap = null;
         values = null;
     }
 
@@ -203,14 +234,14 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     public BigDecimal getBigDecimal(String name) throws SQLException
     {
         checkName(name);
-        return getBigDecimal(valueMap.get(name));
+        return getBigDecimal(indexMap.get(name).intValue());
     }
 
     /** @deprecated */
     public BigDecimal getBigDecimal(String name, int scale) throws SQLException
     {
         checkName(name);
-        return (getBigDecimal(valueMap.get(name))).setScale(scale);
+        return (getBigDecimal(indexMap.get(name).intValue())).setScale(scale);
     }
 
     private BigDecimal getBigDecimal(TypedColumn column) throws SQLException
@@ -249,7 +280,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     public BigInteger getBigInteger(String name) throws SQLException
     {
         checkName(name);
-        return getBigInteger(valueMap.get(name));
+        return getBigInteger(indexMap.get(name).intValue());
     }
 
     private BigInteger getBigInteger(TypedColumn column) throws SQLException
@@ -287,7 +318,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     public boolean getBoolean(String name) throws SQLException
     {
         checkName(name);
-        return getBoolean(valueMap.get(name));
+        return getBoolean(indexMap.get(name).intValue());
     }
 
     private final Boolean getBoolean(TypedColumn column) throws SQLException
@@ -327,7 +358,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     public byte getByte(String name) throws SQLException
     {
         checkName(name);
-        return getByte(valueMap.get(name));
+        return getByte(indexMap.get(name).intValue());
     }
 
     private final Byte getByte(TypedColumn column) throws SQLException
@@ -363,7 +394,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
 
     public byte[] getBytes(String name) throws SQLException
     {
-        return getBytes(valueMap.get(name));
+        return getBytes(indexMap.get(name).intValue());
     }
 
     private byte[] getBytes(TypedColumn column) throws SQLException
@@ -385,7 +416,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     {
         checkName(name);
         checkNotClosed();
-        return valueMap.get(name);
+        return values.get(indexMap.get(name).intValue());
     }
 
     public int getConcurrency() throws SQLException
@@ -410,7 +441,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     public Date getDate(String name) throws SQLException
     {
         checkName(name);
-        return getDate(valueMap.get(name));
+        return getDate(indexMap.get(name).intValue());
     }
 
     public Date getDate(String name, Calendar calendar) throws SQLException
@@ -453,7 +484,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     public double getDouble(String name) throws SQLException
     {
         checkName(name);
-        return getDouble(valueMap.get(name));
+        return getDouble(indexMap.get(name).intValue());
     }
 
     private final Double getDouble(TypedColumn column) throws SQLException
@@ -507,7 +538,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     public float getFloat(String name) throws SQLException
     {
         checkName(name);
-        return getFloat(valueMap.get(name));
+        return getFloat(indexMap.get(name).intValue());
     }
 
     private final Float getFloat(TypedColumn column) throws SQLException
@@ -555,7 +586,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     public int getInt(String name) throws SQLException
     {
         checkName(name);
-        return getInt(valueMap.get(name));
+        return getInt(indexMap.get(name).intValue());
     }
 
     private int getInt(TypedColumn column) throws SQLException
@@ -598,7 +629,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     public long getLong(String name) throws SQLException
     {
         checkName(name);
-        return getLong(valueMap.get(name));
+        return getLong(indexMap.get(name).intValue());
     }
 
     private Long getLong(TypedColumn column) throws SQLException
@@ -644,7 +675,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     public Object getObject(String name) throws SQLException
     {
         checkName(name);
-        return getObject(valueMap.get(name));
+        return getObject(indexMap.get(name).intValue());
     }
 
 
@@ -671,7 +702,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     public RowId getRowId(String name) throws SQLException
     {
         checkName(name);
-        return getRowId(valueMap.get(name));
+        return getRowId(indexMap.get(name).intValue());
     }
 
     private final RowId getRowId(TypedColumn column) throws SQLException
@@ -691,7 +722,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     public short getShort(String name) throws SQLException
     {
         checkName(name);
-        return getShort(valueMap.get(name));
+        return getShort(indexMap.get(name).intValue());
     }
 
     private final Short getShort(TypedColumn column) throws SQLException
@@ -735,7 +766,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     public String getString(String name) throws SQLException
     {
         checkName(name);
-        return getString(valueMap.get(name));
+        return getString(indexMap.get(name).intValue());
     }
 
     private String getString(TypedColumn column) throws SQLException
@@ -762,7 +793,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     public Time getTime(String name) throws SQLException
     {
         checkName(name);
-        return getTime(valueMap.get(name));
+        return getTime(indexMap.get(name).intValue());
     }
 
     public Time getTime(String name, Calendar calendar) throws SQLException
@@ -812,7 +843,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     public Timestamp getTimestamp(String name) throws SQLException
     {
         checkName(name);
-        return getTimestamp(valueMap.get(name));
+        return getTimestamp(indexMap.get(name).intValue());
     }
 
     public Timestamp getTimestamp(String name, Calendar calendar) throws SQLException
@@ -889,7 +920,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
 
     public boolean isClosed() throws SQLException
     {
-        return valueMap == null;
+        return values == null;
     }
 
     public boolean isFirst() throws SQLException
@@ -901,7 +932,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     public boolean isLast() throws SQLException
     {
         checkNotClosed();
-        return !rSetIter.hasNext();
+        return !rowsIterator.hasNext();
     }
 
     public boolean isWrapperFor(Class<?> iface) throws SQLException
@@ -919,26 +950,11 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
 
     public synchronized boolean next() throws SQLException
     {
-        if (!values.isEmpty() || !valueMap.isEmpty())
+        if (hasMoreRows())
         {
-            values.clear();
-            valueMap.clear();
-        }
-        if (rSetIter != null && rSetIter.hasNext())
-        {
-            CqlRow row = rSetIter.next();
+            populateColumns();
             rowNumber++;
-            curRowKey = row.getKey();
-            List<Column> cols = row.getColumns();
-            for (Column col : cols)
-            {
-                TypedColumn c = createColumn(col);
-                String columnName = c.getNameString();
-                values.add(c);
-                indexMap.put(columnName, values.size()); // one greater than 0 based index of a list
-                valueMap.put(columnName, c);
-            }
-            return !(values.isEmpty() || valueMap.isEmpty());
+            return true;
         }
         else
         {
