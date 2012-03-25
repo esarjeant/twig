@@ -73,6 +73,13 @@ under the License.
         <role>developer</role>
       </roles>
     </developer>
+    <developer>
+      <id>rickshaw</id>
+      <name>Rick Shaw</name>
+      <roles>
+        <role>developer</role>
+      </roles>
+    </developer>
   </developers>
 
   <scm>
@@ -97,8 +104,13 @@ under the License.
   <dependencies>
     <dependency>
       <groupId>org.apache.cassandra</groupId>
+      <artifactId>cassandra-clientutil</artifactId>
+      <version>1.1.0-beta1</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.cassandra</groupId>
       <artifactId>cassandra-thrift</artifactId>
-      <version>1.1-dev-SNAPSHOT</version>
+      <version>1.1.0-beta1</version>
       <exclusions>
         <exclusion>
           <groupId>javax.servlet</groupId>
@@ -111,16 +123,6 @@ under the License.
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>org.apache.cassandra</groupId>
-      <artifactId>cassandra-clientutil</artifactId>
-      <version>1.1-dev-SNAPSHOT</version>
-    </dependency>
-    <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava</artifactId>
-      <version>r08</version>
-    </dependency>
-    <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>4.6</version>
@@ -131,11 +133,6 @@ under the License.
       <artifactId>slf4j-log4j12</artifactId>
       <version>1.6.1</version>
       <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.thrift</groupId>
-      <artifactId>libthrift</artifactId>
-      <version>0.7.0</version>
     </dependency>
   </dependencies>
 
