@@ -119,10 +119,17 @@ class Utils
         ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
         byte[] buffer = new byte[1024];
 
-        while (!compressor.finished())
+        try
         {
-            int size = compressor.deflate(buffer);
-            byteArray.write(buffer, 0, size);
+            while (!compressor.finished())
+            {
+                int size = compressor.deflate(buffer);
+                byteArray.write(buffer, 0, size);
+            }
+        }
+        finally
+        {
+            compressor.end(); //clean up after the Deflater
         }
 
         logger.trace("Compressed query statement {} bytes in length to {} bytes", data.length, byteArray.size());
