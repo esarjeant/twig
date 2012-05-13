@@ -1,11 +1,21 @@
-1.0.5
- * relocated project to Apache Extras (Google Code).
- * add Issue #5 restructure directory to support Maven lifecycle as well as Ant lifecycle
- * fix Issue #4 - error in CResltset#getColumn(int index) where index was not being "one-based".
+For details of the CHANGES in JDBC-Cassandra please refer to the "Changes" 
+item in the "Sources" tab in the cassandra-jdbc project in Apache Extras.
 
+Links:
 
-1.0.4
- * improve JDBC spec compliance (CASSANDRA-2720, 2754, 3052, 3089)
- * cooperate with other jdbc drivers (CASSANDRA-2842)
- * fix unbox-to-NPE with null primitives (CASSANDRA-2956)
- * add BigDecimal support (CASSANDRA-3153)
+1. The cassandra-jdbc project:
+
+    http://code.google.com/a/apache-extras.org/p/cassandra-jdbc/
+
+2. The link to changes in the "trunk" branch:
+
+    http://code.google.com/a/apache-extras.org/p/cassandra-jdbc/source/list?name=trunk
+    
+3. The link to changes in the "v1.0.5" branch:
+
+    http://code.google.com/a/apache-extras.org/p/cassandra-jdbc/source/list?name=v1.0.5
+    
+4. The link to changes in the "v1.1.0" branch:
+
+    http://code.google.com/a/apache-extras.org/p/cassandra-jdbc/source/list?name=v1.1.0
+
