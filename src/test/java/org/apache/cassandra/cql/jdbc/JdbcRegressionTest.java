@@ -48,7 +48,10 @@ public class JdbcRegressionTest
     public static void setUpBeforeClass() throws Exception
     {
         Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,"system"));
+        String URL = String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,"system");
+        System.out.println("Connection URL = '"+URL +"'");
+        
+        con = DriverManager.getConnection(URL);
         Statement stmt = con.createStatement();
         
         // Drop Keyspace
@@ -56,10 +59,12 @@ public class JdbcRegressionTest
         
         try { stmt.execute(dropKS);}
         catch (Exception e){/* Exception on DROP is OK */}
-        
+
         // Create KeySpace
         String createKS = String.format("CREATE KEYSPACE %s WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1;",KEYSPACE);
+        System.out.println("createKS = '"+createKS+"'");
         stmt = con.createStatement();
+        stmt.execute("USE system;");
         stmt.execute(createKS);
         
         // Use Keyspace
@@ -100,8 +105,6 @@ public class JdbcRegressionTest
         statement.executeUpdate(insert);
         statement.close();
         
-        Thread.sleep(3000);
-        
         statement = con.createStatement();
         ResultSet result = statement.executeQuery("SELECT bValue,notThere,iValue FROM RegressionTest WHERE keyname=key0;");
         result.next();
@@ -130,6 +133,7 @@ public class JdbcRegressionTest
 //        con.close();
 
     }
+    
     @Test
     public void testIssue18() throws Exception
     {
@@ -176,6 +180,49 @@ public class JdbcRegressionTest
            System.out.println();
        }
     }
+    
+    @Test
+    public void testIssue33() throws Exception
+    {
+        Statement stmt = con.createStatement();
+        
+        // Create the target Column family
+        String createCF = "CREATE COLUMNFAMILY t33 (k int PRIMARY KEY," 
+                        + "c text "
+                        + ") WITH comparator = ascii AND default_validation = text;";        
+        
+        stmt.execute(createCF);
+        stmt.close();
+        con.close();
+
+        // open it up again to see the new CF
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+        
+        // paraphrase of the snippet from the ISSUE #33 provided test
+        PreparedStatement statement = con.prepareStatement("update t33 set c=? where k=123");
+        statement.setString(1, "mark");
+        statement.executeUpdate();
+
+        ResultSet result = statement.executeQuery("SELECT * FROM t33;");
+        
+        ResultSetMetaData metadata = result.getMetaData();
+        
+        int colCount = metadata.getColumnCount();
+        
+        System.out.println("Test Issue #33");
+        System.out.println("--------------");
+        while (result.next())
+        {
+            metadata = result.getMetaData();
+            colCount = metadata.getColumnCount();
+            System.out.printf("(%d) ",result.getRow());
+            for (int i = 1; i <= colCount; i++)
+            {
+                System.out.print(showColumn(i,result)+ " "); 
+            }
+            System.out.println();
+        }
+   }
     
     
     private final String  showColumn(int index, ResultSet result) throws SQLException
