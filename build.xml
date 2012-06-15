@@ -36,7 +36,7 @@
   <property name="debuglevel" value="source,lines,vars" />
   <property name="test.name" value="*Test" />
   <property name="test.timeout" value="60000" />
-  <property name="base.version" value="1.1.0" />
+  <property name="base.version" value="1.1.1" />
 
   <condition property="version" value="${base.version}">
     <isset property="release" />
