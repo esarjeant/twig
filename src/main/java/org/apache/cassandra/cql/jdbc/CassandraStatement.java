@@ -176,7 +176,7 @@ class CassandraStatement extends AbstractStatement implements Statement, Compara
         }
         catch (InvalidRequestException e)
         {
-            throw new SQLSyntaxErrorException(e.getWhy());
+            throw new SQLSyntaxErrorException(e.getWhy()+"\n'"+sql+"'",e);
         }
         catch (UnavailableException e)
         {
@@ -184,7 +184,7 @@ class CassandraStatement extends AbstractStatement implements Statement, Compara
         }
         catch (TimedOutException e)
         {
-            throw new SQLTransientConnectionException(e.getMessage());
+            throw new SQLTransientConnectionException(e);
         }
         catch (SchemaDisagreementException e)
         {
@@ -192,7 +192,7 @@ class CassandraStatement extends AbstractStatement implements Statement, Compara
         }
         catch (TException e)
         {
-            throw new SQLNonTransientConnectionException(e.getMessage());
+            throw new SQLNonTransientConnectionException(e);
         }
 
     }
