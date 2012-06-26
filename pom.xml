@@ -30,7 +30,7 @@ under the License.
 
   <groupId>org.apache-extras.cassandra-jdbc</groupId>
   <artifactId>cassandra-jdbc</artifactId>
-  <version>1.1.1</version>
+  <version>1.2.0-SNAPSHOT</version>
 
   <name>JDBC driver for Cassandra/CQL</name>
   <description>A JDBC-compliant driver for Cassandra using CQL.</description>
@@ -143,6 +143,7 @@ under the License.
         <filtering>true</filtering>
         <includes>
           <include>**/ConnectionDetails.properties</include>
+          <include>**/log4j.properties</include>
         </includes>
       </testResource>
     </testResources>
