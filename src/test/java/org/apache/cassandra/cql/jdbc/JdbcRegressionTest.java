@@ -22,6 +22,7 @@ package org.apache.cassandra.cql.jdbc;
 
 import static org.junit.Assert.*;
 
+import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -73,8 +74,8 @@ public class JdbcRegressionTest
         
         // Create the target Column family
         String createCF = "CREATE COLUMNFAMILY RegressionTest (keyname text PRIMARY KEY," 
-                        + "bValue boolean, "
-                        + "iValue int "
+                        + " bValue boolean,"
+                        + " iValue int"
                         + ") WITH comparator = ascii AND default_validation = bigint;";
         
         
@@ -223,7 +224,37 @@ public class JdbcRegressionTest
             System.out.println();
         }
    }
-    
+
+    @Test
+    public void testIssue38() throws Exception
+    {
+        DatabaseMetaData md = con.getMetaData();
+        System.out.println();
+        System.out.println("Test Issue #38");
+        System.out.println("--------------");
+        System.out.println("Driver Version :   " + md.getDriverVersion());
+        System.out.println("DB Version     :   " + md.getDatabaseProductVersion());
+        System.out.println("Catalog term   :   " + md.getCatalogTerm());
+        System.out.println("Catalog        :   " + con.getCatalog());
+        System.out.println("Schema term    :   " + md.getSchemaTerm());
+        
+        // test catching exception for beforeFirst() and afterLast()
+        Statement stmt = con.createStatement();
+
+        ResultSet result = stmt.executeQuery("SELECT * FROM t33;");
+        
+        try
+        {
+            result.beforeFirst();
+        }
+        catch (Exception e)
+        {
+            System.out.println();
+            System.out.println("beforeFirst() test -> "+ e);
+        }
+        
+}
+
     
     private final String  showColumn(int index, ResultSet result) throws SQLException
     {

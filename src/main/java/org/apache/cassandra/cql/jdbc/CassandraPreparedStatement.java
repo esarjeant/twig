@@ -135,12 +135,11 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         {
             resetResults();
             CqlResult result = connection.execute(itemId, getBindValues());
-            String keyspace = connection.currentKeyspace;
 
             switch (result.getType())
             {
                 case ROWS:
-                    currentResultSet = new CassandraResultSet(this, result, keyspace);
+                    currentResultSet = new CassandraResultSet(this, result);
                     break;
                 case INT:
                     updateCount = result.getNum();
@@ -152,7 +151,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         }
         catch (InvalidRequestException e)
         {
-            throw new SQLSyntaxErrorException(e.getWhy());
+            throw new SQLSyntaxErrorException(e.getWhy()+"\n'"+cql+"'",e);
         }
         catch (UnavailableException e)
         {
@@ -160,7 +159,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         }
         catch (TimedOutException e)
         {
-            throw new SQLTransientConnectionException(e.getMessage());
+            throw new SQLTransientConnectionException(e);
         }
         catch (SchemaDisagreementException e)
         {
@@ -168,7 +167,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         }
         catch (TException e)
         {
-            throw new SQLNonTransientConnectionException(e.getMessage());
+            throw new SQLNonTransientConnectionException(e);
         }
     }
     

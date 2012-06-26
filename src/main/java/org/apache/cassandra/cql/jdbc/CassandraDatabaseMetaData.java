@@ -102,12 +102,13 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public String getCatalogTerm() throws SQLException
     {
-        return "";
+        return "Cluster";
     }
 
     public ResultSet getCatalogs() throws SQLException
     {
-        return new CassandraResultSet();
+        CassandraResultSet rs = new CassandraResultSet();
+        return rs;
     }
 
     public ResultSet getClientInfoProperties() throws SQLException
@@ -373,7 +374,7 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public String getSchemaTerm() throws SQLException
     {
-        return "";
+        return "Column Family";
     }
 
     public ResultSet getSchemas() throws SQLException
@@ -813,7 +814,7 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public boolean supportsSchemasInDataManipulation() throws SQLException
     {
-        return false;
+        return true;
     }
 
     public boolean supportsSchemasInIndexDefinitions() throws SQLException

@@ -51,7 +51,7 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
     private static final Logger logger = LoggerFactory.getLogger(CassandraConnection.class);
 
     public static final int DB_MAJOR_VERSION = 1;
-    public static final int DB_MINOR_VERSION = 1;
+    public static final int DB_MINOR_VERSION = 2;
     public static final String DB_PRODUCT_NAME = "Cassandra";
     public static final String DEFAULT_CQL_VERSION = "2.0.0";
 
@@ -84,6 +84,8 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
     protected String username = null;
     protected String url = null;
     String currentKeyspace;
+    String cluster;
+    int majorCqlVersion;
     ColumnDecoder decoder;
 
 
@@ -102,13 +104,17 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
             currentKeyspace = props.getProperty(TAG_DATABASE_NAME,"system");
             username = props.getProperty(TAG_USER);
             String password = props.getProperty(TAG_PASSWORD);
-            String version = props.getProperty(TAG_CQL_VERSION);
+            String version = props.getProperty(TAG_CQL_VERSION,DEFAULT_CQL_VERSION);
+            connectionProps.setProperty(TAG_ACTIVE_CQL_VERSION, version);
+            majorCqlVersion = getMajor(version);
 
             TSocket socket = new TSocket(host, port);
             transport = new TFramedTransport(socket);
             TProtocol protocol = new TBinaryProtocol(transport);
             client = new Cassandra.Client(protocol);
             socket.open();
+            
+            cluster = client.describe_cluster_name();
 
             if (username != null)
             {
@@ -119,10 +125,9 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
                 client.login(areq);
             }
             
-            if (version != null)
+            if (majorCqlVersion > 2)
             {
                 client.set_cql_version(version);
-                connectionProps.setProperty(TAG_ACTIVE_CQL_VERSION, version);
             }
             
             decoder = new ColumnDecoder(client.describe_keyspaces());
@@ -131,8 +136,8 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
 
             client.set_keyspace(currentKeyspace);
 
-            Object[] args = {host, port,currentKeyspace,(version==null) ? DEFAULT_CQL_VERSION: version};
-            logger.info("Connected to {}:{} using Keyspace {} and CQL version {}",args);                       
+            Object[] args = {host, port,currentKeyspace,cluster,version};
+            logger.debug("Connected to {}:{} in Cluster '{}' using Keyspace '{}' and CQL version '{}'",args);                       
         }
         catch (InvalidRequestException e)
         {
@@ -151,7 +156,23 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
             throw new SQLInvalidAuthorizationSpecException(e);
         }
     }
-
+    
+    // get the Major portion of a string like : Major.minor.patch where 2 is the default
+    private final int getMajor(String version)
+    {
+        int major = 0;
+        String[] parts = version.split("\\.");
+        try
+        {
+            major = Integer.valueOf(parts[0]);
+        }
+        catch (Exception e)
+        {
+            major = 2;
+        }
+        return major;
+    }
+    
     private final void checkNotClosed() throws SQLException
     {
         if (isClosed()) throw new SQLNonTransientConnectionException(WAS_CLOSED_CON);
@@ -219,10 +240,8 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
 
     public String getCatalog() throws SQLException
     {
-        // This implementation does not support the catalog names so null is always returned if the connection is open.
-        // but it is still an exception to call this on a closed connection.
         checkNotClosed();
-        return null;
+        return cluster;
     }
 
     public Properties getClientInfo() throws SQLException

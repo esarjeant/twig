@@ -63,8 +63,6 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     public static final int DEFAULT_CONCURRENCY = ResultSet.CONCUR_READ_ONLY;
     public static final int DEFAULT_HOLDABILITY = ResultSet.HOLD_CURSORS_OVER_COMMIT;
 
-    private final String keyspace;
-
     /**
      * The rows iterator.
      */
@@ -86,7 +84,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
 
     private final CResultSetMetaData meta;
 
-    private final Statement statement;
+    private final CassandraStatement statement;
 
     private int resultSetType;
 
@@ -103,18 +101,16 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
      */
     CassandraResultSet()
     {
-        keyspace = null;
         statement = null;
         meta = new CResultSetMetaData();
     }
 
     /**
-     * Instantiates a new cassandra result set.
+     * Instantiates a new cassandra result set from a CqlResult.
      */
-    CassandraResultSet(Statement statement, CqlResult resultSet, String keyspace) throws SQLException
+    CassandraResultSet(CassandraStatement statement, CqlResult resultSet) throws SQLException
     {
         this.statement = statement;
-        this.keyspace = keyspace;
         this.resultSetType = statement.getResultSetType();
         this.fetchDirection = statement.getFetchDirection();
         this.fetchSize = statement.getFetchSize();
@@ -134,6 +130,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
                 
         meta = new CResultSetMetaData();
     }
+    
     
     private final boolean hasMoreRows()
     {
@@ -167,11 +164,13 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
 
     public void afterLast() throws SQLException
     {
+        if (resultSetType==TYPE_FORWARD_ONLY) throw new SQLNonTransientException(FORWARD_ONLY);
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void beforeFirst() throws SQLException
     {
+        if (resultSetType==TYPE_FORWARD_ONLY) throw new SQLNonTransientException(FORWARD_ONLY);
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
@@ -1020,10 +1019,13 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
      */
     class CResultSetMetaData implements ResultSetMetaData
     {
+        /**
+         * return the Cassandra Cluster Name as the Catalog
+         */
         public String getCatalogName(int column) throws SQLException
         {
             checkIndex(column);
-            return "";
+            return statement.connection.cluster;
         }
 
         public String getColumnClassName(int column) throws SQLException
@@ -1061,7 +1063,9 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
             return values.get(column - 1).getValueType().getJdbcType();
         }
 
-        // Spec says "database specific type name". For Cassandra this means the abstract type.
+        /**
+         * Spec says "database specific type name"; for Cassandra this means the AbstractType.
+         */
         public String getColumnTypeName(int column) throws SQLException
         {
             checkIndex(column);
@@ -1082,10 +1086,13 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
             return tc.getValueType().getScale(tc.getValue());
         }
 
+        /**
+         * return the DEFAULT current Keyspace as the Schema Name
+         */
         public String getSchemaName(int column) throws SQLException
         {
             checkIndex(column);
-            return keyspace;
+            return statement.connection.currentKeyspace;
         }
 
         public String getTableName(int column) throws SQLException
