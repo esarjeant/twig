@@ -22,12 +22,10 @@ package org.apache.cassandra.cql.jdbc;
 
 import static org.junit.Assert.*;
 
-import java.io.Serializable;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.sql.Date;
 import java.sql.SQLException;
-import java.sql.SQLNonTransientException;
 import java.sql.Time;
 import java.sql.Types;
 import java.util.ArrayList;

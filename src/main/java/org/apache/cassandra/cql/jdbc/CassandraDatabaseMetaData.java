@@ -33,10 +33,12 @@ import java.sql.SQLFeatureNotSupportedException;
 class CassandraDatabaseMetaData implements DatabaseMetaData
 {
     private CassandraConnection connection;
+    private CassandraStatement statement;
     
-    public CassandraDatabaseMetaData(CassandraConnection connection)
+    public CassandraDatabaseMetaData(CassandraConnection connection) throws SQLException
     {
         this.connection = connection;
+        this.statement = new CassandraStatement(connection);
     }
     
     public boolean isWrapperFor(Class<?> iface) throws SQLException
@@ -329,7 +331,7 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public String getNumericFunctions() throws SQLException
     {
-        return null;
+        return "";
     }
 
     public ResultSet getPrimaryKeys(String arg0, String arg1, String arg2) throws SQLException
@@ -419,7 +421,8 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public ResultSet getTableTypes() throws SQLException
     {
-        return new CassandraResultSet();
+        ResultSet result = MetadataResultSets.makeTableTypes(statement);
+        return result;
     }
 
     public ResultSet getTables(String arg0, String arg1, String arg2, String[] arg3) throws SQLException
