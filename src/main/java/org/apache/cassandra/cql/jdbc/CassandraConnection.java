@@ -217,6 +217,11 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
         return autoCommit;
     }
 
+    public Properties getConnectionProps()
+    {
+        return connectionProps;
+    }
+
     public String getCatalog() throws SQLException
     {
         // This implementation does not support the catalog names so null is always returned if the connection is open.
