@@ -22,7 +22,6 @@ package org.apache.cassandra.cql.jdbc;
 
 import static org.junit.Assert.*;
 
-import java.io.PrintWriter;
 import java.sql.DriverManager;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Statement;

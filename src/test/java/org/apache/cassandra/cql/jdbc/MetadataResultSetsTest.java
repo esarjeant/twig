@@ -36,7 +36,10 @@ public class MetadataResultSetsTest
 {
     private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
     private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort()+""));
-    private static final String KEYSPACE = "TestKS";
+    private static final String KEYSPACE1 = "TestKS1";
+    private static final String KEYSPACE2 = "TestKS2";
+    private static final String DROP_KS = "DROP KEYSPACE \"%s\";";
+    private static final String CREATE_KS = "CREATE KEYSPACE \"%s\" WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1;";
       
     private static java.sql.Connection con = null;
     
@@ -45,43 +48,57 @@ public class MetadataResultSetsTest
     public static void setUpBeforeClass() throws Exception
     {
         Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
-        String URL = String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,"system");
+        String URL = String.format("jdbc:cassandra://%s:%d/%s?version=3.0.0",HOST,PORT,"system");
         System.out.println("Connection URL = '"+URL +"'");
         
         con = DriverManager.getConnection(URL);
         Statement stmt = con.createStatement();
         
         // Drop Keyspace
-        String dropKS = String.format("DROP KEYSPACE %s;",KEYSPACE);
+        String dropKS1 = String.format(DROP_KS,KEYSPACE1);
+        String dropKS2 = String.format(DROP_KS,KEYSPACE2);
         
-        try { stmt.execute(dropKS);}
+        try { stmt.execute(dropKS1); stmt.execute(dropKS2);}
         catch (Exception e){/* Exception on DROP is OK */}
 
         // Create KeySpace
-        String createKS = String.format("CREATE KEYSPACE %s WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1;",KEYSPACE);
-        System.out.println("createKS = '"+createKS+"'");
+        String createKS1 = String.format(CREATE_KS,KEYSPACE1);
+        String createKS2 = String.format(CREATE_KS,KEYSPACE2);
         stmt = con.createStatement();
         stmt.execute("USE system;");
-        stmt.execute(createKS);
+        stmt.execute(createKS1);
+        stmt.execute(createKS2);
         
         // Use Keyspace
-        String useKS = String.format("USE %s;",KEYSPACE);
-        stmt.execute(useKS);
+        String useKS1 = String.format("USE \"%s\";",KEYSPACE1);
+        String useKS2 = String.format("USE \"%s\";",KEYSPACE2);
+        stmt.execute(useKS1);
         
         // Create the target Column family
-        String createCF = "CREATE COLUMNFAMILY RegressionTest (keyname text PRIMARY KEY," 
-                        + " bValue boolean,"
-                        + " iValue int"
-                        + ") WITH comparator = ascii AND default_validation = bigint;";
+        String createCF1 = "CREATE COLUMNFAMILY test1 (keyname text PRIMARY KEY," 
+                        + " t1bValue boolean,"
+                        + " t1iValue int"
+                        + ") WITH comment = 'first TABLE in the Keyspace'"
+                        + ";";
+        
+        String createCF2 = "CREATE COLUMNFAMILY test2 (keyname text PRIMARY KEY," 
+                        + " t2bValue boolean,"
+                        + " t2iValue int"
+                        + ") WITH comment = 'second TABLE in the Keyspace'"
+                        + ";";
         
         
-        stmt.execute(createCF);
+        stmt.execute(createCF1);
+        stmt.execute(createCF2);
+        stmt.execute(useKS2);
+        stmt.execute(createCF1);
+        stmt.execute(createCF2);
+
         stmt.close();
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
-        System.out.println(con);
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?version=3.0.0",HOST,PORT,KEYSPACE1));
 
     }
     
@@ -91,7 +108,7 @@ public class MetadataResultSetsTest
         if (con!=null) con.close();
     }
 
-    private final String  showColumn(int index, ResultSet result) throws SQLException
+    private final String showColumn(int index, ResultSet result) throws SQLException
     {
         StringBuilder sb = new StringBuilder();
         sb.append("[").append(index).append("]");
@@ -105,24 +122,93 @@ public class MetadataResultSetsTest
         return sb.toString();
     }
     
+    private final String toString(ResultSet result) throws SQLException
+    {
+       StringBuilder sb = new StringBuilder();
+
+       while (result.next())
+       {
+           ResultSetMetaData metadata = result.getMetaData();
+           int colCount = metadata.getColumnCount();
+           sb.append(String.format("(%d) ",result.getRow()));
+           for (int i = 1; i <= colCount; i++)
+           {
+               sb.append(" " +showColumn(i,result)); 
+           }
+           sb.append("\n");
+       }
+       return sb.toString();
+    }
+
+    // TESTS ------------------------------------------------------------------
+    
     @Test
     public void testTableType() throws SQLException
     {
         CassandraStatement statement = (CassandraStatement) con.createStatement();
-        ResultSet result = MetadataResultSets.makeTableTypes(statement);
+        ResultSet result = MetadataResultSets.instance.makeTableTypes(statement);
         
-        while (result.next())
-        {
-            ResultSetMetaData metadata = result.getMetaData();
-            int colCount = metadata.getColumnCount();
-            System.out.printf("(%d) ",result.getRow());
-            for (int i = 1; i <= colCount; i++)
-            {
-                System.out.print(showColumn(i,result)+ " "); 
-            }
-            System.out.println();
-        }
+        System.out.println("--- testTableType() ---");
+        System.out.println(toString(result));       
+        System.out.println();
+    }
 
+    @Test
+    public void testCatalogs() throws SQLException
+    {
+        CassandraStatement statement = (CassandraStatement) con.createStatement();
+        ResultSet result = MetadataResultSets.instance.makeCatalogs(statement);
+        
+        System.out.println("--- testCatalogs() ---");
+        System.out.println(toString(result));       
+        System.out.println();
+    }
+
+    @Test
+    public void testSchemas() throws SQLException
+    {
+        CassandraStatement statement = (CassandraStatement) con.createStatement();
+        ResultSet result = MetadataResultSets.instance.makeSchemas(statement, null);
+        
+        System.out.println("--- testSchemas() ---");
+        System.out.println(result.getMetaData().getColumnName(1));
+        System.out.println(result.getMetaData().getColumnName(2));
+       
+        System.out.println(toString(result));       
+        System.out.println();
+        
+        result = MetadataResultSets.instance.makeSchemas(statement, "TestKS2");
+        System.out.println(toString(result));       
+        System.out.println();
+    }
+    
+    @Test
+    public void testTables() throws SQLException
+    {
+        CassandraStatement statement = (CassandraStatement) con.createStatement();
+        ResultSet result = MetadataResultSets.instance.makeTables(statement, null, null);
+        
+        System.out.println("--- testTables() ---");
+        System.out.println(result.getMetaData().getColumnName(1));
+        System.out.println(result.getMetaData().getColumnName(2));
+        System.out.println(result.getMetaData().getColumnName(3));
+        System.out.println(result.getMetaData().getColumnName(4));
+        System.out.println(result.getMetaData().getColumnName(5));
+       
+        System.out.println(toString(result));       
+        System.out.println();
+        
+        result = MetadataResultSets.instance.makeTables(statement, "TestKS2", null);
+        System.out.println(toString(result));       
+        System.out.println();
+
+        result = MetadataResultSets.instance.makeTables(statement, null, "test1");
+        System.out.println(toString(result));       
+        System.out.println();
+
+        result = MetadataResultSets.instance.makeTables(statement, "TestKS2", "test1");
+        System.out.println(toString(result));       
+        System.out.println();
     }
 
 }

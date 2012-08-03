@@ -40,7 +40,7 @@ public class JdbcRegressionTest
     private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
     private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort()+""));
     private static final String KEYSPACE = "TestKS";
-    private static final String CQLV3 = "3.0.0";
+//    private static final String CQLV3 = "3.0.0";
       
     private static java.sql.Connection con = null;
     

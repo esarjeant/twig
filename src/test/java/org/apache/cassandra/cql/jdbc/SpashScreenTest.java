@@ -21,7 +21,6 @@
 
 package org.apache.cassandra.cql.jdbc;
 
-import static org.junit.Assert.*;
 
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;

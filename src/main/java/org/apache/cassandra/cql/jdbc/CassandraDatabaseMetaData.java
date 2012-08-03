@@ -29,6 +29,7 @@ import java.sql.ResultSet;
 import java.sql.RowIdLifetime;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
+import java.sql.SQLSyntaxErrorException;
 
 class CassandraDatabaseMetaData implements DatabaseMetaData
 {
@@ -109,7 +110,7 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public ResultSet getCatalogs() throws SQLException
     {
-        CassandraResultSet rs = new CassandraResultSet();
+        ResultSet rs = MetadataResultSets.instance.makeCatalogs(statement);
         return rs;
     }
 
@@ -381,12 +382,17 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public ResultSet getSchemas() throws SQLException
     {
-        return new CassandraResultSet();
+        ResultSet rs = MetadataResultSets.instance.makeSchemas(statement, null);
+        return rs;
     }
 
-    public ResultSet getSchemas(String arg0, String arg1) throws SQLException
+    public ResultSet getSchemas(String catalog, String schemaPattern) throws SQLException
     {
-        return new CassandraResultSet();
+        if (!(catalog == null || catalog.equals(statement.connection.cluster) ))
+            throw new SQLSyntaxErrorException("catalog name must exactly match or be null");
+        
+        ResultSet rs = MetadataResultSets.instance.makeSchemas(statement, schemaPattern);
+        return rs;
     }
 
     public String getSearchStringEscape() throws SQLException
@@ -421,7 +427,7 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public ResultSet getTableTypes() throws SQLException
     {
-        ResultSet result = MetadataResultSets.makeTableTypes(statement);
+        ResultSet result = MetadataResultSets.instance.makeTableTypes(statement);
         return result;
     }
 

@@ -21,11 +21,13 @@
 package org.apache.cassandra.cql.jdbc;
 
 import static org.apache.cassandra.cql.jdbc.Utils.*;
+import static org.apache.cassandra.utils.ByteBufferUtil.string;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
 import java.sql.*;
 import java.sql.Date;
 import java.util.*;
@@ -67,6 +69,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
      * The rows iterator.
      */
     private Iterator<CqlRow> rowsIterator;
+    
 
     int rowNumber = 0;
     // the current row key when iterating through results.
@@ -109,7 +112,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
      * Instantiates a new cassandra result set from a CqlResult.
      */
     CassandraResultSet(CassandraStatement statement, CqlResult resultSet) throws SQLException
-    {
+    {        
         this.statement = statement;
         this.resultSetType = statement.getResultSetType();
         this.fetchDirection = statement.getFetchDirection();
@@ -964,10 +967,26 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
 
     private TypedColumn createColumn(Column column)
     {
+        assert column != null;
+        assert column.name != null;
+        
+        String columnname=null;
+        
+        try
+        {
+            columnname = string(column.name);
+        }
+        catch (CharacterCodingException e)
+        {
+            throw new RuntimeException(e);
+        }
+        
         String nameType = schema.name_types.get(column.name);
+        if (nameType==null) nameType = "AsciiType";
         AbstractJdbcType<?> comparator = TypesMap.getTypeForComparator(nameType == null ? schema.default_name_type : nameType);
         String valueType = schema.value_types.get(column.name);
         AbstractJdbcType<?> validator = TypesMap.getTypeForComparator(valueType == null ? schema.default_value_type : valueType);
+        nameType = columnname;
         return new TypedColumn(column, comparator, validator);
     }
 
