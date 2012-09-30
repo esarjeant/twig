@@ -21,6 +21,7 @@
 package org.apache.cassandra.cql.jdbc;
 
 import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
 
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -39,7 +40,6 @@ public class JdbcRegressionTest
     private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
     private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort()+""));
     private static final String KEYSPACE = "TestKS";
-    private static final String CQLV3 = "3.0.0";
       
     private static java.sql.Connection con = null;
     
@@ -224,6 +224,29 @@ public class JdbcRegressionTest
         }
    }
     
+    @Test
+    public void isValid() throws Exception
+    {
+    	assert con.isValid(3);
+    }
+    
+    @Test(expected=SQLException.class)
+    public void isValidSubZero() throws Exception
+    {
+    	con.isValid(-42);
+    }
+    
+    @Test
+    public void isNotValid() throws Exception
+    {
+        PreparedStatement currentStatement = ((CassandraConnection) con).isAlive;
+        PreparedStatement mockedStatement = mock(PreparedStatement.class);
+        when(mockedStatement.executeQuery()).thenThrow(new SQLException("A mocked ERROR"));
+        ((CassandraConnection) con).isAlive = mockedStatement;
+        assert con.isValid(5) == false;
+        ((CassandraConnection) con).isAlive = currentStatement;
+    }
+    
     
     private final String  showColumn(int index, ResultSet result) throws SQLException
     {
@@ -233,3 +256,4 @@ public class JdbcRegressionTest
         return sb.toString();
     }
 }
+

@@ -50,6 +50,9 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
 
     private static final Logger logger = LoggerFactory.getLogger(CassandraConnection.class);
 
+    static final String IS_VALID_CQLQUERY_2_0_0 = "SELECT COUNT(1) FROM system.Versions WHERE component = 'cql';";
+    static final String IS_VALID_CQLQUERY_3_0_0 = "SELECT COUNT(1) FROM system.\"Versions\" WHERE component = 'cql';";
+    
     public static final int DB_MAJOR_VERSION = 1;
     public static final int DB_MINOR_VERSION = 1;
     public static final String DB_PRODUCT_NAME = "Cassandra";
@@ -86,6 +89,11 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
     String currentKeyspace;
     ColumnDecoder decoder;
 
+    private TSocket socket;
+    
+    PreparedStatement isAlive = null;
+    
+    private String currentCqlVersion;
 
     /**
      * Instantiates a new CassandraConnection.
@@ -104,7 +112,7 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
             String password = props.getProperty(TAG_PASSWORD);
             String version = props.getProperty(TAG_CQL_VERSION);
 
-            TSocket socket = new TSocket(host, port);
+            socket = new TSocket(host, port);
             transport = new TFramedTransport(socket);
             TProtocol protocol = new TBinaryProtocol(transport);
             client = new Cassandra.Client(protocol);
@@ -119,11 +127,10 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
                 client.login(areq);
             }
             
-            if (version != null)
-            {
-                client.set_cql_version(version);
-                connectionProps.setProperty(TAG_ACTIVE_CQL_VERSION, version);
-            }
+            currentCqlVersion = (version==null) ? DEFAULT_CQL_VERSION: version;
+
+            client.set_cql_version(currentCqlVersion);
+            connectionProps.setProperty(TAG_ACTIVE_CQL_VERSION, currentCqlVersion);
             
             decoder = new ColumnDecoder(client.describe_keyspaces());
                     
@@ -131,8 +138,8 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
 
             client.set_keyspace(currentKeyspace);
 
-            Object[] args = {host, port,currentKeyspace,(version==null) ? DEFAULT_CQL_VERSION: version};
-            logger.info("Connected to {}:{} using Keyspace {} and CQL version {}",args);                       
+            Object[] args = {host, port,currentKeyspace, currentCqlVersion};
+            logger.info("Connected to {}:{} using Keyspace {} and CQL version {}",args);
         }
         catch (InvalidRequestException e)
         {
@@ -282,11 +289,34 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
 
     public boolean isValid(int timeout) throws SQLException
     {
-        checkNotClosed();
         if (timeout < 0) throw new SQLTimeoutException(BAD_TIMEOUT);
+        
+    	if (isClosed()) {
+    		return false;
+    	}
+    	
+        // set timeout
+        socket.setTimeout(timeout * 1000);
 
-        // this needs to be more robust. Some query needs to be made to verify connection is really up.
-        return !isClosed();
+        try
+        {        
+            if (isAlive == null)
+            {
+                isAlive = prepareStatement(currentCqlVersion == "2.0.0" ? IS_VALID_CQLQUERY_2_0_0 : IS_VALID_CQLQUERY_3_0_0);
+            }
+            // the result is not important
+            isAlive.executeQuery().close();
+        }
+        catch (SQLException e)
+        {
+        	return false;
+        }
+        finally {
+            // reset timeout
+            socket.setTimeout(0);
+        }
+
+        return true;
     }
 
     public boolean isWrapperFor(Class<?> arg0) throws SQLException
@@ -495,5 +525,6 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
         builder.append(connectionProps);
         builder.append("]");
         return builder.toString();
-    }    
+    }
 }
+

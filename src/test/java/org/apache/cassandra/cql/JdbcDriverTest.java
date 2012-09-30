@@ -114,43 +114,22 @@ public class JdbcDriverTest
         assertEquals(valuCaseSense, md.isCaseSensitive(col));
     }
 
-    @Test
+    @Test(expected=SQLNonTransientConnectionException.class)
     public void testNoHost() throws SQLException
     {
-        try
-        {
-            DriverManager.getConnection("jdbc:cassandra:localhost");
-        }
-        catch (Exception e)
-        {
-            assertEquals(SQLNonTransientConnectionException.class, e.getClass());
-        }
+           DriverManager.getConnection("jdbc:cassandra:localhost");
     }
 
-    @Test
+    @Test(expected=SQLNonTransientConnectionException.class)
     public void testBadKeyspace() throws SQLException
     {
-        try
-        {
-            DriverManager.getConnection("jdbc:cassandra://localhost/Keysp@ce");
-        }
-        catch (Exception e)
-        {
-            assertEquals(SQLNonTransientConnectionException.class, e.getClass());
-        }
+        DriverManager.getConnection("jdbc:cassandra://localhost/Keysp@ce");
     }
 
-    @Test
+    @Test(expected=SQLNonTransientConnectionException.class)
     public void testBadUserinfo() throws SQLException
     {
-        try
-        {
-            DriverManager.getConnection("jdbc:cassandra://root;root@localhost");
-        }
-        catch (Exception e)
-        {
-            assertEquals(SQLNonTransientConnectionException.class, e.getClass());
-        }
+        DriverManager.getConnection("jdbc:cassandra://root;root@localhost");
     }
 
     @Test
