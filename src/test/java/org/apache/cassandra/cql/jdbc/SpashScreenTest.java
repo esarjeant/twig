@@ -21,8 +21,6 @@
 
 package org.apache.cassandra.cql.jdbc;
 
-import static org.junit.Assert.*;
-
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
@@ -86,13 +84,15 @@ public class SpashScreenTest
     {
         String query = "UPDATE Test SET a=?, b=? WHERE KEY=?";
         PreparedStatement statement = con.prepareStatement(query);
+        try {
+            statement.setLong(1, 100);
+            statement.setLong(2, 1000);
+            statement.setString(3, "key0");
 
-        statement.setLong(1, 100);
-        statement.setLong(2, 1000);
-        statement.setString(3, "key0");
-
-        statement.executeUpdate();
-
-        statement.close();
+            statement.executeUpdate();
+        }
+        finally {
+            statement.close();
+        }
     }
 }
