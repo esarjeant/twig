@@ -42,9 +42,10 @@ import java.sql.SQLNonTransientConnectionException;
 import java.util.Properties;
 import java.util.logging.Logger;
 
+import javax.sql.ConnectionPoolDataSource;
 import javax.sql.DataSource;
 
-public class CassandraDataSource implements DataSource
+public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
 {
 
     static
@@ -207,4 +208,16 @@ public class CassandraDataSource implements DataSource
     {
     	throw new SQLFeatureNotSupportedException(String.format(NOT_SUPPORTED));
     }
+
+	@Override
+	public PooledCassandraConnection getPooledConnection() throws SQLException
+	{
+		return new PooledCassandraConnection(getConnection());
+	}
+
+	@Override
+	public PooledCassandraConnection getPooledConnection(String user, String password) throws SQLException
+	{
+		return new PooledCassandraConnection(getConnection(user, password));
+	}
 }
