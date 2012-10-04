@@ -96,6 +96,11 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
             throw new SQLNonTransientConnectionException(e);
         }
     }
+    
+    String getCql()
+    {
+    	return cql;
+    }
 
     private final void checkIndex(int index) throws SQLException
     {
@@ -121,7 +126,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
     }
 
     
-    public void close() throws SQLException
+    public void close()
     {
         connection.removeStatement(this);
         

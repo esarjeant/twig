@@ -287,19 +287,19 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
         return false;
     }
 
-    public boolean isValid(int timeout) throws SQLException
+    public boolean isValid(int timeout) throws SQLTimeoutException
     {
         if (timeout < 0) throw new SQLTimeoutException(BAD_TIMEOUT);
-        
-    	if (isClosed()) {
-    		return false;
-    	}
     	
         // set timeout
         socket.setTimeout(timeout * 1000);
 
         try
-        {        
+        {
+        	if (isClosed()) {
+        		return false;
+        	}
+        	
             if (isAlive == null)
             {
                 isAlive = prepareStatement(currentCqlVersion == "2.0.0" ? IS_VALID_CQLQUERY_2_0_0 : IS_VALID_CQLQUERY_3_0_0);
@@ -332,10 +332,10 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
         return sql;
     }
 
-    public PreparedStatement prepareStatement(String sql) throws SQLException
+    public CassandraPreparedStatement prepareStatement(String sql) throws SQLException
     {
         checkNotClosed();
-        PreparedStatement statement = new CassandraPreparedStatement(this, sql);
+        CassandraPreparedStatement statement = new CassandraPreparedStatement(this, sql);
         statements.add(statement);
         return statement;
     }

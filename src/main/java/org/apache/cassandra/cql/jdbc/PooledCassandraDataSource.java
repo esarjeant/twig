@@ -37,6 +37,8 @@ import org.slf4j.LoggerFactory;
 
 public class PooledCassandraDataSource implements DataSource, ConnectionEventListener
 {
+	private static final int CONNECTION_IS_VALID_TIMEOUT = 5;
+
 	private static final int MIN_POOL_SIZE = 4;
 
 	protected static final String NOT_SUPPORTED = "the Cassandra implementation does not support this method";
@@ -105,6 +107,16 @@ public class PooledCassandraDataSource implements DataSource, ConnectionEventLis
 	public void connectionErrorOccurred(ConnectionEvent event)
 	{
 		PooledCassandraConnection connection = (PooledCassandraConnection) event.getSource();
+		try
+		{
+			if (!connection.getConnection().isValid(CONNECTION_IS_VALID_TIMEOUT)) {
+				connection.getConnection().close();
+			}
+		}
+		catch (SQLException e)
+		{
+			logger.error(e.getMessage());
+		}
 		usedConnections.remove(connection);
 	}
 
@@ -130,31 +142,31 @@ public class PooledCassandraDataSource implements DataSource, ConnectionEventLis
 	}
 
 	@Override
-	public PrintWriter getLogWriter() throws SQLException
-	{
-		return connectionPoolDataSource.getLogWriter();
-	}
-
-	@Override
-	public int getLoginTimeout() throws SQLException
+	public int getLoginTimeout()
 	{
 		return connectionPoolDataSource.getLoginTimeout();
 	}
 
 	@Override
-	public void setLogWriter(PrintWriter writer) throws SQLException
-	{
-		connectionPoolDataSource.setLogWriter(writer);
-	}
-
-	@Override
-	public void setLoginTimeout(int secounds) throws SQLException
+	public void setLoginTimeout(int secounds)
 	{
 		connectionPoolDataSource.setLoginTimeout(secounds);
 	}
 
 	@Override
-	public boolean isWrapperFor(Class<?> arg0) throws SQLException
+	public PrintWriter getLogWriter()
+	{
+		return connectionPoolDataSource.getLogWriter();
+	}
+
+	@Override
+	public void setLogWriter(PrintWriter writer)
+	{
+		connectionPoolDataSource.setLogWriter(writer);
+	}
+
+	@Override
+	public boolean isWrapperFor(Class<?> arg0)
 	{
 		return connectionPoolDataSource.isWrapperFor(arg0);
 	}

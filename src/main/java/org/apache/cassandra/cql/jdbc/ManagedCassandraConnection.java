@@ -30,27 +30,28 @@ import java.sql.SQLClientInfoException;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLNonTransientConnectionException;
+import java.sql.SQLTimeoutException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
+import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.ConcurrentSkipListSet;
 
-public class ManagedCassandraConnection extends AbstractCassandraConnection implements Connection
+class ManagedCassandraConnection extends AbstractCassandraConnection implements Connection
 {
 	private PooledCassandraConnection pooledCassandraConnection;
 
-	private Connection physicalConnection;
+	private CassandraConnection physicalConnection;
 
-	private Set<Statement> statements = new ConcurrentSkipListSet<Statement>();
+	private Set<Statement> statements = new HashSet<Statement>();
 
-	public ManagedCassandraConnection(PooledCassandraConnection pooledCassandraConnection)
+	ManagedCassandraConnection(PooledCassandraConnection pooledCassandraConnection)
 	{
 		this.pooledCassandraConnection = pooledCassandraConnection;
 		this.physicalConnection = pooledCassandraConnection.getConnection();
 	}
 
-	private void checkClosed() throws SQLNonTransientConnectionException
+	private void checkNotClosed() throws SQLNonTransientConnectionException
 	{
 		if (isClosed())
 		{
@@ -59,23 +60,24 @@ public class ManagedCassandraConnection extends AbstractCassandraConnection impl
 	}
 
 	@Override
+	public boolean isClosed()
+	{
+		return physicalConnection == null;
+	}
+
+	@Override
 	public synchronized void close() throws SQLException
 	{
 		for (Statement statement : statements)
 		{
-			if (!statement.isClosed()) {
+			if (!statement.isClosed())
+			{
 				statement.close();
 			}
 		}
 		pooledCassandraConnection.connectionClosed();
 		pooledCassandraConnection = null;
 		physicalConnection = null;
-	}
-
-	@Override
-	public boolean isClosed()
-	{
-		return physicalConnection == null;
 	}
 
 	@Override
@@ -93,8 +95,26 @@ public class ManagedCassandraConnection extends AbstractCassandraConnection impl
 	@Override
 	public Statement createStatement() throws SQLException
 	{
-		checkClosed();
-		Statement statement = pooledCassandraConnection.createStatement();
+		checkNotClosed();
+		Statement statement = physicalConnection.createStatement();
+		statements.add(statement);
+		return statement;
+	}
+
+	@Override
+	public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException
+	{
+		checkNotClosed();
+		Statement statement = physicalConnection.createStatement(resultSetType, resultSetConcurrency);
+		statements.add(statement);
+		return statement;
+	}
+
+	@Override
+	public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException
+	{
+		checkNotClosed();
+		Statement statement = physicalConnection.createStatement(resultSetType, resultSetConcurrency, resultSetHoldability);
 		statements.add(statement);
 		return statement;
 	}
@@ -102,227 +122,8 @@ public class ManagedCassandraConnection extends AbstractCassandraConnection impl
 	@Override
 	public PreparedStatement prepareStatement(String cql) throws SQLException
 	{
-		checkClosed();
-		PreparedStatement statement = pooledCassandraConnection.prepareStatement(cql);
-		statements.add(statement);
-		return statement;
-	}
-
-	@Override
-	public String nativeSQL(String sql) throws SQLException
-	{
-		checkClosed();
-		try
-		{
-			return physicalConnection.nativeSQL(sql);
-		}
-		catch (SQLException sqlException)
-		{
-			pooledCassandraConnection.connectionErrorOccurred(sqlException);
-			throw sqlException;
-		}
-	}
-
-	@Override
-	public void setAutoCommit(boolean autoCommit) throws SQLException
-	{
-		checkClosed();
-		try
-		{
-			physicalConnection.setAutoCommit(autoCommit);
-		}
-		catch (SQLException sqlException)
-		{
-			pooledCassandraConnection.connectionErrorOccurred(sqlException);
-			throw sqlException;
-		}
-	}
-
-	@Override
-	public boolean getAutoCommit() throws SQLException
-	{
-		checkClosed();
-		try
-		{
-			return physicalConnection.getAutoCommit();
-		}
-		catch (SQLException sqlException)
-		{
-			pooledCassandraConnection.connectionErrorOccurred(sqlException);
-			throw sqlException;
-		}
-	}
-
-	@Override
-	public void commit() throws SQLException
-	{
-		checkClosed();
-		try
-		{
-			physicalConnection.commit();
-		}
-		catch (SQLException sqlException)
-		{
-			pooledCassandraConnection.connectionErrorOccurred(sqlException);
-			throw sqlException;
-		}
-	}
-
-	@Override
-	public void rollback() throws SQLException
-	{
-		checkClosed();
-		try
-		{
-			physicalConnection.rollback();
-		}
-		catch (SQLException sqlException)
-		{
-			pooledCassandraConnection.connectionErrorOccurred(sqlException);
-			throw sqlException;
-		}
-	}
-
-	@Override
-	public DatabaseMetaData getMetaData() throws SQLException
-	{
-		checkClosed();
-		try
-		{
-			return physicalConnection.getMetaData();
-		}
-		catch (SQLException sqlException)
-		{
-			pooledCassandraConnection.connectionErrorOccurred(sqlException);
-			throw sqlException;
-		}
-	}
-
-	@Override
-	public void setReadOnly(boolean readOnly) throws SQLException
-	{
-		checkClosed();
-		try
-		{
-			physicalConnection.setReadOnly(readOnly);
-		}
-		catch (SQLException sqlException)
-		{
-			pooledCassandraConnection.connectionErrorOccurred(sqlException);
-			throw sqlException;
-		}
-	}
-
-	@Override
-	public boolean isReadOnly() throws SQLException
-	{
-		checkClosed();
-		try
-		{
-			return physicalConnection.isReadOnly();
-		}
-		catch (SQLException sqlException)
-		{
-			pooledCassandraConnection.connectionErrorOccurred(sqlException);
-			throw sqlException;
-		}
-	}
-
-	@Override
-	public void setCatalog(String catalog) throws SQLException
-	{
-		checkClosed();
-		try
-		{
-			physicalConnection.setCatalog(catalog);
-		}
-		catch (SQLException sqlException)
-		{
-			pooledCassandraConnection.connectionErrorOccurred(sqlException);
-			throw sqlException;
-		}
-	}
-
-	@Override
-	public String getCatalog() throws SQLException
-	{
-		checkClosed();
-		try
-		{
-			return physicalConnection.getCatalog();
-		}
-		catch (SQLException sqlException)
-		{
-			pooledCassandraConnection.connectionErrorOccurred(sqlException);
-			throw sqlException;
-		}
-	}
-
-	@Override
-	public void setTransactionIsolation(int level) throws SQLException
-	{
-		checkClosed();
-		try
-		{
-			physicalConnection.setTransactionIsolation(level);
-		}
-		catch (SQLException sqlException)
-		{
-			pooledCassandraConnection.connectionErrorOccurred(sqlException);
-			throw sqlException;
-		}
-	}
-
-	@Override
-	public int getTransactionIsolation() throws SQLException
-	{
-		checkClosed();
-		try
-		{
-			return physicalConnection.getTransactionIsolation();
-		}
-		catch (SQLException sqlException)
-		{
-			pooledCassandraConnection.connectionErrorOccurred(sqlException);
-			throw sqlException;
-		}
-	}
-
-	@Override
-	public SQLWarning getWarnings() throws SQLException
-	{
-		checkClosed();
-		try
-		{
-			return physicalConnection.getWarnings();
-		}
-		catch (SQLException sqlException)
-		{
-			pooledCassandraConnection.connectionErrorOccurred(sqlException);
-			throw sqlException;
-		}
-	}
-
-	@Override
-	public void clearWarnings() throws SQLException
-	{
-		checkClosed();
-		try
-		{
-			physicalConnection.clearWarnings();
-		}
-		catch (SQLException sqlException)
-		{
-			pooledCassandraConnection.connectionErrorOccurred(sqlException);
-			throw sqlException;
-		}
-	}
-
-	@Override
-	public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException
-	{
-		checkClosed();
-		Statement statement = pooledCassandraConnection.createStatement(resultSetType, resultSetConcurrency);
+		checkNotClosed();
+		ManagedPreparedStatement statement = pooledCassandraConnection.prepareStatement(this, cql);
 		statements.add(statement);
 		return statement;
 	}
@@ -334,45 +135,6 @@ public class ManagedCassandraConnection extends AbstractCassandraConnection impl
 	}
 
 	@Override
-	public void setHoldability(int holdability) throws SQLException
-	{
-		checkClosed();
-		try
-		{
-			physicalConnection.setHoldability(holdability);
-		}
-		catch (SQLException sqlException)
-		{
-			pooledCassandraConnection.connectionErrorOccurred(sqlException);
-			throw sqlException;
-		}
-	}
-
-	@Override
-	public int getHoldability() throws SQLException
-	{
-		checkClosed();
-		try
-		{
-			return physicalConnection.getHoldability();
-		}
-		catch (SQLException sqlException)
-		{
-			pooledCassandraConnection.connectionErrorOccurred(sqlException);
-			throw sqlException;
-		}
-	}
-
-	@Override
-	public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException
-	{
-		checkClosed();
-		Statement statement = pooledCassandraConnection.createStatement(resultSetType, resultSetConcurrency, resultSetHoldability);
-		statements.add(statement);
-		return statement;
-	}
-
-	@Override
 	public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability)
 			throws SQLException
 	{
@@ -380,18 +142,9 @@ public class ManagedCassandraConnection extends AbstractCassandraConnection impl
 	}
 
 	@Override
-	public boolean isValid(int timeout) throws SQLException
+	public boolean isValid(int timeout) throws SQLTimeoutException
 	{
-		checkClosed();
-		try
-		{
-			return physicalConnection.isValid(timeout);
-		}
-		catch (SQLException sqlException)
-		{
-			pooledCassandraConnection.connectionErrorOccurred(sqlException);
-			throw sqlException;
-		}
+		return physicalConnection.isValid(timeout);
 	}
 
 	@Override
@@ -412,10 +165,253 @@ public class ManagedCassandraConnection extends AbstractCassandraConnection impl
 		}
 	}
 
+	// all following methods have the form
+	// checkNotClosed-try-return/void-catch-notify-throw
+
+	@Override
+	public String nativeSQL(String sql) throws SQLException
+	{
+		checkNotClosed();
+		try
+		{
+			return physicalConnection.nativeSQL(sql);
+		}
+		catch (SQLException sqlException)
+		{
+			pooledCassandraConnection.connectionErrorOccurred(sqlException);
+			throw sqlException;
+		}
+	}
+
+	@Override
+	public void setAutoCommit(boolean autoCommit) throws SQLException
+	{
+		checkNotClosed();
+		try
+		{
+			physicalConnection.setAutoCommit(autoCommit);
+		}
+		catch (SQLException sqlException)
+		{
+			pooledCassandraConnection.connectionErrorOccurred(sqlException);
+			throw sqlException;
+		}
+	}
+
+	@Override
+	public boolean getAutoCommit() throws SQLException
+	{
+		checkNotClosed();
+		try
+		{
+			return physicalConnection.getAutoCommit();
+		}
+		catch (SQLException sqlException)
+		{
+			pooledCassandraConnection.connectionErrorOccurred(sqlException);
+			throw sqlException;
+		}
+	}
+
+	@Override
+	public void commit() throws SQLException
+	{
+		checkNotClosed();
+		try
+		{
+			physicalConnection.commit();
+		}
+		catch (SQLException sqlException)
+		{
+			pooledCassandraConnection.connectionErrorOccurred(sqlException);
+			throw sqlException;
+		}
+	}
+
+	@Override
+	public void rollback() throws SQLException
+	{
+		checkNotClosed();
+		try
+		{
+			physicalConnection.rollback();
+		}
+		catch (SQLException sqlException)
+		{
+			pooledCassandraConnection.connectionErrorOccurred(sqlException);
+			throw sqlException;
+		}
+	}
+
+	@Override
+	public DatabaseMetaData getMetaData() throws SQLException
+	{
+		checkNotClosed();
+		try
+		{
+			return physicalConnection.getMetaData();
+		}
+		catch (SQLException sqlException)
+		{
+			pooledCassandraConnection.connectionErrorOccurred(sqlException);
+			throw sqlException;
+		}
+	}
+
+	@Override
+	public void setReadOnly(boolean readOnly) throws SQLException
+	{
+		checkNotClosed();
+		try
+		{
+			physicalConnection.setReadOnly(readOnly);
+		}
+		catch (SQLException sqlException)
+		{
+			pooledCassandraConnection.connectionErrorOccurred(sqlException);
+			throw sqlException;
+		}
+	}
+
+	@Override
+	public boolean isReadOnly() throws SQLException
+	{
+		checkNotClosed();
+		try
+		{
+			return physicalConnection.isReadOnly();
+		}
+		catch (SQLException sqlException)
+		{
+			pooledCassandraConnection.connectionErrorOccurred(sqlException);
+			throw sqlException;
+		}
+	}
+
+	@Override
+	public void setCatalog(String catalog) throws SQLException
+	{
+		checkNotClosed();
+		try
+		{
+			physicalConnection.setCatalog(catalog);
+		}
+		catch (SQLException sqlException)
+		{
+			pooledCassandraConnection.connectionErrorOccurred(sqlException);
+			throw sqlException;
+		}
+	}
+
+	@Override
+	public String getCatalog() throws SQLException
+	{
+		checkNotClosed();
+		try
+		{
+			return physicalConnection.getCatalog();
+		}
+		catch (SQLException sqlException)
+		{
+			pooledCassandraConnection.connectionErrorOccurred(sqlException);
+			throw sqlException;
+		}
+	}
+
+	@Override
+	public void setTransactionIsolation(int level) throws SQLException
+	{
+		checkNotClosed();
+		try
+		{
+			physicalConnection.setTransactionIsolation(level);
+		}
+		catch (SQLException sqlException)
+		{
+			pooledCassandraConnection.connectionErrorOccurred(sqlException);
+			throw sqlException;
+		}
+	}
+
+	@Override
+	public int getTransactionIsolation() throws SQLException
+	{
+		checkNotClosed();
+		try
+		{
+			return physicalConnection.getTransactionIsolation();
+		}
+		catch (SQLException sqlException)
+		{
+			pooledCassandraConnection.connectionErrorOccurred(sqlException);
+			throw sqlException;
+		}
+	}
+
+	@Override
+	public SQLWarning getWarnings() throws SQLException
+	{
+		checkNotClosed();
+		try
+		{
+			return physicalConnection.getWarnings();
+		}
+		catch (SQLException sqlException)
+		{
+			pooledCassandraConnection.connectionErrorOccurred(sqlException);
+			throw sqlException;
+		}
+	}
+
+	@Override
+	public void clearWarnings() throws SQLException
+	{
+		checkNotClosed();
+		try
+		{
+			physicalConnection.clearWarnings();
+		}
+		catch (SQLException sqlException)
+		{
+			pooledCassandraConnection.connectionErrorOccurred(sqlException);
+			throw sqlException;
+		}
+	}
+
+	@Override
+	public void setHoldability(int holdability) throws SQLException
+	{
+		checkNotClosed();
+		try
+		{
+			physicalConnection.setHoldability(holdability);
+		}
+		catch (SQLException sqlException)
+		{
+			pooledCassandraConnection.connectionErrorOccurred(sqlException);
+			throw sqlException;
+		}
+	}
+
+	@Override
+	public int getHoldability() throws SQLException
+	{
+		checkNotClosed();
+		try
+		{
+			return physicalConnection.getHoldability();
+		}
+		catch (SQLException sqlException)
+		{
+			pooledCassandraConnection.connectionErrorOccurred(sqlException);
+			throw sqlException;
+		}
+	}
+
 	@Override
 	public String getClientInfo(String name) throws SQLException
 	{
-		checkClosed();
+		checkNotClosed();
 		try
 		{
 			return physicalConnection.getClientInfo(name);
@@ -430,7 +426,7 @@ public class ManagedCassandraConnection extends AbstractCassandraConnection impl
 	@Override
 	public Properties getClientInfo() throws SQLException
 	{
-		checkClosed();
+		checkNotClosed();
 		try
 		{
 			return physicalConnection.getClientInfo();

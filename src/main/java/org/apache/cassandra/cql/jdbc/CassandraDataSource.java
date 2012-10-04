@@ -34,7 +34,6 @@ import static org.apache.cassandra.cql.jdbc.Utils.TAG_USER;
 import static org.apache.cassandra.cql.jdbc.Utils.createSubName;
 
 import java.io.PrintWriter;
-import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
@@ -149,12 +148,12 @@ public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
         this.password = password;
     }
 
-    public Connection getConnection() throws SQLException
+    public CassandraConnection getConnection() throws SQLException
     {
         return getConnection(null, null);
     }
 
-    public Connection getConnection(String user, String password) throws SQLException
+    public CassandraConnection getConnection(String user, String password) throws SQLException
     {
         Properties props = new Properties();
         
@@ -170,30 +169,30 @@ public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
         if (this.version != null) props.setProperty(TAG_CQL_VERSION, version);
 
         String url = PROTOCOL+createSubName(props);
-        return DriverManager.getConnection(url, props);
+        return (CassandraConnection) DriverManager.getConnection(url, props);
     }
 
-    public int getLoginTimeout() throws SQLException
+    public int getLoginTimeout()
     {
         return DriverManager.getLoginTimeout();
     }
 
-    public PrintWriter getLogWriter() throws SQLException
+    public PrintWriter getLogWriter()
     {
         return DriverManager.getLogWriter();
     }
 
-    public void setLoginTimeout(int timeout) throws SQLException
+    public void setLoginTimeout(int timeout)
     {
         DriverManager.setLoginTimeout(timeout);
     }
 
-    public void setLogWriter(PrintWriter writer) throws SQLException
+    public void setLogWriter(PrintWriter writer)
     {
         DriverManager.setLogWriter(writer);
     }
 
-    public boolean isWrapperFor(Class<?> iface) throws SQLException
+    public boolean isWrapperFor(Class<?> iface)
     {
         return iface.isAssignableFrom(getClass());
     }

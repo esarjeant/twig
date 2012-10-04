@@ -20,11 +20,10 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.sql.Statement;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import javax.sql.ConnectionEvent;
@@ -33,21 +32,30 @@ import javax.sql.PooledConnection;
 import javax.sql.StatementEvent;
 import javax.sql.StatementEventListener;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 class PooledCassandraConnection implements PooledConnection
 {
-	private Connection physicalConnection;
+	private static final Logger logger = LoggerFactory.getLogger(PooledCassandraConnection.class);
 	
+	private CassandraConnection physicalConnection;
+
 	Set<ConnectionEventListener> connectionEventListeners = new HashSet<ConnectionEventListener>();
-	
+
 	Set<StatementEventListener> statementEventListeners = new HashSet<StatementEventListener>();
 
-	public PooledCassandraConnection(Connection physicalConnection)
+	private Map<String, Set<CassandraPreparedStatement>> freePreparedStatements = new HashMap<String, Set<CassandraPreparedStatement>>();
+
+	private Map<String, Set<CassandraPreparedStatement>> usedPreparedStatements = new HashMap<String, Set<CassandraPreparedStatement>>();
+
+	public PooledCassandraConnection(CassandraConnection physicalConnection)
 	{
 		this.physicalConnection = physicalConnection;
 	}
 
 	@Override
-	public Connection getConnection()
+	public CassandraConnection getConnection()
 	{
 		return physicalConnection;
 	}
@@ -82,57 +90,79 @@ class PooledCassandraConnection implements PooledConnection
 		statementEventListeners.remove(listener);
 	}
 
-	void connectionClosed ()
+	void connectionClosed()
 	{
 		ConnectionEvent event = new ConnectionEvent(this);
-		for (ConnectionEventListener listener : connectionEventListeners) {
+		for (ConnectionEventListener listener : connectionEventListeners)
+		{
 			listener.connectionClosed(event);
 		}
 	}
-	
-	void connectionErrorOccurred (SQLException sqlException)
+
+	void connectionErrorOccurred(SQLException sqlException)
 	{
 		ConnectionEvent event = new ConnectionEvent(this, sqlException);
-		for (ConnectionEventListener listener : connectionEventListeners) {
+		for (ConnectionEventListener listener : connectionEventListeners)
+		{
 			listener.connectionErrorOccurred(event);
 		}
 	}
-	
-	void statementClosed (PreparedStatement preparedStatement)
+
+	void statementClosed(CassandraPreparedStatement preparedStatement)
 	{
 		StatementEvent event = new StatementEvent(this, preparedStatement);
-		for (StatementEventListener listener : statementEventListeners) {
+		for (StatementEventListener listener : statementEventListeners)
+		{
 			listener.statementClosed(event);
 		}
+
+		usedPreparedStatements.get(preparedStatement.getCql()).remove(preparedStatement);
+		
+		preparedStatement.resetResults();
+		try
+		{
+			preparedStatement.clearParameters();
+			freePreparedStatements.get(preparedStatement.getCql()).add(preparedStatement);
+		}
+		catch (SQLException e)
+		{
+			logger.error(e.getMessage());
+		}
+
 	}
-	
-	void statementErrorOccurred (PreparedStatement preparedStatement, SQLException sqlException)
+
+	void statementErrorOccurred(CassandraPreparedStatement preparedStatement, SQLException sqlException)
 	{
 		StatementEvent event = new StatementEvent(this, preparedStatement, sqlException);
-		for (StatementEventListener listener : statementEventListeners) {
+		for (StatementEventListener listener : statementEventListeners)
+		{
 			listener.statementErrorOccurred(event);
 		}
 	}
 
-	public Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException
+	public ManagedPreparedStatement prepareStatement(ManagedCassandraConnection managedConnection, String cql) throws SQLException
 	{
-		return physicalConnection.createStatement(resultSetType, resultSetConcurrency, resultSetHoldability);
-	}
+		if (!freePreparedStatements.containsKey(cql)) {
+			freePreparedStatements.put(cql, new HashSet<CassandraPreparedStatement>());
+			usedPreparedStatements.put(cql, new HashSet<CassandraPreparedStatement>());
+		}
+		
+		Set<CassandraPreparedStatement> freeStatements = freePreparedStatements.get(cql);
+		Set<CassandraPreparedStatement> usedStatements = usedPreparedStatements.get(cql);
 
-	public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException
-	{
-		return physicalConnection.createStatement(resultSetType, resultSetConcurrency);
+		CassandraPreparedStatement managedPreparedStatement;
+		if (freeStatements.isEmpty())
+		{
+			managedPreparedStatement = physicalConnection.prepareStatement(cql);
+		}
+		else
+		{
+			managedPreparedStatement = freeStatements.iterator().next();
+			freeStatements.remove(managedPreparedStatement);
+		}
+		usedStatements.add(managedPreparedStatement);
+		
+		return new ManagedPreparedStatement(this, managedConnection, managedPreparedStatement);
 	}
-
-	public Statement createStatement() throws SQLException
-	{
-		return physicalConnection.createStatement();
-	}
-
-	public PreparedStatement prepareStatement(String cql) throws SQLException
-	{
-		return physicalConnection.prepareStatement(cql);
-	}
-	
 
 }

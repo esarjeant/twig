@@ -33,7 +33,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-public class PooledDataSourceTest
+public class PooledTests
 {
 	private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
 	private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort() + ""));
@@ -102,6 +102,22 @@ public class PooledDataSourceTest
 	}
 
 	@Test
+	public void twoMillionPreparedStatements() throws Exception
+	{
+		CassandraDataSource connectionPoolDataSource = new CassandraDataSource(HOST, PORT, KEYSPACE, USER, PASSWORD, VERSION);
+
+		DataSource pooledCassandraDataSource = new PooledCassandraDataSource(connectionPoolDataSource);
+
+		Connection connection = pooledCassandraDataSource.getConnection();
+		for (int i = 0; i < 10000; i++)
+		{
+			PreparedStatement preparedStatement = connection.prepareStatement("SELECT someInt FROM pooled_test WHERE somekey = ?");
+			preparedStatement.close();
+		}
+		connection.close();
+	}
+
+	@Test
 	public void preparedStatement() throws Exception
 	{
 		CassandraDataSource connectionPoolDataSource = new CassandraDataSource(HOST, PORT, KEYSPACE, USER, PASSWORD, VERSION);
@@ -124,6 +140,29 @@ public class PooledDataSourceTest
 	}
 
 	@Test
+	public void preparedStatementClose() throws Exception
+	{
+		CassandraDataSource connectionPoolDataSource = new CassandraDataSource(HOST, PORT, KEYSPACE, USER, PASSWORD, VERSION);
+
+		DataSource pooledCassandraDataSource = new PooledCassandraDataSource(connectionPoolDataSource);
+
+		Connection connection = pooledCassandraDataSource.getConnection();
+
+		PreparedStatement statement = connection.prepareStatement("SELECT someInt FROM pooled_test WHERE somekey = ?");
+		statement.setString(1, "world");
+
+		ResultSet resultSet = statement.executeQuery();
+		assert resultSet.next();
+		assert resultSet.getInt(1) == 1;
+		assert resultSet.next() == false;
+		resultSet.close();
+
+		connection.close();
+		
+		assert statement.isClosed();
+	}
+
+	@Test
 	public void statement() throws Exception
 	{
 		CassandraDataSource connectionPoolDataSource = new CassandraDataSource(HOST, PORT, KEYSPACE, USER, PASSWORD, VERSION);
@@ -142,5 +181,27 @@ public class PooledDataSourceTest
 
 		statement.close();
 		connection.close();
+	}
+
+	@Test
+	public void statementClosed() throws Exception
+	{
+		CassandraDataSource connectionPoolDataSource = new CassandraDataSource(HOST, PORT, KEYSPACE, USER, PASSWORD, VERSION);
+
+		DataSource pooledCassandraDataSource = new PooledCassandraDataSource(connectionPoolDataSource);
+
+		Connection connection = pooledCassandraDataSource.getConnection();
+
+		Statement statement = connection.createStatement();
+
+		ResultSet resultSet = statement.executeQuery("SELECT someInt FROM pooled_test WHERE somekey = 'world'");
+		assert resultSet.next();
+		assert resultSet.getInt(1) == 1;
+		assert resultSet.next() == false;
+		resultSet.close();
+
+		connection.close();
+		
+		assert statement.isClosed();
 	}
 }
