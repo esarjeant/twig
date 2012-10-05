@@ -42,9 +42,9 @@ class PooledCassandraConnection implements PooledConnection
 	
 	private CassandraConnection physicalConnection;
 
-	Set<ConnectionEventListener> connectionEventListeners = new HashSet<ConnectionEventListener>();
+	volatile Set<ConnectionEventListener> connectionEventListeners = new HashSet<ConnectionEventListener>();
 
-	Set<StatementEventListener> statementEventListeners = new HashSet<StatementEventListener>();
+	volatile Set<StatementEventListener> statementEventListeners = new HashSet<StatementEventListener>();
 
 	private Map<String, Set<CassandraPreparedStatement>> freePreparedStatements = new HashMap<String, Set<CassandraPreparedStatement>>();
 
@@ -154,7 +154,7 @@ class PooledCassandraConnection implements PooledConnection
 		}
 	}
 
-	public ManagedPreparedStatement prepareStatement(ManagedConnection managedConnection, String cql) throws SQLException
+	public synchronized ManagedPreparedStatement prepareStatement(ManagedConnection managedConnection, String cql) throws SQLException
 	{
 		if (!freePreparedStatements.containsKey(cql)) {
 			freePreparedStatements.put(cql, new HashSet<CassandraPreparedStatement>());

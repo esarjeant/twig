@@ -47,9 +47,9 @@ public class PooledCassandraDataSource implements DataSource, ConnectionEventLis
 
 	private CassandraDataSource connectionPoolDataSource;
 
-	private Set<PooledCassandraConnection> freeConnections = new HashSet<PooledCassandraConnection>();
+	private volatile Set<PooledCassandraConnection> freeConnections = new HashSet<PooledCassandraConnection>();
 
-	private Set<PooledCassandraConnection> usedConnections = new HashSet<PooledCassandraConnection>();
+	private volatile Set<PooledCassandraConnection> usedConnections = new HashSet<PooledCassandraConnection>();
 
 	public PooledCassandraDataSource(CassandraDataSource connectionPoolDataSource) throws SQLException
 	{
@@ -57,7 +57,7 @@ public class PooledCassandraDataSource implements DataSource, ConnectionEventLis
 	}
 
 	@Override
-	public Connection getConnection() throws SQLException
+	public synchronized Connection getConnection() throws SQLException
 	{
 		PooledCassandraConnection pooledConnection;
 		if (freeConnections.isEmpty())
@@ -81,7 +81,7 @@ public class PooledCassandraDataSource implements DataSource, ConnectionEventLis
 	}
 
 	@Override
-	public void connectionClosed(ConnectionEvent event)
+	public synchronized void connectionClosed(ConnectionEvent event)
 	{
 		PooledCassandraConnection connection = (PooledCassandraConnection) event.getSource();
 		usedConnections.remove(connection);
@@ -104,7 +104,7 @@ public class PooledCassandraDataSource implements DataSource, ConnectionEventLis
 	}
 
 	@Override
-	public void connectionErrorOccurred(ConnectionEvent event)
+	public synchronized void connectionErrorOccurred(ConnectionEvent event)
 	{
 		PooledCassandraConnection connection = (PooledCassandraConnection) event.getSource();
 		try
@@ -120,7 +120,7 @@ public class PooledCassandraDataSource implements DataSource, ConnectionEventLis
 		usedConnections.remove(connection);
 	}
 
-	public void close()
+	public synchronized void close()
 	{
 		closePooledConnections(usedConnections);
 		closePooledConnections(freeConnections);
