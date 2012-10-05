@@ -21,6 +21,7 @@
 package org.apache.cassandra.cql.jdbc;
 
 import java.sql.SQLException;
+import java.sql.SQLRecoverableException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -116,13 +117,17 @@ class PooledCassandraConnection implements PooledConnection
 			listener.statementClosed(event);
 		}
 
-		usedPreparedStatements.get(preparedStatement.getCql()).remove(preparedStatement);
+		String cql = preparedStatement.getCql();
+		Set<CassandraPreparedStatement> freeStatements = freePreparedStatements.get(cql);
+		Set<CassandraPreparedStatement> usedStatements = usedPreparedStatements.get(cql);
+
+		usedStatements.remove(preparedStatement);
 		
 		preparedStatement.resetResults();
 		try
 		{
 			preparedStatement.clearParameters();
-			freePreparedStatements.get(preparedStatement.getCql()).add(preparedStatement);
+			freeStatements.add(preparedStatement);
 		}
 		catch (SQLException e)
 		{
@@ -137,6 +142,15 @@ class PooledCassandraConnection implements PooledConnection
 		for (StatementEventListener listener : statementEventListeners)
 		{
 			listener.statementErrorOccurred(event);
+		}
+		
+		String cql = preparedStatement.getCql();
+		Set<CassandraPreparedStatement> usedStatements = usedPreparedStatements.get(cql);
+		
+		if (!(event.getSQLException() instanceof SQLRecoverableException))
+		{
+			preparedStatement.close();
+			usedStatements.remove(preparedStatement);
 		}
 	}
 
