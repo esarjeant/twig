@@ -71,7 +71,7 @@ public class PooledCassandraDataSource implements DataSource, ConnectionEventLis
 			freeConnections.remove(pooledConnection);
 		}
 		usedConnections.add(pooledConnection);
-		return new ManagedCassandraConnection(pooledConnection);
+		return new ManagedConnection(pooledConnection);
 	}
 
 	@Override

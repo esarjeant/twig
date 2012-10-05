@@ -34,7 +34,7 @@ import java.sql.Struct;
 import java.util.concurrent.Executor;
 import java.util.Map;
 
-abstract class AbstractCassandraConnection
+abstract class AbstractConnection
 {
     protected static final String NOT_SUPPORTED = "the Cassandra implementation does not support this method";
 

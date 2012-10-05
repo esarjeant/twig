@@ -37,7 +37,7 @@ import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
 
-class ManagedCassandraConnection extends AbstractCassandraConnection implements Connection
+class ManagedConnection extends AbstractConnection implements Connection
 {
 	private PooledCassandraConnection pooledCassandraConnection;
 
@@ -45,7 +45,7 @@ class ManagedCassandraConnection extends AbstractCassandraConnection implements 
 
 	private Set<Statement> statements = new HashSet<Statement>();
 
-	ManagedCassandraConnection(PooledCassandraConnection pooledCassandraConnection)
+	ManagedConnection(PooledCassandraConnection pooledCassandraConnection)
 	{
 		this.pooledCassandraConnection = pooledCassandraConnection;
 		this.physicalConnection = pooledCassandraConnection.getConnection();

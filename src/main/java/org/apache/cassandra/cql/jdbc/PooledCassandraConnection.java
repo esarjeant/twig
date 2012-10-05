@@ -140,7 +140,7 @@ class PooledCassandraConnection implements PooledConnection
 		}
 	}
 
-	public ManagedPreparedStatement prepareStatement(ManagedCassandraConnection managedConnection, String cql) throws SQLException
+	public ManagedPreparedStatement prepareStatement(ManagedConnection managedConnection, String cql) throws SQLException
 	{
 		if (!freePreparedStatements.containsKey(cql)) {
 			freePreparedStatements.put(cql, new HashSet<CassandraPreparedStatement>());

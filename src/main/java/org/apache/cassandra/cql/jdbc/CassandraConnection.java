@@ -45,7 +45,7 @@ import static org.apache.cassandra.cql.jdbc.Utils.*;
 /**
  * Implementation class for {@link Connection}.
  */
-class CassandraConnection extends AbstractCassandraConnection implements Connection
+class CassandraConnection extends AbstractConnection implements Connection
 {
 
     private static final Logger logger = LoggerFactory.getLogger(CassandraConnection.class);

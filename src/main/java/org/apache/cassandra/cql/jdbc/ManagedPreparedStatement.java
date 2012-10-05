@@ -21,13 +21,13 @@ class ManagedPreparedStatement extends AbstractStatement implements PreparedStat
 {
 	private PooledCassandraConnection pooledCassandraConnection;
 
-	private ManagedCassandraConnection managedConnection;
+	private ManagedConnection managedConnection;
 
 	private CassandraPreparedStatement preparedStatement;
 
 	private boolean poolable;
 
-	ManagedPreparedStatement(PooledCassandraConnection pooledCassandraConnection, ManagedCassandraConnection managedConnection,
+	ManagedPreparedStatement(PooledCassandraConnection pooledCassandraConnection, ManagedConnection managedConnection,
 			CassandraPreparedStatement preparedStatement)
 	{
 		this.pooledCassandraConnection = pooledCassandraConnection;
@@ -44,7 +44,7 @@ class ManagedPreparedStatement extends AbstractStatement implements PreparedStat
 	}
 
 	@Override
-	public ManagedCassandraConnection getConnection() throws SQLException
+	public ManagedConnection getConnection() throws SQLException
 	{
 		return managedConnection;
 	}
@@ -73,15 +73,6 @@ class ManagedPreparedStatement extends AbstractStatement implements PreparedStat
 	public void setPoolable(boolean poolable)
 	{
 		this.poolable = poolable;
-	}
-
-	public boolean equals(Object obj)
-	{
-		if (obj == this)
-		{
-			return true;
-		}
-		return false;
 	}
 
 	@Override
