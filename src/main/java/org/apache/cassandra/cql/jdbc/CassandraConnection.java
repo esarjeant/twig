@@ -45,11 +45,14 @@ import static org.apache.cassandra.cql.jdbc.Utils.*;
 /**
  * Implementation class for {@link Connection}.
  */
-class CassandraConnection extends AbstractCassandraConnection implements Connection
+class CassandraConnection extends AbstractConnection implements Connection
 {
 
     private static final Logger logger = LoggerFactory.getLogger(CassandraConnection.class);
 
+    static final String IS_VALID_CQLQUERY_2_0_0 = "SELECT COUNT(1) FROM system.Versions WHERE component = 'cql';";
+    static final String IS_VALID_CQLQUERY_3_0_0 = "SELECT COUNT(1) FROM system.\"Versions\" WHERE component = 'cql';";
+    
     public static final int DB_MAJOR_VERSION = 1;
     public static final int DB_MINOR_VERSION = 2;
     public static final String DB_PRODUCT_NAME = "Cassandra";
@@ -88,6 +91,11 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
     int majorCqlVersion;
     ColumnDecoder decoder;
 
+    private TSocket socket;
+    
+    PreparedStatement isAlive = null;
+    
+    private String currentCqlVersion;
 
     /**
      * Instantiates a new CassandraConnection.
@@ -108,7 +116,7 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
             connectionProps.setProperty(TAG_ACTIVE_CQL_VERSION, version);
             majorCqlVersion = getMajor(version);
 
-            TSocket socket = new TSocket(host, port);
+            socket = new TSocket(host, port);
             transport = new TFramedTransport(socket);
             TProtocol protocol = new TBinaryProtocol(transport);
             client = new Cassandra.Client(protocol);
@@ -238,6 +246,11 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
         return autoCommit;
     }
 
+    public Properties getConnectionProps()
+    {
+        return connectionProps;
+    }
+
     public String getCatalog() throws SQLException
     {
         checkNotClosed();
@@ -294,13 +307,36 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
         return false;
     }
 
-    public boolean isValid(int timeout) throws SQLException
+    public boolean isValid(int timeout) throws SQLTimeoutException
     {
-        checkNotClosed();
         if (timeout < 0) throw new SQLTimeoutException(BAD_TIMEOUT);
 
-        // this needs to be more robust. Some query needs to be made to verify connection is really up.
-        return !isClosed();
+        // set timeout
+        socket.setTimeout(timeout * 1000);
+
+        try
+        {
+        	if (isClosed()) {
+        		return false;
+        	}
+        	
+            if (isAlive == null)
+            {
+                isAlive = prepareStatement(currentCqlVersion == "2.0.0" ? IS_VALID_CQLQUERY_2_0_0 : IS_VALID_CQLQUERY_3_0_0);
+            }
+            // the result is not important
+            isAlive.executeQuery().close();
+        }
+        catch (SQLException e)
+        {
+        	return false;
+        }
+        finally {
+            // reset timeout
+            socket.setTimeout(0);
+        }
+
+        return true;
     }
 
     public boolean isWrapperFor(Class<?> arg0) throws SQLException
@@ -316,10 +352,10 @@ class CassandraConnection extends AbstractCassandraConnection implements Connect
         return sql;
     }
 
-    public PreparedStatement prepareStatement(String sql) throws SQLException
+    public CassandraPreparedStatement prepareStatement(String sql) throws SQLException
     {
         checkNotClosed();
-        PreparedStatement statement = new CassandraPreparedStatement(this, sql);
+        CassandraPreparedStatement statement = new CassandraPreparedStatement(this, sql);
         statements.add(statement);
         return statement;
     }

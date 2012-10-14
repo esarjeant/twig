@@ -350,7 +350,7 @@ class CassandraStatement extends AbstractStatement implements Statement, Compara
         return null;
     }
 
-    public boolean isClosed() throws SQLException
+    public boolean isClosed()
     {
         return connection == null;
     }

@@ -29,6 +29,7 @@ import java.sql.*;
 import java.util.Arrays;
 import java.util.List;
 
+import org.apache.cassandra.cql.jdbc.CassandraResultSetExtras;
 import org.apache.cassandra.cql.jdbc.JdbcAscii;
 import org.apache.cassandra.cql.jdbc.JdbcBytes;
 import org.apache.cassandra.cql.jdbc.JdbcInteger;
@@ -112,43 +113,22 @@ public class JdbcDriverTest
         assertEquals(valuCaseSense, md.isCaseSensitive(col));
     }
 
-    @Test
+    @Test(expected=SQLNonTransientConnectionException.class)
     public void testNoHost() throws SQLException
     {
-        try
-        {
-            DriverManager.getConnection("jdbc:cassandra:localhost");
-        }
-        catch (Exception e)
-        {
-            assertEquals(SQLNonTransientConnectionException.class, e.getClass());
-        }
+           DriverManager.getConnection("jdbc:cassandra:localhost");
     }
 
-    @Test
+    @Test(expected=SQLNonTransientConnectionException.class)
     public void testBadKeyspace() throws SQLException
     {
-        try
-        {
-            DriverManager.getConnection("jdbc:cassandra://localhost/Keysp@ce");
-        }
-        catch (Exception e)
-        {
-            assertEquals(SQLNonTransientConnectionException.class, e.getClass());
-        }
+        DriverManager.getConnection("jdbc:cassandra://localhost/Keysp@ce");
     }
 
-    @Test
+    @Test(expected=SQLNonTransientConnectionException.class)
     public void testBadUserinfo() throws SQLException
     {
-        try
-        {
-            DriverManager.getConnection("jdbc:cassandra://root;root@localhost");
-        }
-        catch (Exception e)
-        {
-            assertEquals(SQLNonTransientConnectionException.class, e.getClass());
-        }
+        DriverManager.getConnection("jdbc:cassandra://root;root@localhost");
     }
 
     @Test
@@ -484,6 +464,7 @@ public class JdbcDriverTest
     {
         int actualRows = 0;
         assert rs != null;
+        assert rs instanceof CassandraResultSetExtras;
         while (rs.next())
         {
             actualRows++;

@@ -1,29 +1,50 @@
+/*
+ * 
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ * 
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ * 
+ */
 
 package org.apache.cassandra.cql.jdbc;
 
 import static org.apache.cassandra.cql.jdbc.Utils.HOST_REQUIRED;
-import static org.apache.cassandra.cql.jdbc.Utils.NO_INTERFACE;
 import static org.apache.cassandra.cql.jdbc.Utils.NOT_SUPPORTED;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_INTERFACE;
 import static org.apache.cassandra.cql.jdbc.Utils.PROTOCOL;
-import static org.apache.cassandra.cql.jdbc.Utils.TAG_SERVER_NAME;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_CQL_VERSION;
 import static org.apache.cassandra.cql.jdbc.Utils.TAG_DATABASE_NAME;
 import static org.apache.cassandra.cql.jdbc.Utils.TAG_PASSWORD;
 import static org.apache.cassandra.cql.jdbc.Utils.TAG_PORT_NUMBER;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_SERVER_NAME;
 import static org.apache.cassandra.cql.jdbc.Utils.TAG_USER;
 import static org.apache.cassandra.cql.jdbc.Utils.createSubName;
 
 import java.io.PrintWriter;
-import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.SQLNonTransientConnectionException;
-import java.util.logging.Logger;
 import java.util.Properties;
+import java.util.logging.Logger;
 
+import javax.sql.ConnectionPoolDataSource;
 import javax.sql.DataSource;
 
-public class CassandraDataSource implements DataSource
+public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
 {
 
     static
@@ -50,10 +71,13 @@ public class CassandraDataSource implements DataSource
 
     protected String password;
 
-    public CassandraDataSource(String host, int port, String keyspace, String user, String password)
+    protected String version = null;
+
+    public CassandraDataSource(String host, int port, String keyspace, String user, String password, String version)
     {
         if (host != null) setServerName(host);
         if (port != -1) setPortNumber(port);
+        if (version != null) setVersion(version);
         setDatabaseName(keyspace);
         setUser(user);
         setPassword(password);
@@ -72,6 +96,16 @@ public class CassandraDataSource implements DataSource
     public void setServerName(String serverName)
     {
         this.serverName = serverName;
+    }
+
+    public String getVersion()
+    {
+        return version;
+    }
+
+    public void setVersion(String version)
+    {
+        this.version = version;
     }
 
     public int getPortNumber()
@@ -114,12 +148,12 @@ public class CassandraDataSource implements DataSource
         this.password = password;
     }
 
-    public Connection getConnection() throws SQLException
+    public CassandraConnection getConnection() throws SQLException
     {
         return getConnection(null, null);
     }
 
-    public Connection getConnection(String user, String password) throws SQLException
+    public CassandraConnection getConnection(String user, String password) throws SQLException
     {
         Properties props = new Properties();
         
@@ -132,32 +166,33 @@ public class CassandraDataSource implements DataSource
         if (this.databaseName!=null) props.setProperty(TAG_DATABASE_NAME, this.databaseName);
         if (user!=null) props.setProperty(TAG_USER, user);
         if (password!=null) props.setProperty(TAG_PASSWORD, password);
+        if (this.version != null) props.setProperty(TAG_CQL_VERSION, version);
 
         String url = PROTOCOL+createSubName(props);
-        return DriverManager.getConnection(url, props);
+        return (CassandraConnection) DriverManager.getConnection(url, props);
     }
 
-    public int getLoginTimeout() throws SQLException
+    public int getLoginTimeout()
     {
         return DriverManager.getLoginTimeout();
     }
 
-    public PrintWriter getLogWriter() throws SQLException
+    public PrintWriter getLogWriter()
     {
         return DriverManager.getLogWriter();
     }
 
-    public void setLoginTimeout(int timeout) throws SQLException
+    public void setLoginTimeout(int timeout)
     {
         DriverManager.setLoginTimeout(timeout);
     }
 
-    public void setLogWriter(PrintWriter writer) throws SQLException
+    public void setLogWriter(PrintWriter writer)
     {
         DriverManager.setLogWriter(writer);
     }
 
-    public boolean isWrapperFor(Class<?> iface) throws SQLException
+    public boolean isWrapperFor(Class<?> iface)
     {
         return iface.isAssignableFrom(getClass());
     }
@@ -172,4 +207,16 @@ public class CassandraDataSource implements DataSource
     {
     	throw new SQLFeatureNotSupportedException(String.format(NOT_SUPPORTED));
     }
+
+	@Override
+	public PooledCassandraConnection getPooledConnection() throws SQLException
+	{
+		return new PooledCassandraConnection(getConnection());
+	}
+
+	@Override
+	public PooledCassandraConnection getPooledConnection(String user, String password) throws SQLException
+	{
+		return new PooledCassandraConnection(getConnection(user, password));
+	}
 }

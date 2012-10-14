@@ -85,13 +85,15 @@ public class SpashScreenTest
     {
         String query = "UPDATE Test SET a=?, b=? WHERE KEY=?";
         PreparedStatement statement = con.prepareStatement(query);
-
+        try {
         statement.setLong(1, 100);
         statement.setLong(2, 1000);
         statement.setString(3, "key0");
 
         statement.executeUpdate();
-
+        }
+        finally {
         statement.close();
     }
+}
 }

@@ -86,18 +86,18 @@ class ColumnDecoder
     protected AbstractJdbcType<?> getComparator(String keyspace, String columnFamily)
     {
         CFamMeta cf = metadata.get(String.format("%s.%s", keyspace, columnFamily));
-        AbstractJdbcType<?> type = (cf != null) ? TypesMap.getTypeForComparator(cf.comparator) : null;
+		AbstractJdbcType<?> type = (cf != null) ? TypesMap.getTypeForComparator(cf.comparator) : null;
         return (type == null) ? null : type;
     }
 
     protected AbstractJdbcType<?> getDefaultValidator(String keyspace, String columnFamily)
     {
         CFamMeta cf = metadata.get(String.format("%s.%s", keyspace, columnFamily));
-        AbstractJdbcType<?> type = (cf != null) ? TypesMap.getTypeForComparator(cf.defaultValidator) : null;
+		AbstractJdbcType<?> type = (cf != null) ? TypesMap.getTypeForComparator(cf.defaultValidator) : null;
         return (type == null) ? null : type;
     }
 
-    private AbstractJdbcType<?> getNameType(String keyspace, String columnFamily, ByteBuffer name)
+	private AbstractJdbcType<?> getNameType(String keyspace, String columnFamily, ByteBuffer name)
     {
         CFamMeta cf = metadata.get(String.format("%s.%s", keyspace, columnFamily));
         try
@@ -112,7 +112,7 @@ class ColumnDecoder
         return TypesMap.getTypeForComparator(cf.comparator);
     }
 
-    private AbstractJdbcType<?> getValueType(String keyspace, String columnFamily, ByteBuffer name)
+	private AbstractJdbcType<?> getValueType(String keyspace, String columnFamily, ByteBuffer name)
     {
         CFamMeta cf = metadata.get(String.format("%s.%s", keyspace, columnFamily));
         if (cf == null)
@@ -135,7 +135,7 @@ class ColumnDecoder
     public AbstractJdbcType<?> getKeyValidator(String keyspace, String columnFamily)
     {
         CFamMeta cf = metadata.get(String.format("%s.%s", keyspace, columnFamily));
-        AbstractJdbcType<?> type = (cf != null) ? TypesMap.getTypeForComparator(cf.keyValidator) : null;
+		AbstractJdbcType<?> type = (AbstractJdbcType<?>) ((cf != null) ? TypesMap.getTypeForComparator(cf.keyValidator) : null);
         return (type == null) ? null : type;
     }
 
@@ -147,7 +147,8 @@ class ColumnDecoder
     }
 
     /** constructs a typed column */
-    public TypedColumn makeCol(String keyspace, String columnFamily, Column column)
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public TypedColumn<?> makeCol(String keyspace, String columnFamily, Column column)
     {
         return new TypedColumn(column,
                                getNameType(keyspace, columnFamily, column.name),
@@ -156,7 +157,8 @@ class ColumnDecoder
 
     /** constructs a typed column to hold the key
      * @throws SQLNonTransientException */
-    public TypedColumn makeKeyColumn(String keyspace, String columnFamily, byte[] key) throws SQLNonTransientException
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+	public TypedColumn<?> makeKeyColumn(String keyspace, String columnFamily, byte[] key) throws SQLNonTransientException
     {
         CFamMeta cf = metadata.get(String.format("%s.%s", keyspace, columnFamily));
         if (cf == null)

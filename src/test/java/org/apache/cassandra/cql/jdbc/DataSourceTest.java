@@ -20,7 +20,10 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import java.sql.DriverManager;
 import java.sql.SQLFeatureNotSupportedException;
@@ -40,6 +43,7 @@ public class DataSourceTest
     private static final String KEYSPACE = "TestKS";
     private static final String USER = "JohnDoe";
     private static final String PASSWORD = "secret";
+    private static final String VERSION = "2.0.0";
     
     private static java.sql.Connection con = null;
 
@@ -72,14 +76,15 @@ public class DataSourceTest
     @Test
     public void testConstructor() throws Exception
     {
-        CassandraDataSource cds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD);
+        CassandraDataSource cds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD,VERSION);
         assertEquals(HOST,cds.getServerName());
         assertEquals(PORT,cds.getPortNumber());
         assertEquals(KEYSPACE,cds.getDatabaseName());
         assertEquals(USER,cds.getUser());
         assertEquals(PASSWORD,cds.getPassword());
+        assertEquals(VERSION, cds.getVersion());
         
-        DataSource ds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD);
+        DataSource ds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD,VERSION);
         assertNotNull(ds);
         
         // null username and password
@@ -92,6 +97,7 @@ public class DataSourceTest
         cnx = ds.getConnection();
         assertFalse(cnx.isClosed());
         ds.setLoginTimeout(5);
+        assertEquals("2.0.0", ((CassandraConnection) cnx).getConnectionProps().get(Utils.TAG_CQL_VERSION));
         assertEquals(5, ds.getLoginTimeout());
     }
 
@@ -99,7 +105,7 @@ public class DataSourceTest
     @Test
     public void testIsWrapperFor() throws Exception
     {
-        DataSource ds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD);
+        DataSource ds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD,VERSION);
         
         boolean isIt = false;
                 
@@ -115,7 +121,7 @@ public class DataSourceTest
     @Test(expected=SQLFeatureNotSupportedException.class)
     public void testUnwrap() throws Exception
     {
-        DataSource ds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD);
+        DataSource ds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD,VERSION);
 
         // it is a wrapper for DataSource
         DataSource newds = ds.unwrap(DataSource.class);        

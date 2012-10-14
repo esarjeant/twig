@@ -46,27 +46,74 @@ public class HandleObjectsUnitTest
     public static void setUpBeforeClass() throws Exception
     {}
 
-    @Test
-    public void test0Unsupported() throws Exception
+    @Test(expected=Exception.class)
+    public void test0UnsupportedArray() throws Exception
     {
         Object object = new String("This is a String");
-        boolean passed = false;
-        int[] notsupported = {Types.ARRAY,Types.BLOB,Types.CLOB,Types.DISTINCT,
-                              Types.NCLOB,Types.NULL,Types.OTHER,Types.REF,Types.SQLXML,Types.STRUCT};
-    
-        for (int item:notsupported)
-        {
-            passed = false;
-            try
-            {
-                ByteBuffer bb = HandleObjects.makeBytes(object, item, 0);
-            }
-            catch (Exception e)
-            {
-                passed = true;
-            }
-            assertTrue(passed);
-        }        
+    	HandleObjects.makeBytes(object, Types.ARRAY, 0);
+    }
+
+    @Test(expected=Exception.class)
+    public void test0UnsupportedBlob() throws Exception
+    {
+        Object object = new String("This is a String");
+    	HandleObjects.makeBytes(object, Types.BLOB, 0);
+    }
+
+    @Test(expected=Exception.class)
+    public void test0UnsupportedClob() throws Exception
+    {
+        Object object = new String("This is a String");
+    	HandleObjects.makeBytes(object, Types.CLOB, 0);
+    }
+
+    @Test(expected=Exception.class)
+    public void test0UnsupportedDistinct() throws Exception
+    {
+        Object object = new String("This is a String");
+    	HandleObjects.makeBytes(object, Types.DISTINCT, 0);
+    }
+
+    @Test(expected=Exception.class)
+    public void test0UnsupportedNclob() throws Exception
+    {
+        Object object = new String("This is a String");
+    	HandleObjects.makeBytes(object, Types.NCLOB, 0);
+    }
+
+    @Test(expected=Exception.class)
+    public void test0UnsupportedNull() throws Exception
+    {
+        Object object = new String("This is a String");
+    	HandleObjects.makeBytes(object, Types.NULL, 0);
+    }
+
+    @Test(expected=Exception.class)
+    public void test0UnsupportedOther() throws Exception
+    {
+        Object object = new String("This is a String");
+    	HandleObjects.makeBytes(object, Types.OTHER, 0);
+    }
+
+    @Test(expected=Exception.class)
+    public void test0UnsupportedRef() throws Exception
+    {
+        Object object = new String("This is a String");
+    	HandleObjects.makeBytes(object, Types.REF, 0);
+    }
+
+    @Test(expected=Exception.class)
+    public void test0UnsupportedSqlxml() throws Exception
+    {
+        Object object = new String("This is a String");
+    	HandleObjects.makeBytes(object, Types.SQLXML, 0);
+    }
+
+    @Test(expected=Exception.class)
+    public void test0UnsupportedStruct() throws Exception
+    {
+        Object object = new String("This is a String");
+    	HandleObjects.makeBytes(object, Types.STRUCT, 0);
     }
     
     @Test
