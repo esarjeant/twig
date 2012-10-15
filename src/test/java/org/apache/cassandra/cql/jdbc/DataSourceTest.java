@@ -40,10 +40,10 @@ public class DataSourceTest
 {
     private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
     private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort()+""));
-    private static final String KEYSPACE = "TestKS";
+    private static final String KEYSPACE = "testks";
     private static final String USER = "JohnDoe";
     private static final String PASSWORD = "secret";
-    private static final String VERSION = "2.0.0";
+    private static final String VERSION = "3.0.0";
     
     private static java.sql.Connection con = null;
 
@@ -56,13 +56,13 @@ public class DataSourceTest
         Statement stmt = con.createStatement();
         
         // Drop Keyspace
-        String dropKS = String.format("DROP KEYSPACE %s;",KEYSPACE);
+        String dropKS = String.format("DROP KEYSPACE \"%s\";",KEYSPACE);
         
         try { stmt.execute(dropKS);}
         catch (Exception e){/* Exception on DROP is OK */}
         
         // Create KeySpace
-        String createKS = String.format("CREATE KEYSPACE %s WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1;",KEYSPACE);
+        String createKS = String.format("CREATE KEYSPACE \"%s\" WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};",KEYSPACE);
         stmt.execute(createKS);
     }
 
@@ -97,7 +97,7 @@ public class DataSourceTest
         cnx = ds.getConnection();
         assertFalse(cnx.isClosed());
         ds.setLoginTimeout(5);
-        assertEquals("2.0.0", ((CassandraConnection) cnx).getConnectionProps().get(Utils.TAG_CQL_VERSION));
+        assertEquals(VERSION, ((CassandraConnection) cnx).getConnectionProps().get(Utils.TAG_CQL_VERSION));
         assertEquals(5, ds.getLoginTimeout());
     }
 

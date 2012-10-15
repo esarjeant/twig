@@ -33,11 +33,11 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-public class PooledTests
+public class PooledTest
 {
 	private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
 	private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort() + ""));
-	private static final String KEYSPACE = "TestKS";
+	private static final String KEYSPACE = "testks";
 	private static final String USER = "JohnDoe";
 	private static final String PASSWORD = "secret";
 	private static final String VERSION = "2.0.0";
@@ -52,7 +52,7 @@ public class PooledTests
 		Statement stmt = con.createStatement();
 
 		// Drop Keyspace
-		String dropKS = String.format("DROP KEYSPACE %s;", KEYSPACE);
+		String dropKS = String.format("DROP KEYSPACE \"%s\";", KEYSPACE);
 
 		try
 		{
@@ -64,17 +64,17 @@ public class PooledTests
 
 		// Create KeySpace
 		String createKS = String.format(
-				"CREATE KEYSPACE %s WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1;",
+				"CREATE KEYSPACE \"%s\" WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};",
 				KEYSPACE);
 		stmt.execute(createKS);
 
 		// Create KeySpace
-		String useKS = String.format("USE %s;", KEYSPACE);
+		String useKS = String.format("USE \"%s\";", KEYSPACE);
 		stmt.execute(useKS);
 
 		// Create the target Column family
 		String createCF = "CREATE COLUMNFAMILY pooled_test (somekey text PRIMARY KEY," + "someInt int"
-				+ ") WITH comparator = ascii AND default_validation = bigint;";
+				+ ") ;";
 		stmt.execute(createCF);
 
 		String insertWorld = "UPDATE pooled_test SET someInt = 1 WHERE somekey = 'world'";

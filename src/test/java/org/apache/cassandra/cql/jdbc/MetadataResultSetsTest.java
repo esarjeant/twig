@@ -36,10 +36,10 @@ public class MetadataResultSetsTest
 {
     private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
     private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort()+""));
-    private static final String KEYSPACE1 = "TestKS1";
-    private static final String KEYSPACE2 = "TestKS2";
+    private static final String KEYSPACE1 = "testks1";
+    private static final String KEYSPACE2 = "testks2";
     private static final String DROP_KS = "DROP KEYSPACE \"%s\";";
-    private static final String CREATE_KS = "CREATE KEYSPACE \"%s\" WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1;";
+    private static final String CREATE_KS = "CREATE KEYSPACE \"%s\" WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};";
       
     private static java.sql.Connection con = null;
     
@@ -177,7 +177,7 @@ public class MetadataResultSetsTest
         System.out.println(toString(result));       
         System.out.println();
         
-        result = MetadataResultSets.instance.makeSchemas(statement, "TestKS2");
+        result = MetadataResultSets.instance.makeSchemas(statement, "testks2");
         System.out.println(toString(result));       
         System.out.println();
     }
@@ -198,7 +198,7 @@ public class MetadataResultSetsTest
         System.out.println(toString(result));       
         System.out.println();
         
-        result = MetadataResultSets.instance.makeTables(statement, "TestKS2", null);
+        result = MetadataResultSets.instance.makeTables(statement, "testks2", null);
         System.out.println(toString(result));       
         System.out.println();
 
@@ -206,7 +206,7 @@ public class MetadataResultSetsTest
         System.out.println(toString(result));       
         System.out.println();
 
-        result = MetadataResultSets.instance.makeTables(statement, "TestKS2", "test1");
+        result = MetadataResultSets.instance.makeTables(statement, "testks2", "test1");
         System.out.println(toString(result));       
         System.out.println();
     }
