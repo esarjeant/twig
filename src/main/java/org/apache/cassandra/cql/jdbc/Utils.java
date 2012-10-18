@@ -99,6 +99,7 @@ class Utils
     protected static final String BAD_KEYSPACE = "Keyspace names must be composed of alphanumerics and underscores (parsed: '%s')";
     protected static final String URI_IS_SIMPLE = "Connection url may only include host, port, and keyspace and version option, e.g., jdbc:cassandra://localhost:9170/Keyspace1?version=2.0.0";
     protected static final String NOT_OPTION = "Connection url only support the 'version' option";
+    protected static final String FORWARD_ONLY = "Can not position cursor with a type of TYPE_FORWARD_ONLY";
 
     protected static final Logger logger = LoggerFactory.getLogger(Utils.class);
 

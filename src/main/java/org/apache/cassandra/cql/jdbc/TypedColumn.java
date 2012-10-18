@@ -27,18 +27,18 @@ import org.apache.cassandra.thrift.Column;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
 
-public class TypedColumn
+public class TypedColumn<T>
 {
     private final Column rawColumn;
 
     // we cache the frequently-accessed forms: java object for value, String for name.
     // Note that {N|V}.toString() isn't always the same as Type.getString
     // (a good example is byte buffers).
-    private final Object value;
+    private final T value;
     private final String nameString;
-    private final AbstractJdbcType<?> nameType, valueType;
+    private final AbstractJdbcType<T> nameType, valueType;
 
-    public TypedColumn(Column column, AbstractJdbcType<?> comparator, AbstractJdbcType<?> validator)
+    public TypedColumn(Column column, AbstractJdbcType<T> comparator, AbstractJdbcType<T> validator)
     {
         rawColumn = column;
         this.value = (column.value == null || !column.value.hasRemaining()) ? null : validator.compose(column.value);
@@ -52,7 +52,7 @@ public class TypedColumn
         return rawColumn;
     }
     
-    public Object getValue()
+    public T getValue()
     {
         return value;
     }
@@ -67,12 +67,12 @@ public class TypedColumn
         return valueType.getString(rawColumn.value);
     }
     
-    public AbstractJdbcType getNameType()
+    public AbstractJdbcType<T> getNameType()
     {
         return nameType;
     }
 
-    public AbstractJdbcType getValueType()
+    public AbstractJdbcType<T> getValueType()
     {
         return valueType;
     }

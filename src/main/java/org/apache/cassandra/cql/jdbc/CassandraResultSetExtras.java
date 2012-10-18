@@ -37,7 +37,7 @@ public interface CassandraResultSetExtras extends ResultSet
     public BigInteger getBigInteger(String name) throws SQLException;
 
     /** @return the raw column data for the given column offset */
-    public TypedColumn getColumn(int i) throws SQLException;
+    public TypedColumn<?> getColumn(int i) throws SQLException;
     /** @return the raw column data for the given column name */
-    public TypedColumn getColumn(String name) throws SQLException;
+    public TypedColumn<?> getColumn(String name) throws SQLException;
 }
