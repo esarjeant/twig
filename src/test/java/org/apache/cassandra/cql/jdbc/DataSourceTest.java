@@ -63,6 +63,7 @@ public class DataSourceTest
         
         // Create KeySpace
         String createKS = String.format("CREATE KEYSPACE \"%s\" WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};",KEYSPACE);
+//        String createKS = String.format("CREATE KEYSPACE %s WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1;",KEYSPACE);
         stmt.execute(createKS);
     }
 

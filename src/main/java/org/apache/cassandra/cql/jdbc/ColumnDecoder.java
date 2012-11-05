@@ -147,28 +147,28 @@ class ColumnDecoder
     }
 
     /** constructs a typed column */
-	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public TypedColumn<?> makeCol(String keyspace, String columnFamily, Column column)
-    {
-        return new TypedColumn(column,
-                               getNameType(keyspace, columnFamily, column.name),
-                               getValueType(keyspace, columnFamily, column.name));
-    }
+//	@SuppressWarnings({ "rawtypes", "unchecked" })
+//	public TypedColumn makeCol(String keyspace, String columnFamily, Column column)
+//    {
+//        return new TypedColumn(column,
+//                               getNameType(keyspace, columnFamily, column.name),
+//                               getValueType(keyspace, columnFamily, column.name));
+//    }
 
     /** constructs a typed column to hold the key
      * @throws SQLNonTransientException */
-    @SuppressWarnings({ "unchecked", "rawtypes" })
-	public TypedColumn<?> makeKeyColumn(String keyspace, String columnFamily, byte[] key) throws SQLNonTransientException
-    {
-        CFamMeta cf = metadata.get(String.format("%s.%s", keyspace, columnFamily));
-        if (cf == null)
-            throw new SQLNonTransientException(String.format("could not find decoder metadata for: %s.%s",
-                                                                       keyspace,
-                                                                       columnFamily));
-
-        Column column = new Column(cf.keyAlias).setValue(key).setTimestamp(-1);
-        return new TypedColumn(column,
-                               getNameType(keyspace, columnFamily, (cf.keyAlias != null) ? cf.keyAlias : DEFAULT_KEY_NAME),
-                               getValueType(keyspace, columnFamily, (cf.keyAlias != null) ? cf.keyAlias : DEFAULT_KEY_NAME));
-    }
+//    @SuppressWarnings({ "unchecked", "rawtypes" })
+//	public TypedColumn makeKeyColumn(String keyspace, String columnFamily, byte[] key) throws SQLNonTransientException
+//    {
+//        CFamMeta cf = metadata.get(String.format("%s.%s", keyspace, columnFamily));
+//        if (cf == null)
+//            throw new SQLNonTransientException(String.format("could not find decoder metadata for: %s.%s",
+//                                                                       keyspace,
+//                                                                       columnFamily));
+//
+//        Column column = new Column(cf.keyAlias).setValue(key).setTimestamp(-1);
+//        return new TypedColumn(column,
+//                               getNameType(keyspace, columnFamily, (cf.keyAlias != null) ? cf.keyAlias : DEFAULT_KEY_NAME),
+//                               getValueType(keyspace, columnFamily, (cf.keyAlias != null) ? cf.keyAlias : DEFAULT_KEY_NAME));
+//    }
 }

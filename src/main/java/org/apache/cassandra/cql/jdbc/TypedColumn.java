@@ -27,32 +27,64 @@ import org.apache.cassandra.thrift.Column;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
 
-public class TypedColumn<T>
+public class TypedColumn
 {
+    public enum CollectionType {NOT_COLLECTION,MAP,LIST,SET};
+    
     private final Column rawColumn;
 
     // we cache the frequently-accessed forms: java object for value, String for name.
     // Note that {N|V}.toString() isn't always the same as Type.getString
     // (a good example is byte buffers).
-    private final T value;
+    private final Object value;
     private final String nameString;
-    private final AbstractJdbcType<T> nameType, valueType;
-
-    public TypedColumn(Column column, AbstractJdbcType<T> comparator, AbstractJdbcType<T> validator)
+    private final AbstractJdbcType<?> nameType, valueType, keyType;
+    private final CollectionType collectionType;
+    
+    public TypedColumn(Column column, AbstractJdbcType<?> comparator, AbstractJdbcType<?> validator)
+    {
+        this(column,comparator, validator, null, CollectionType.NOT_COLLECTION);
+    }
+    
+    public TypedColumn(Column column, AbstractJdbcType<?> nameType, AbstractJdbcType<?> valueType, AbstractJdbcType<?> keyType, CollectionType type)
     {
         rawColumn = column;
-        this.value = (column.value == null || !column.value.hasRemaining()) ? null : validator.compose(column.value);
-        nameString = comparator.getString(column.name);
-        nameType = comparator;
-        valueType = validator;
+        this.collectionType = type;
+        this.nameType = nameType;
+        this.nameString = nameType.getString(column.name);
+        this.valueType = valueType;
+        this.keyType = keyType;
+        
+        if (column.value == null || !column.value.hasRemaining()) 
+        {
+            this.value = null;
+        }
+        else switch(collectionType)
+        {
+            case NOT_COLLECTION:
+                this.value =  valueType.compose(column.value);
+                break;
+            case LIST:
+                value = ListMaker.getInstance(valueType).compose(column.value);
+                break;
+            case SET:
+                value = SetMaker.getInstance(valueType).compose(column.value);
+                break;
+            case MAP:
+                value = MapMaker.getInstance(keyType, valueType).compose(column.value);
+                break;
+           default:
+                value = null;
+        }
     }
+
 
     public Column getRawColumn()
     {
         return rawColumn;
     }
     
-    public T getValue()
+    public Object getValue()
     {
         return value;
     }
@@ -67,25 +99,34 @@ public class TypedColumn<T>
         return valueType.getString(rawColumn.value);
     }
     
-    public AbstractJdbcType<T> getNameType()
+    public AbstractJdbcType getNameType()
     {
-        return nameType;
+        return  nameType;
     }
 
-    public AbstractJdbcType<T> getValueType()
+    public AbstractJdbcType getValueType()
     {
         return valueType;
     }
 
+    public CollectionType getCollectionType()
+    {
+        return collectionType;
+    }
+    
+
     public String toString()
     {
-        return String.format("TypedColumn [rawColumn=%s, value=%s, nameString=%s, nameType=%s, valueType=%s]",
+        return String.format("TypedColumn [rawColumn=%s, value=%s, nameString=%s, nameType=%s, valueType=%s, keyType=%s, collectionType=%s]",
             displayRawColumn(rawColumn),
             value,
             nameString,
             nameType,
-            valueType);
+            valueType,
+            keyType,
+            collectionType);
     }
+    
     private String displayRawColumn(Column column)
     {
         String name;

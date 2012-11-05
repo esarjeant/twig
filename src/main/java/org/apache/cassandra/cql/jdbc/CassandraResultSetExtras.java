@@ -23,6 +23,9 @@ package org.apache.cassandra.cql.jdbc;
 import java.math.BigInteger;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public interface CassandraResultSetExtras extends ResultSet
 {
@@ -35,9 +38,19 @@ public interface CassandraResultSetExtras extends ResultSet
     public BigInteger getBigInteger(int i) throws SQLException;
     /** @return a BigInteger value for the given column name */
     public BigInteger getBigInteger(String name) throws SQLException;
+    
+    public List<?> getList(int index) throws SQLException;
+    public List<?> getList(String name) throws SQLException;
+
+    public Set<?> getSet(int index) throws SQLException;
+    public Set<?> getSet(String name) throws SQLException;
+
+    public Map<?,?> getMap(int index) throws SQLException;
+    public Map<?,?> getMap(String name) throws SQLException;
+
 
     /** @return the raw column data for the given column offset */
-    public TypedColumn<?> getColumn(int i) throws SQLException;
+    public TypedColumn getColumn(int i) throws SQLException;
     /** @return the raw column data for the given column name */
-    public TypedColumn<?> getColumn(String name) throws SQLException;
+    public TypedColumn getColumn(String name) throws SQLException;
 }

@@ -43,7 +43,7 @@ public class SpashScreenTest
     public static void setUpBeforeClass() throws Exception
     {
         Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,"system"));
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?version=3.0.0",HOST,PORT,"system"));
         Statement stmt = con.createStatement();
 
         // Drop Keyspace
