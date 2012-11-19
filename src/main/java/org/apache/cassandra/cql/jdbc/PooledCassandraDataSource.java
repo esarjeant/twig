@@ -177,4 +177,11 @@ public class PooledCassandraDataSource implements DataSource, ConnectionEventLis
 		return connectionPoolDataSource.unwrap(arg0);
 	}
 
+	// Method not annotated with @Override since getParentLogger() is a new method
+	// in the CommonDataSource interface starting with JDK7 and this annotation
+	// would cause compilation errors with JDK6.
+    public java.util.logging.Logger getParentLogger() throws SQLFeatureNotSupportedException
+    {
+        return connectionPoolDataSource.getParentLogger();
+    }
 }
