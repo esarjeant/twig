@@ -56,7 +56,7 @@ class CassandraConnection extends AbstractConnection implements Connection
     public static final int DB_MAJOR_VERSION = 1;
     public static final int DB_MINOR_VERSION = 2;
     public static final String DB_PRODUCT_NAME = "Cassandra";
-    public static final String DEFAULT_CQL_VERSION = "2.0.0";
+    public static final String DEFAULT_CQL_VERSION = "3.0.0";
 
     public static Compression defaultCompression = Compression.GZIP;
 
@@ -444,7 +444,8 @@ class CassandraConnection extends AbstractConnection implements Connection
 
         try
         {
-            return client.execute_cql_query(Utils.compressQuery(queryStr, compression), compression);
+            if (majorCqlVersion==3) return client.execute_cql3_query(Utils.compressQuery(queryStr, compression), compression, ConsistencyLevel.ONE);
+            else                    return client.execute_cql_query(Utils.compressQuery(queryStr, compression), compression);
         }
         catch (TException error)
         {
@@ -476,7 +477,8 @@ class CassandraConnection extends AbstractConnection implements Connection
     {
         try
         {
-            return client.execute_prepared_cql_query(itemId, values);
+            if (majorCqlVersion==3) return client.execute_prepared_cql3_query(itemId, values, ConsistencyLevel.ONE);
+            else                    return client.execute_prepared_cql_query(itemId, values);
         }
         catch (TException error)
         {
@@ -490,7 +492,8 @@ class CassandraConnection extends AbstractConnection implements Connection
     {
         try
         {
-            return client.prepare_cql_query(Utils.compressQuery(queryStr, compression), compression);
+            if (majorCqlVersion==3) return client.prepare_cql3_query(Utils.compressQuery(queryStr, compression), compression);
+            else                    return client.prepare_cql_query(Utils.compressQuery(queryStr, compression), compression);
         }
         catch (TException error)
         {
