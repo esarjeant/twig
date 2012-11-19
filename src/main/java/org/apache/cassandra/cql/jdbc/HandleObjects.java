@@ -28,16 +28,25 @@ import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.sql.Date;
 import java.sql.RowId;
 import java.sql.SQLException;
 import java.sql.SQLNonTransientException;
+import java.sql.SQLRecoverableException;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.text.ParseException;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.commons.lang.time.DateUtils;
@@ -51,6 +60,33 @@ public class HandleObjects
     private static final String BAD_MAPPING = "encountered object of class: %s, but only '%s' is supported to map to %s";
 
     private static final String STR_BOOL_NUMERIC = "String, Boolean, or a Numeric class";
+    
+    private final static Map<Class<?>, AbstractJdbcType<?>> map = new HashMap<Class<?>, AbstractJdbcType<?>>();
+
+    static
+    {
+        map.put(Boolean.class, JdbcBoolean.instance);
+        map.put(Byte[].class, JdbcBytes.instance);
+        map.put(java.util.Date.class, JdbcDate.instance);
+        map.put(BigDecimal.class, JdbcDecimal.instance);
+        map.put(Double.class, JdbcDouble.instance);
+        map.put(Float.class, JdbcFloat.instance);
+        map.put(Integer.class, JdbcInt32.instance);
+        map.put(Inet4Address.class, JdbcInetAddress.instance);
+        map.put(Inet6Address.class, JdbcInetAddress.instance);
+        map.put(BigInteger.class, JdbcInteger.instance);
+        map.put(Long.class, JdbcLong.instance);
+        map.put(String.class, JdbcUTF8.instance);
+        map.put(UUID.class, JdbcUUID.instance);
+    }
+
+    private static AbstractJdbcType<?> getType(Class<?> elementClass) throws SQLException
+    {
+        AbstractJdbcType<?> type = map.get(elementClass);
+        if (type==null) throw new SQLRecoverableException(String.format("unsupported Collection elemement type:  '%s' for CQL", elementClass));
+        return type;
+    }
+
 
     private static Long fromString(String source) throws SQLException
     {
@@ -210,12 +246,85 @@ public class HandleObjects
         else return null; // this should not happen
     }
 
+    
+    private static final Class<?> getCollectionElementType(Object maybeCollection)
+    {
+        Collection trial = (Collection) maybeCollection;
+        if (trial.isEmpty()) return null;
+        else return trial.iterator().next().getClass();
+    }
+   
+    private static final Class<?> getKeyElementType(Object maybeMap)
+    {
+        return getCollectionElementType(((Map) maybeMap).keySet());
+    }
+   
+    private static final Class<?> getValueElementType(Object maybeMap)
+    {
+        return getCollectionElementType(((Map) maybeMap).values());
+    }
+   
+    private  static final <X> ByteBuffer makeByteBuffer4List(AbstractJdbcType<?> instanceType, List<X> value)
+    {
+        return ListMaker.getInstance(instanceType).decompose(value.getClass().cast(value));
+    }
+    
+    private  static final <X> ByteBuffer makeByteBuffer4Set(AbstractJdbcType<?> instanceType, Set<X> value)
+    {
+        return SetMaker.getInstance(instanceType).decompose(value.getClass().cast(value));
+    }
+    
+    private  static final <K,V> ByteBuffer makeByteBuffer4Map(AbstractJdbcType<?> keyInstanceType, AbstractJdbcType<?> valueInstanceType, Map<K,V> value)
+    {
+        return MapMaker.getInstance(keyInstanceType,valueInstanceType).decompose(value.getClass().cast(value));
+    }
+    
+    private static final <X> ByteBuffer handleAsList(Class<? extends Object> objectClass, Object object) throws SQLException
+    {
+        if (!List.class.isAssignableFrom(objectClass)) return ByteBuffer.wrap(new byte[0]);
 
+        Class<?> elementClass = getCollectionElementType(object);
+        
+        AbstractJdbcType<?> instanceType = getType(elementClass);
+        
+        ByteBuffer bb =  makeByteBuffer4List(instanceType, (List<X>) object.getClass().cast(object));
+        
+        return bb;
+    }
 
-    public static final ByteBuffer makeBytes(Object object, int targetSqlType, int scaleOrLength) throws SQLException
+    private static final <X> ByteBuffer handleAsSet(Class<? extends Object> objectClass, Object object) throws SQLException
+    {
+        if (!Set.class.isAssignableFrom(objectClass)) return ByteBuffer.wrap(new byte[0]);
+
+        Class<?> elementClass = getCollectionElementType(object);
+        
+        AbstractJdbcType<?> instanceType = getType(elementClass);
+        
+        ByteBuffer bb =  makeByteBuffer4Set(instanceType, (Set<X>) object.getClass().cast(object));
+        
+        return bb;
+    }
+
+    private static final <K,V> ByteBuffer handleAsMap(Class<? extends Object> objectClass, Object object) throws SQLException
+    {
+        if (!Map.class.isAssignableFrom(objectClass)) return ByteBuffer.wrap(new byte[0]);
+
+        Class<?> keyElementClass = getKeyElementType(object);
+        Class<?> valueElementClass = getValueElementType(object);
+        
+        AbstractJdbcType<?> keyInstanceType = getType(keyElementClass);
+        AbstractJdbcType<?> valueInstanceType = getType(valueElementClass);
+        
+        ByteBuffer bb =  makeByteBuffer4Map(keyInstanceType,valueInstanceType, (Map<K,V>) object.getClass().cast(object));
+        
+        return bb;
+    }
+
+    public static final ByteBuffer makeBytes(Object object, int baseType, int scaleOrLength) throws SQLException
     {
         Class<? extends Object> objectClass = object.getClass();
-
+        boolean isCollection = (Collection.class.isAssignableFrom(objectClass));
+        int targetSqlType = isCollection ? Types.OTHER : baseType;
         // Type check first
         switch (targetSqlType)
         {
@@ -311,6 +420,14 @@ public class HandleObjects
             case Types.JAVA_OBJECT:
                 break;
 
+            case Types.OTHER:
+                // Only Collection classes for transformation to OTHER
+                if (!( List.class.isAssignableFrom(object.getClass()) 
+                    || Set.class.isAssignableFrom(object.getClass())
+                    || Map.class.isAssignableFrom(object.getClass())))
+                    throw makeBadMapping(objectClass,STR_BOOL_NUMERIC,"OTHER");
+                break;
+
             case Types.ROWID:
                 if (objectClass != RowId.class) throw makeBadMapping(objectClass,"a RowId type","ROWID");
                 break;
@@ -383,6 +500,22 @@ public class HandleObjects
 
             case Types.JAVA_OBJECT:
                 return javaObject(object);
+                
+            case Types.OTHER:
+                if ( List.class.isAssignableFrom(objectClass))
+                {
+                  return handleAsList(objectClass, object);  
+                }
+                else if ( Set.class.isAssignableFrom(objectClass))
+                {
+                    return handleAsSet(objectClass, object);  
+                }
+                else if ( Map.class.isAssignableFrom(objectClass))
+                {
+                    return handleAsMap(objectClass, object);  
+                }
+                else return null;
+                
 
             case Types.ROWID:
                 byte[] bytes = ((RowId) object).getBytes();

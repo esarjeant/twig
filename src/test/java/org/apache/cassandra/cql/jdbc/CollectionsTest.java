@@ -23,6 +23,9 @@ package org.apache.cassandra.cql.jdbc;
 import static org.junit.Assert.*;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -30,6 +33,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.Map;
 
 import org.apache.cassandra.cql.ConnectionDetails;
@@ -70,7 +74,7 @@ public class CollectionsTest
 
         con = DriverManager.getConnection(URL);
 
-        LOG.debug("URL         = '{}'", URL);
+        if (LOG.isDebugEnabled()) LOG.debug("URL         = '{}'", URL);
 
         Statement stmt = con.createStatement();
 
@@ -88,9 +92,9 @@ public class CollectionsTest
         {/* Exception on DROP is OK */}
 
         // Create KeySpace
-        String createKS = String.format("CREATE KEYSPACE %s WITH replication = { 'class' : 'SimpleStrategy',  'replication_factor' : 1 }",KEYSPACE);
+        String createKS = String.format("CREATE KEYSPACE %s WITH replication = { 'class' : 'SimpleStrategy',  'replication_factor' : 1  };",KEYSPACE);
 //        String createKS = String.format("CREATE KEYSPACE %s WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1;",KEYSPACE);
-        LOG.debug("createKS    = '{}'", createKS);
+        if (LOG.isDebugEnabled()) LOG.debug("createKS    = '{}'", createKS);
 
         stmt = con.createStatement();
         stmt.execute("USE " + SYSTEM);
@@ -100,7 +104,7 @@ public class CollectionsTest
 
         // Create the target Table (CF)
         String createTable = "CREATE TABLE testcollection (" + " k int PRIMARY KEY," + " L list<bigint>," + " M map<double, boolean>," + " S set<text>" + ") ;";
-        LOG.debug("createTable = '{}'", createTable);
+        if (LOG.isDebugEnabled()) LOG.debug("createTable = '{}'", createTable);
 
         stmt.execute(createTable);
         stmt.close();
@@ -109,7 +113,7 @@ public class CollectionsTest
         // open it up again to see the new TABLE
         URL = String.format("jdbc:cassandra://%s:%d/%s?version=%s", HOST, PORT, KEYSPACE, CQLV3);
         con = DriverManager.getConnection(URL);
-        LOG.debug("URL         = '{}'", URL);
+        if (LOG.isDebugEnabled()) LOG.debug("URL         = '{}'", URL);
 
         Statement statement = con.createStatement();
 
@@ -121,7 +125,7 @@ public class CollectionsTest
         statement.executeUpdate(update2);
 
 
-        LOG.debug("Unit Test: 'CollectionsTest' initialization complete.\n\n");
+        if (LOG.isDebugEnabled()) LOG.debug("Unit Test: 'CollectionsTest' initialization complete.\n\n");
     }
 
     /**
@@ -136,7 +140,7 @@ public class CollectionsTest
     @Test
     public void testReadList() throws Exception
     {
-        if (LOG.isDebugEnabled()) LOG.debug("Test: 'testReadList'.\n");
+        if (LOG.isDebugEnabled()) LOG.debug("Test: 'testReadList'\n");
 
         Statement statement = con.createStatement();
 
@@ -146,7 +150,7 @@ public class CollectionsTest
         assertEquals(1, result.getInt("k"));
 
         Object myObj = result.getObject("l");
-        LOG.debug("l           = '{}'", myObj);
+        if (LOG.isDebugEnabled()) LOG.debug("l           = '{}'\n", myObj);
         List<Long> myList = (List<Long>) myObj;
         assertEquals(3, myList.size());
         assertTrue(12345L == myList.get(2));
@@ -155,14 +159,12 @@ public class CollectionsTest
         myList = (List<Long>) extras(result).getList("l");
         statement.close();
         assertTrue(3L == myList.get(1));
-
-        if (LOG.isDebugEnabled()) LOG.debug("\n");
     }
 
     @Test
     public void testUpdateList() throws Exception
     {
-        if (LOG.isDebugEnabled()) LOG.debug("Test: 'testUpdateList'.\n");
+        if (LOG.isDebugEnabled()) LOG.debug("Test: 'testUpdateList'\n");
         
         Statement statement = con.createStatement();
 
@@ -178,7 +180,7 @@ public class CollectionsTest
         assertEquals(6, myList.size());
         assertTrue(12345L == myList.get(2));
         
-        LOG.debug("l           = '{}'", myObj);
+        if (LOG.isDebugEnabled()) LOG.debug("l           = '{}'", myObj);
 
         String update2 = "UPDATE testcollection SET L = [98,99,100] + L WHERE k = 1;";
         statement.executeUpdate(update2);
@@ -188,7 +190,7 @@ public class CollectionsTest
         myList = (List<Long>) myObj;
         assertTrue(100L == myList.get(0));
         
-        LOG.debug("l           = '{}'", myObj);
+        if (LOG.isDebugEnabled()) LOG.debug("l           = '{}'", myObj);
 
         String update3 = "UPDATE testcollection SET L[0] = 2000 WHERE k = 1;";
         statement.executeUpdate(update3);
@@ -197,28 +199,30 @@ public class CollectionsTest
         myObj = result.getObject("l");
         myList = (List<Long>) myObj;
         
-        LOG.debug("l           = '{}'", myObj);
+        if (LOG.isDebugEnabled()) LOG.debug("l           = '{}'", myObj);
         
 //        String update4 = "UPDATE testcollection SET L = L +  ? WHERE k = 1;";
-//        
-//        PreparedStatement prepared = con.prepareStatement(update4);
-//        prepared.setLong(1, 8888L);
-//        prepared.executeUpdate();
-//
-//        result = prepared.executeQuery("SELECT * FROM testcollection WHERE k = 1;");
-//        result.next();
-//        myObj = result.getObject("l");
-//        myList = (List<Long>) myObj;
-//        
-//        LOG.debug("l           = '{}'", myObj);
+        String update4 = "UPDATE testcollection SET L =  ? WHERE k = 1;";
+        
+        PreparedStatement prepared = con.prepareStatement(update4);
+        List<Long> myNewList = new ArrayList<Long>();
+        myNewList.add(8888L);
+        myNewList.add(9999L);
+        prepared.setObject(1, myNewList, Types.OTHER);
+        prepared.execute();
 
-        if (LOG.isDebugEnabled()) LOG.debug("\n");
+        result = prepared.executeQuery("SELECT * FROM testcollection WHERE k = 1;");
+        result.next();
+        myObj = result.getObject("l");
+        myList = (List<Long>) myObj;
+        
+        if (LOG.isDebugEnabled()) LOG.debug("l (prepared)= '{}'\n", myObj);
     }
 
     @Test
     public void testReadSet() throws Exception
     {
-        if (LOG.isDebugEnabled()) LOG.debug("Test: 'testReadSet'.\n");
+        if (LOG.isDebugEnabled()) LOG.debug("Test: 'testReadSet'\n");
 
         Statement statement = con.createStatement();
 
@@ -229,19 +233,17 @@ public class CollectionsTest
         assertEquals(1, result.getInt("k"));
 
         Object myObj = result.getObject("s");
-        LOG.debug("s           = '{}'", myObj);
+        if (LOG.isDebugEnabled()) LOG.debug("s           = '{}'\n", myObj);
         Set<String> mySet = (Set<String>) myObj;
         assertEquals(3, mySet.size());
         assertTrue(mySet.contains("white"));
         assertTrue(myObj instanceof LinkedHashSet);
-
-        if (LOG.isDebugEnabled()) LOG.debug("\n");
     }
 
     @Test
     public void testUpdateSet() throws Exception
     {
-        if (LOG.isDebugEnabled()) LOG.debug("Test: 'testUpdateSet'.\n");
+        if (LOG.isDebugEnabled()) LOG.debug("Test: 'testUpdateSet'\n");
         
         Statement statement = con.createStatement();
 
@@ -258,7 +260,7 @@ public class CollectionsTest
         assertEquals(5, mySet.size());
         assertTrue(mySet.contains("white"));
 
-        LOG.debug("l           = '{}'", myObj);
+        if (LOG.isDebugEnabled()) LOG.debug("s           = '{}'", myObj);
 
         // remove an item from the set
         String update2 = "UPDATE testcollection SET S = S - {'red'} WHERE k = 1;";
@@ -275,9 +277,100 @@ public class CollectionsTest
         assertTrue(mySet.contains("white"));
         assertFalse(mySet.contains("red"));
 
-        LOG.debug("s           = '{}'", myObj);
+        if (LOG.isDebugEnabled()) LOG.debug("s           = '{}'", myObj);
+        
+        String update4 = "UPDATE testcollection SET S =  ? WHERE k = 1;";
+        
+        PreparedStatement prepared = con.prepareStatement(update4);
+        Set<String> myNewSet = new HashSet<String>();
+        myNewSet.add("black");
+        myNewSet.add("blue");
+        prepared.setObject(1, myNewSet, Types.OTHER);
+        prepared.execute();
 
-        if (LOG.isDebugEnabled()) LOG.debug("\n");
+        result = prepared.executeQuery("SELECT * FROM testcollection WHERE k = 1;");
+        result.next();
+        myObj = result.getObject("s");
+        mySet = (Set<String>) myObj;
+        
+        if (LOG.isDebugEnabled()) LOG.debug("s (prepared)= '{}'\n", myObj);
+    }
+
+    @Test
+    public void testReadMap() throws Exception
+    {
+        if (LOG.isDebugEnabled()) LOG.debug("Test: 'testReadMap'\n");
+
+        Statement statement = con.createStatement();
+
+
+        ResultSet result = statement.executeQuery("SELECT * FROM testcollection WHERE k = 1;");
+        result.next();
+
+        assertEquals(1, result.getInt("k"));
+
+        Object myObj = result.getObject("m");
+        if (LOG.isDebugEnabled()) LOG.debug("m           = '{}'\n", myObj);
+        Map<Double,Boolean> myMap = (Map<Double,Boolean>) myObj;
+        assertEquals(3, myMap.size());
+        assertTrue(myMap.keySet().contains(2.0));
+        assertTrue(myObj instanceof HashMap);
+    }
+
+    @Test
+    public void testUpdateMap() throws Exception
+    {
+        if (LOG.isDebugEnabled()) LOG.debug("Test: 'testUpdateMap'\n");
+        
+        Statement statement = con.createStatement();
+
+        // add some items to the set
+        String update1 = "UPDATE testcollection SET M = M + {1.0: 'true', 3.0: 'false', 5.0: 'false'} WHERE k = 1;";
+        statement.executeUpdate(update1);
+
+        ResultSet result = statement.executeQuery("SELECT * FROM testcollection WHERE k = 1;");
+        result.next();
+
+        assertEquals(1, result.getInt("k"));
+        Object myObj = result.getObject("m");
+        Map<Double,Boolean> myMap = (Map<Double,Boolean>) myObj;
+        assertEquals(6, myMap.size());
+        assertTrue(myMap.keySet().contains(5.0));
+
+        if (LOG.isDebugEnabled()) LOG.debug("m           = '{}'", myObj);
+
+        // remove an item from the map
+        String update2 = "DELETE M[6.0] FROM testcollection WHERE k = 1;";
+        statement.executeUpdate(update2);
+
+        result = statement.executeQuery("SELECT * FROM testcollection WHERE k = 1;");
+        result.next();
+
+        assertEquals(1, result.getInt("k"));
+
+        myObj = result.getObject("m");
+        myMap = (Map<Double,Boolean>) myObj;
+        assertEquals(5, myMap.size());
+        assertTrue(myMap.keySet().contains(5.0));
+        assertFalse(myMap.keySet().contains(6.0));
+
+        if (LOG.isDebugEnabled()) LOG.debug("m           = '{}'", myObj);
+        
+        String update4 = "UPDATE testcollection SET M =  ? WHERE k = 1;";
+        
+        PreparedStatement prepared = con.prepareStatement(update4);
+        Map<Double,Boolean> myNewMap = new LinkedHashMap<Double,Boolean> ();
+        myNewMap.put(10.0, false);
+        myNewMap.put(12.0, true);
+        prepared.setObject(1, myNewMap, Types.OTHER);
+        prepared.execute();
+
+        result = prepared.executeQuery("SELECT * FROM testcollection WHERE k = 1;");
+        result.next();
+        myObj = result.getObject("m");
+        myMap = (Map<Double,Boolean>) myObj;
+        
+        if (LOG.isDebugEnabled()) LOG.debug("m (prepared)= '{}'\n", myObj);
     }
 
 

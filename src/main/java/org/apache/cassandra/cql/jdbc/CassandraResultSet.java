@@ -1084,7 +1084,8 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
         }
         
         TypedColumn tc =  new TypedColumn(column, comparator, validator, keyType, type);
-        logger.debug("tc = "+tc);
+        
+        if (logger.isTraceEnabled()) logger.trace("tc = "+tc);
         
         return tc;
     }
