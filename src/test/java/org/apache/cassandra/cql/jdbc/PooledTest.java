@@ -40,7 +40,7 @@ public class PooledTest
 	private static final String KEYSPACE = "testks";
 	private static final String USER = "JohnDoe";
 	private static final String PASSWORD = "secret";
-	private static final String VERSION = "2.0.0";
+	private static final String VERSION = "3.0.0";
 
 	private static java.sql.Connection con = null;
 
