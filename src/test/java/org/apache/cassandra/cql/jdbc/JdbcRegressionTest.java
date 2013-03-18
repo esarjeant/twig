@@ -251,7 +251,35 @@ public class JdbcRegressionTest
             System.out.println("beforeFirst() test -> "+ e);
         }
         
-}
+    }
+    
+    @Test
+    public void testIssue59() throws Exception
+    {
+        Statement stmt = con.createStatement();
+        
+        // Create the target Column family
+        String createCF = "CREATE COLUMNFAMILY t59 (k int PRIMARY KEY," 
+                        + "c text "
+                        + ") ;";        
+        
+        stmt.execute(createCF);
+        stmt.close();
+        con.close();
+
+        // open it up again to see the new CF
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+ 
+        PreparedStatement statement = con.prepareStatement("update t59 set c=? where k=123", ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+        statement.setString(1, "hello");
+        statement.executeUpdate();
+
+        ResultSet result = statement.executeQuery("SELECT * FROM t59;");
+        
+        System.out.println(resultToDisplay(result,59));
+
+    }
+
 
     @Test
     public void isValid() throws Exception
@@ -283,5 +311,29 @@ public class JdbcRegressionTest
         sb.append("[").append(index).append("]");
         sb.append(result.getObject(index));
         return sb.toString();
+    }
+    
+    private final String resultToDisplay(ResultSet result, int issue) throws Exception
+    {
+        StringBuilder sb = new StringBuilder("Test Issue #" + issue + "\n");
+       ResultSetMetaData metadata = result.getMetaData();
+        
+        int colCount = metadata.getColumnCount();
+        
+        sb.append("--------------").append("\n");
+        while (result.next())
+        {
+            metadata = result.getMetaData();
+            colCount = metadata.getColumnCount();
+            sb.append(String.format("(%d) ",result.getRow()));
+            for (int i = 1; i <= colCount; i++)
+            {
+                sb.append(showColumn(i,result)+ " "); 
+            }
+            sb.append("\n");
+        }
+        
+        return sb.toString();
+        
     }
 }

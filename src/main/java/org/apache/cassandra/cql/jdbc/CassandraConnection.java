@@ -41,6 +41,8 @@ import org.apache.thrift.transport.TSocket;
 import org.apache.thrift.transport.TTransport;
 
 import static org.apache.cassandra.cql.jdbc.Utils.*;
+import static org.apache.cassandra.cql.jdbc.CassandraResultSet.*;
+
 
 /**
  * Implementation class for {@link Connection}.
@@ -273,7 +275,7 @@ class CassandraConnection extends AbstractConnection implements Connection
     {
         checkNotClosed();
         // the rationale is there are really no commits in Cassandra so no boundary...
-        return CassandraResultSet.DEFAULT_HOLDABILITY;
+        return DEFAULT_HOLDABILITY;
     }
 
     public DatabaseMetaData getMetaData() throws SQLException
@@ -352,22 +354,27 @@ class CassandraConnection extends AbstractConnection implements Connection
         return sql;
     }
 
-    public CassandraPreparedStatement prepareStatement(String sql) throws SQLException
+    public CassandraPreparedStatement prepareStatement(String cql) throws SQLException
+    {
+        return prepareStatement(cql,DEFAULT_TYPE,DEFAULT_CONCURRENCY,DEFAULT_HOLDABILITY);
+    }
+
+    public CassandraPreparedStatement prepareStatement(String cql, int rsType) throws SQLException
+    {
+        return prepareStatement(cql,rsType,DEFAULT_CONCURRENCY,DEFAULT_HOLDABILITY);
+    }
+
+    public CassandraPreparedStatement prepareStatement(String cql, int rsType, int rsConcurrency) throws SQLException
+    {
+        return prepareStatement(cql,rsType,rsConcurrency,DEFAULT_HOLDABILITY);
+    }
+
+    public CassandraPreparedStatement prepareStatement(String cql, int rsType, int rsConcurrency, int rsHoldability) throws SQLException
     {
         checkNotClosed();
-        CassandraPreparedStatement statement = new CassandraPreparedStatement(this, sql);
+        CassandraPreparedStatement statement = new CassandraPreparedStatement(this, cql, rsType,rsConcurrency,rsHoldability);
         statements.add(statement);
         return statement;
-    }
-
-    public PreparedStatement prepareStatement(String arg0, int arg1, int arg2) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public PreparedStatement prepareStatement(String arg0, int arg1, int arg2, int arg3) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     public void rollback() throws SQLException

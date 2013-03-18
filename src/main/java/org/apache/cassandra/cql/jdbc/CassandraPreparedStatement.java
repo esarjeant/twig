@@ -96,7 +96,35 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
             throw new SQLNonTransientConnectionException(e);
         }
     }
+    
+    
+    CassandraPreparedStatement(CassandraConnection con,
+        String cql,
+        int rsType,
+        int rsConcurrency,
+        int rsHoldability
+        ) throws SQLException
+    {
+       super(con,cql,rsType,rsConcurrency,rsHoldability);
+       if (LOG.isTraceEnabled()) LOG.trace("CQL: " + this.cql);
+       try
+       {
+           CqlPreparedResult result = con.prepare(cql);
 
+           itemId = result.itemId;
+           count = result.count;
+       }
+       catch (InvalidRequestException e)
+       {
+           throw new SQLSyntaxErrorException(e);
+       }
+       catch (TException e)
+       {
+           throw new SQLNonTransientConnectionException(e);
+       }
+
+       
+    }
     String getCql()
     {
         return cql;
