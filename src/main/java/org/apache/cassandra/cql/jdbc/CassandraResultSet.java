@@ -123,10 +123,14 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
         this.fetchDirection = statement.getFetchDirection();
         this.fetchSize = statement.getFetchSize();
         this.schema = resultSet.schema;
+        
+        // Initialize meta-data from schema
+        populateMetaData();
 
         rowsIterator = resultSet.getRowsIterator();
         
         // Initialize to column values from the first row
+        // re-Initialize meta-data to column values from the first row (if data exists)
         // NOTE: that the first call to next() will HARMLESSLY re-write these values for the columns
         // NOTE: the row cursor is not advanced and sits before the first row
         if (hasMoreRows())
@@ -145,6 +149,19 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
         return (rowsIterator !=null && rowsIterator.hasNext());
     }
 
+    private final void populateMetaData()
+    {
+        values.clear();
+        indexMap.clear();
+        for (ByteBuffer name : this.schema.name_types.keySet())
+        {
+            TypedColumn c = createColumn(new Column(name));
+            String columnName = c.getNameString();
+            values.add(c);
+            indexMap.put(columnName, values.size()); // one greater than 0 based index of a list
+        }
+    }
+   
     private final void populateColumns()
     {
         // clear column value tables
