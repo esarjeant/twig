@@ -83,7 +83,7 @@ public class HandleObjects
     private static AbstractJdbcType<?> getType(Class<?> elementClass) throws SQLException
     {
         AbstractJdbcType<?> type = map.get(elementClass);
-        if (type==null) throw new SQLRecoverableException(String.format("unsupported Collection elemement type:  '%s' for CQL", elementClass));
+    //    if (type==null) throw new SQLRecoverableException(String.format("unsupported Collection element type:  '%s' for CQL", elementClass));
         return type;
     }
 
@@ -250,7 +250,7 @@ public class HandleObjects
     private static final Class<?> getCollectionElementType(Object maybeCollection)
     {
         Collection trial = (Collection) maybeCollection;
-        if (trial.isEmpty()) return null;
+        if (trial.isEmpty()) return trial.getClass();
         else return trial.iterator().next().getClass();
     }
    
@@ -285,7 +285,7 @@ public class HandleObjects
 
         Class<?> elementClass = getCollectionElementType(object);
         
-        AbstractJdbcType<?> instanceType = getType(elementClass);
+        AbstractJdbcType<?> instanceType = (elementClass==null)? JdbcUTF8.instance : getType(elementClass);
         
         ByteBuffer bb =  makeByteBuffer4List(instanceType, (List<X>) object.getClass().cast(object));
         
@@ -298,7 +298,7 @@ public class HandleObjects
 
         Class<?> elementClass = getCollectionElementType(object);
         
-        AbstractJdbcType<?> instanceType = getType(elementClass);
+        AbstractJdbcType<?> instanceType = (elementClass==null)? JdbcUTF8.instance : getType(elementClass);
         
         ByteBuffer bb =  makeByteBuffer4Set(instanceType, (Set<X>) object.getClass().cast(object));
         

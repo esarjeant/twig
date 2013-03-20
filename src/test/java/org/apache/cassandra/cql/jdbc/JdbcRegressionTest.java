@@ -30,6 +30,9 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.apache.cassandra.cql.ConnectionDetails;
 import org.junit.AfterClass;
@@ -101,7 +104,7 @@ public class JdbcRegressionTest
     @Test
     public void testIssue10() throws Exception
     {
-        String insert = "INSERT INTO regressiontest (keyname,bValue,iValue) VALUES( 'key0','true', 2000);";
+        String insert = "INSERT INTO regressiontest (keyname,bValue,iValue) VALUES( 'key0',true, 2000);";
         Statement statement = con.createStatement();
 
         statement.executeUpdate(insert);
@@ -141,10 +144,10 @@ public class JdbcRegressionTest
        String truncate = "TRUNCATE regressiontest;";
        statement.execute(truncate);
        
-       String insert1 = "INSERT INTO regressiontest (keyname,bValue,iValue) VALUES( 'key0','true', 2000);";
+       String insert1 = "INSERT INTO regressiontest (keyname,bValue,iValue) VALUES( 'key0',true, 2000);";
        statement.executeUpdate(insert1);
        
-       String insert2 = "INSERT INTO regressiontest (keyname,bValue) VALUES( 'key1','false');";
+       String insert2 = "INSERT INTO regressiontest (keyname,bValue) VALUES( 'key1',false);";
        statement.executeUpdate(insert2);
        
        
@@ -276,9 +279,53 @@ public class JdbcRegressionTest
 
         ResultSet result = statement.executeQuery("SELECT * FROM t59;");
         
-        System.out.println(resultToDisplay(result,59));
+        System.out.println(resultToDisplay(result,59,null));
 
     }
+    
+    @Test
+    public void testIssue65() throws Exception
+    {
+        Statement stmt = con.createStatement();
+        
+        // Create the target Column family
+        String createCF = "CREATE COLUMNFAMILY t65 (key text PRIMARY KEY," 
+                        + "int1 int, "
+                        + "int2 int, "
+                        + "intset  set<int> "
+                        + ") ;";        
+        
+        stmt.execute(createCF);
+        stmt.close();
+        con.close();
+
+        // open it up again to see the new CF
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+        
+        Statement statement = con.createStatement();
+        String insert = "INSERT INTO t65 (key, int1,int2,intset) VALUES ('key1',1,100,{10,20,30,40});";
+        statement.executeUpdate(insert);
+        
+        ResultSet result = statement.executeQuery("SELECT * FROM t65;");
+
+        System.out.println(resultToDisplay(result,65, "with set = {10,20,30,40}"));
+       
+        String update = "UPDATE t65 SET intset=? WHERE key=?;";
+ 
+        PreparedStatement pstatement = con.prepareStatement(update);
+        Set<Integer> mySet = new HashSet<Integer> ();
+        pstatement.setObject(1, mySet, Types.OTHER);
+        pstatement.setString(2, "key1");
+       
+        pstatement.executeUpdate();
+
+        result = statement.executeQuery("SELECT * FROM t65;");
+        
+        System.out.println(resultToDisplay(result,65," with set = <empty>"));
+
+    }
+    
+    
 
 
     @Test
@@ -313,9 +360,9 @@ public class JdbcRegressionTest
         return sb.toString();
     }
     
-    private final String resultToDisplay(ResultSet result, int issue) throws Exception
+    private final String resultToDisplay(ResultSet result, int issue, String note) throws Exception
     {
-        StringBuilder sb = new StringBuilder("Test Issue #" + issue + "\n");
+        StringBuilder sb = new StringBuilder("Test Issue #" + issue + " - "+ note + "\n");
        ResultSetMetaData metadata = result.getMetaData();
         
         int colCount = metadata.getColumnCount();
