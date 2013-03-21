@@ -20,8 +20,8 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
-import static org.apache.cassandra.cql.jdbc.Utils.NO_INTERFACE;
 import static org.apache.cassandra.cql.jdbc.Utils.NOT_SUPPORTED;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_INTERFACE;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -124,8 +124,13 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
         return new CassandraResultSet();
     }
 
-    public ResultSet getColumns(String arg0, String arg1, String arg2, String arg3) throws SQLException
+    public ResultSet getColumns(String catalog,String schemaPattern, String tableNamePattern, String columnNamePattern) throws SQLException
     {
+    	if (catalog == null || connection.getCatalog().equals(catalog))
+    	{
+	        ResultSet rs = MetadataResultSets.instance.makeColumns(statement, schemaPattern, tableNamePattern,columnNamePattern);
+	        return rs;
+    	}
         return new CassandraResultSet();
     }
 
@@ -214,7 +219,7 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
         return new CassandraResultSet();
     }
 
-    public ResultSet getIndexInfo(String arg0, String arg1, String arg2, boolean arg3, boolean arg4) throws SQLException
+    public ResultSet getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate) throws SQLException
     {
         return new CassandraResultSet();
     }
@@ -388,7 +393,7 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public ResultSet getSchemas(String catalog, String schemaPattern) throws SQLException
     {
-        if (!(catalog == null || catalog.equals(statement.connection.cluster) ))
+        if (!(catalog == null || catalog.equals(statement.connection.getCatalog()) ))
             throw new SQLSyntaxErrorException("catalog name must exactly match or be null");
         
         ResultSet rs = MetadataResultSets.instance.makeSchemas(statement, schemaPattern);
@@ -431,8 +436,25 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
         return result;
     }
 
-    public ResultSet getTables(String arg0, String arg1, String arg2, String[] arg3) throws SQLException
+    public ResultSet getTables(String catalog, String schemaPattern, String tableNamePattern, String[] types) throws SQLException
     {
+    	boolean askingForTable = (types == null);
+    	if (types != null)
+    	{
+	    	for (String t: types)
+	    	{
+	    		if (MetadataResultSets.TABLE_CONSTANT.equals(t))
+	    		{
+	    			askingForTable = true;
+	    			break;
+	    		}
+	    	}
+    	}
+    	if ((catalog == null || connection.getCatalog().equals(catalog)) && askingForTable)
+    	{
+	        ResultSet rs = MetadataResultSets.instance.makeTables(statement, schemaPattern, tableNamePattern);
+	        return rs;
+    	}
         return new CassandraResultSet();
     }
 

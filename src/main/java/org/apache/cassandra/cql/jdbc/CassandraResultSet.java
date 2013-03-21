@@ -1231,7 +1231,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
         public String getCatalogName(int column) throws SQLException
         {
             checkIndex(column);
-            return statement.connection.cluster;
+            return statement.connection.getCatalog();
         }
 
         public String getColumnClassName(int column) throws SQLException

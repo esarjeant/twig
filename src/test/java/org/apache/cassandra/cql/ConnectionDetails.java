@@ -1,6 +1,5 @@
 package org.apache.cassandra.cql;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
@@ -20,12 +19,12 @@ public final class ConnectionDetails {
         InputStream stream = getClass().getResourceAsStream(getClass().getSimpleName() + ".properties");
         try {
             p.load(stream);
-        } catch (IOException e) {
+        } catch (Exception e) {
             // ignore, we'll use the defaults
         } finally {
             try {
                 stream.close();
-            } catch (IOException e) {
+            } catch (Exception e) {
                 // ignore
             }
         }
@@ -33,9 +32,9 @@ public final class ConnectionDetails {
         host = p.getProperty("host", "localhost");
         int port;
         try {
-            port = Integer.parseInt(p.getProperty("port", "9170"));
+            port = Integer.parseInt(p.getProperty("port", "9160"));
         } catch (NumberFormatException e) {
-            port = 9170;
+            port = 9160;
         }
         this.port = port;
     }

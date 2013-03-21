@@ -89,7 +89,7 @@ class CassandraConnection extends AbstractConnection implements Connection
     protected String username = null;
     protected String url = null;
     String currentKeyspace;
-    String cluster;
+    protected String cluster;
     int majorCqlVersion;
     ColumnDecoder decoder;
 

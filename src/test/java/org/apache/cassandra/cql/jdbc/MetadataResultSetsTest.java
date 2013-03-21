@@ -140,6 +140,17 @@ public class MetadataResultSetsTest
        return sb.toString();
     }
 
+	private final String getColumnNames(ResultSetMetaData metaData) throws SQLException
+	{
+       StringBuilder sb = new StringBuilder();
+        int count = metaData.getColumnCount();
+        for (int i = 1; i <= count; i++) {
+            sb.append(metaData.getColumnName(i));
+            if (i < count) sb.append(", ");
+		}
+        return sb.toString();
+	}
+
     // TESTS ------------------------------------------------------------------
     
     @Test

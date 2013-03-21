@@ -30,6 +30,7 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.Date;
@@ -46,6 +47,7 @@ public class JdbcRegressionTest
     private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
     private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort()+""));
     private static final String KEYSPACE = "testks";
+    private static final String TABLE = "regressiontest";
 //    private static final String CQLV3 = "3.0.0";
       
     private static java.sql.Connection con = null;
@@ -79,7 +81,7 @@ public class JdbcRegressionTest
         stmt.execute(useKS);
         
         // Create the target Column family
-        String createCF = "CREATE COLUMNFAMILY regressiontest (keyname text PRIMARY KEY," 
+        String createCF = "CREATE COLUMNFAMILY "+TABLE+" (keyname text PRIMARY KEY,"
                         + " bValue boolean,"
                         + " iValue int"
                         + ");";
@@ -100,7 +102,6 @@ public class JdbcRegressionTest
     {
         if (con!=null) con.close();
     }
-
 
 
     @Test
@@ -257,6 +258,52 @@ public class JdbcRegressionTest
         }
         
     }
+    
+    @Test
+    public void testIssue40() throws Exception
+    {
+        DatabaseMetaData md = con.getMetaData();
+        System.out.println();
+        System.out.println("Test Issue #40");
+        System.out.println("--------------");
+
+        // test various retrieval methods
+        ResultSet result = md.getTables(con.getCatalog(), null, "%", new String[]
+        { "TABLE" });
+        assertTrue("Make sure we have found a table", result.next());
+        result = md.getTables(null, KEYSPACE, TABLE, null);
+        assertTrue("Make sure we have found the table asked for", result.next());
+        result = md.getTables(null, KEYSPACE, TABLE, new String[]
+        { "TABLE" });
+        assertTrue("Make sure we have found the table asked for", result.next());
+        result = md.getTables(con.getCatalog(), KEYSPACE, TABLE, new String[]
+        { "TABLE" });
+        assertTrue("Make sure we have found the table asked for", result.next());
+
+        // check the table name
+        String tn = result.getString("TABLE_NAME");
+        assertEquals("Table name match", TABLE, tn);
+        System.out.println("Found table via dmd    :   " + tn);
+
+        // load the columns
+        result = md.getColumns(con.getCatalog(), KEYSPACE, TABLE, null);
+        assertTrue("Make sure we have found first column", result.next());
+        assertEquals("Make sure table name match", TABLE, result.getString("TABLE_NAME"));
+        String cn = result.getString("COLUMN_NAME");
+        System.out.println("Found column       :   " + cn);
+        assertEquals("Column name check", "bvalue", cn);
+        assertEquals("Column type check", Types.BOOLEAN, result.getInt("DATA_TYPE"));
+        assertTrue("Make sure we have found second column", result.next());
+        cn = result.getString("COLUMN_NAME");
+        System.out.println("Found column       :   " + cn);
+        assertEquals("Column name check", "ivalue", cn);
+        assertEquals("Column type check", Types.INTEGER, result.getInt("DATA_TYPE"));
+
+        // make sure we filter
+        result = md.getColumns(con.getCatalog(), KEYSPACE, TABLE, "bvalue");
+        result.next();
+        assertFalse("Make sure we have found requested column only", result.next());
+    }    
     
     @Test
     public void testIssue59() throws Exception
@@ -422,7 +469,6 @@ public class JdbcRegressionTest
             sb.append("\n");
         }
         
-        return sb.toString();
-        
+        return sb.toString();        
     }
 }
