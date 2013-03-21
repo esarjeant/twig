@@ -30,7 +30,9 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
 import java.sql.Types;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -323,6 +325,46 @@ public class JdbcRegressionTest
         
         System.out.println(resultToDisplay(result,65," with set = <empty>"));
 
+    }
+    
+    @Test
+    public void testIssue74() throws Exception
+    {
+        Statement stmt = con.createStatement();
+        java.util.Date now = new java.util.Date();
+
+        
+        // Create the target Column family
+        String createCF = "CREATE COLUMNFAMILY t74 (id BIGINT PRIMARY KEY, col1 TIMESTAMP)";        
+        
+        stmt.execute(createCF);
+        stmt.close();
+        con.close();
+
+        // open it up again to see the new CF
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+        
+        Statement statement = con.createStatement();
+        
+        String insert = "INSERT INTO t74 (id, col1) VALUES (?, ?);";
+        
+        PreparedStatement pstatement = con.prepareStatement(insert);
+        pstatement.setLong(1, 1L); 
+        pstatement.setObject(2, new Timestamp(now.getTime()),Types.TIMESTAMP);
+        pstatement.execute();
+
+        ResultSet result = statement.executeQuery("SELECT * FROM t74;");
+        
+        assertTrue(result.next());
+        assertEquals(1L, result.getLong(1));
+        Timestamp stamp = result.getTimestamp(2);
+        
+        assertEquals(now, stamp);
+        stamp = (Timestamp)result.getObject(2); // maybe exception here
+        assertEquals(now, stamp);
+
+        System.out.println(resultToDisplay(result,74, "current date"));
+       
     }
     
     
