@@ -120,7 +120,7 @@ public class CollectionsTest
         String insert = "INSERT INTO testcollection (k,L) VALUES( 1,[1, 3, 12345]);";
         statement.executeUpdate(insert);
         String update1 = "UPDATE testcollection SET S = {'red', 'white', 'blue'} WHERE k = 1;";
-        String update2 = "UPDATE testcollection SET M = {2.0: 'true', 4.0: 'false', 6.0 : 'true'} WHERE k = 1;";
+        String update2 = "UPDATE testcollection SET M = {2.0: true, 4.0: false, 6.0 : true} WHERE k = 1;";
         statement.executeUpdate(update1);
         statement.executeUpdate(update2);
 
@@ -325,7 +325,7 @@ public class CollectionsTest
         Statement statement = con.createStatement();
 
         // add some items to the set
-        String update1 = "UPDATE testcollection SET M = M + {1.0: 'true', 3.0: 'false', 5.0: 'false'} WHERE k = 1;";
+        String update1 = "UPDATE testcollection SET M = M + {1.0: true, 3.0: false, 5.0: false} WHERE k = 1;";
         statement.executeUpdate(update1);
 
         ResultSet result = statement.executeQuery("SELECT * FROM testcollection WHERE k = 1;");
