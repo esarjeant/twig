@@ -46,9 +46,6 @@ import org.apache.cassandra.utils.ByteBufferUtil;
 
 public  class MetadataResultSets
 {
-    
-    private static final String UTF8_TYPE = "UTF8Type";
-    private static final String ASCII_TYPE = "AsciiType";
     static final String TABLE_CONSTANT = "TABLE";
 
     public static final MetadataResultSets instance = new MetadataResultSets();
@@ -203,7 +200,7 @@ public  class MetadataResultSets
         String query = "SELECT keyspace_name FROM system.schema_keyspaces";
         if (schemaPattern!=null) query = query + " where keyspace_name = '" + schemaPattern + "'";
         
-        String catalog = statement.connection.cluster;
+        String catalog = statement.connection.getCatalog();
         Entry entryC = new Entry("TABLE_CATALOG",bytes(catalog),Entry.ASCII_TYPE);
         
         CassandraResultSet result;

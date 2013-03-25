@@ -116,12 +116,6 @@ public class MetadataResultSetsTest
         return sb.toString();
     }
 
-    private final String showRow(ResultSet result) throws SQLException
-    {
-        StringBuilder sb = new StringBuilder();
-        return sb.toString();
-    }
-    
     private final String toString(ResultSet result) throws SQLException
     {
        StringBuilder sb = new StringBuilder();
@@ -182,13 +176,12 @@ public class MetadataResultSetsTest
         ResultSet result = MetadataResultSets.instance.makeSchemas(statement, null);
         
         System.out.println("--- testSchemas() ---");
-        System.out.println(result.getMetaData().getColumnName(1));
-        System.out.println(result.getMetaData().getColumnName(2));
+        System.out.println(getColumnNames(result.getMetaData()));
        
         System.out.println(toString(result));       
         System.out.println();
         
-        result = MetadataResultSets.instance.makeSchemas(statement, "testks2");
+        result = MetadataResultSets.instance.makeSchemas(statement, KEYSPACE2);
         System.out.println(toString(result));       
         System.out.println();
     }
@@ -200,16 +193,12 @@ public class MetadataResultSetsTest
         ResultSet result = MetadataResultSets.instance.makeTables(statement, null, null);
         
         System.out.println("--- testTables() ---");
-        System.out.println(result.getMetaData().getColumnName(1));
-        System.out.println(result.getMetaData().getColumnName(2));
-        System.out.println(result.getMetaData().getColumnName(3));
-        System.out.println(result.getMetaData().getColumnName(4));
-        System.out.println(result.getMetaData().getColumnName(5));
+        System.out.println(getColumnNames(result.getMetaData()));
        
         System.out.println(toString(result));       
         System.out.println();
         
-        result = MetadataResultSets.instance.makeTables(statement, "testks2", null);
+        result = MetadataResultSets.instance.makeTables(statement, KEYSPACE2, null);
         System.out.println(toString(result));       
         System.out.println();
 
@@ -217,9 +206,29 @@ public class MetadataResultSetsTest
         System.out.println(toString(result));       
         System.out.println();
 
-        result = MetadataResultSets.instance.makeTables(statement, "testks2", "test1");
+        result = MetadataResultSets.instance.makeTables(statement, KEYSPACE2, "test1");
         System.out.println(toString(result));       
         System.out.println();
     }
 
+    @Test
+    public void testColumns() throws SQLException
+    {
+        CassandraStatement statement = (CassandraStatement) con.createStatement();
+        ResultSet result = MetadataResultSets.instance.makeColumns(statement, KEYSPACE1, "test1" ,null);
+        
+        System.out.println("--- testColumns() ---");
+        System.out.println(getColumnNames(result.getMetaData()));
+       
+        System.out.println(toString(result));       
+        System.out.println();
+
+        result = MetadataResultSets.instance.makeColumns(statement, KEYSPACE1, "test2" ,null);
+        
+        System.out.println("--- testColumns() ---");
+        System.out.println(getColumnNames(result.getMetaData()));
+       
+        System.out.println(toString(result));       
+        System.out.println();
+    }
 }

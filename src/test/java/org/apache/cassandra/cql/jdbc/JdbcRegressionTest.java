@@ -414,9 +414,6 @@ public class JdbcRegressionTest
        
     }
     
-    
-
-
     @Test
     public void isValid() throws Exception
     {
@@ -439,7 +436,6 @@ public class JdbcRegressionTest
         assert con.isValid(5) == false;
         ((CassandraConnection) con).isAlive = currentStatement;
     }
-    
     
     private final String  showColumn(int index, ResultSet result) throws SQLException
     {
