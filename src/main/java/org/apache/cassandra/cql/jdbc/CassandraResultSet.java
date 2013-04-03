@@ -1299,7 +1299,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
         public String getSchemaName(int column) throws SQLException
         {
             checkIndex(column);
-            return statement.connection.currentKeyspace;
+            return statement.connection.getSchema();
         }
 
         public String getTableName(int column) throws SQLException

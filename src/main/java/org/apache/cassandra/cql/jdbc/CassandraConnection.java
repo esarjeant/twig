@@ -88,8 +88,8 @@ class CassandraConnection extends AbstractConnection implements Connection
     protected int numFailures = 0;
     protected String username = null;
     protected String url = null;
-    String currentKeyspace;
-    protected String cluster;
+    protected String cluster;//current catalog
+    protected String currentKeyspace;//current schema
     int majorCqlVersion;
     ColumnDecoder decoder;
 
@@ -257,6 +257,18 @@ class CassandraConnection extends AbstractConnection implements Connection
     {
         checkNotClosed();
         return cluster;
+    }
+
+    public void setSchema(String schema) throws SQLException
+    {
+        checkNotClosed();
+        currentKeyspace = schema;
+    }
+
+    public String getSchema() throws SQLException
+    {
+        checkNotClosed();
+        return currentKeyspace;
     }
 
     public Properties getClientInfo() throws SQLException

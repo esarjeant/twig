@@ -132,16 +132,6 @@ abstract class AbstractConnection
     	throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
-    public void setSchema(String schema) throws SQLException
-    {
-    	throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public String getSchema() throws SQLException
-    {
-    	throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
     public void setNetworkTimeout(Executor executor, int milliseconds) throws SQLException
     {
     	throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
