@@ -422,8 +422,8 @@ public class JdbcRegressionTest
         System.out.println("--------------");
 
         Statement stmt = con.createStatement();
-        String select = "select ivalue from "+TABLE;
-
+        String select = "select ivalue from "+TABLE;        
+        
         ResultSet result = stmt.executeQuery(select);
         assertFalse("Make sure we have no rows", result.next());
         ResultSetMetaData rsmd = result.getMetaData();
@@ -433,7 +433,7 @@ public class JdbcRegressionTest
         stmt.close();
         con.close();
     }
-
+    
     @Test
     public void isValid() throws Exception
     {

@@ -96,7 +96,7 @@ public class TypedColumn
     
     public String getValueString()
     {
-       if (rawColumn.value == null) return null;
+    	if (rawColumn.value == null) return null;
         return valueType.getString(rawColumn.value);
     }
     
