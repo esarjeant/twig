@@ -211,7 +211,7 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public String getIdentifierQuoteString() throws SQLException
     {
-        return "'";
+        return " ";
     }
 
     public ResultSet getImportedKeys(String arg0, String arg1, String arg2) throws SQLException
@@ -221,6 +221,11 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public ResultSet getIndexInfo(String catalog, String schema, String table, boolean unique, boolean approximate) throws SQLException
     {
+    	if (catalog == null || connection.getCatalog().equals(catalog))
+    	{
+	        ResultSet rs = MetadataResultSets.instance.makeIndexes(statement, schema, table,unique,approximate);
+	        return rs;
+    	}
         return new CassandraResultSet();
     }
 

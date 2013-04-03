@@ -32,8 +32,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.sql.Timestamp;
-import java.sql.Types;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -85,9 +83,10 @@ public class JdbcRegressionTest
                         + " bValue boolean,"
                         + " iValue int"
                         + ");";
-        
-        
         stmt.execute(createCF);
+        
+        //create an index
+        stmt.execute("CREATE INDEX ON "+TABLE+" (iValue)");
         stmt.close();
         con.close();
 
@@ -413,7 +412,7 @@ public class JdbcRegressionTest
         System.out.println(resultToDisplay(result,74, "current date"));
        
     }
-    
+
     @Test
     public void testIssue75() throws Exception
     {
@@ -432,6 +431,24 @@ public class JdbcRegressionTest
         System.out.println("Found a column in ResultsetMetaData even when there are no rows:   " + rsmd.getColumnLabel(1));
         stmt.close();
         con.close();
+    }
+
+    @Test
+    public void testIssue76() throws Exception
+    {
+        DatabaseMetaData md = con.getMetaData();
+        System.out.println();
+        System.out.println("Test Issue #76");
+        System.out.println("--------------");
+
+        // test various retrieval methods
+        ResultSet result = md.getIndexInfo(con.getCatalog(), KEYSPACE, TABLE, false, false);
+        assertTrue("Make sure we have found an index", result.next());
+
+        // check the column name from index
+        String cn = result.getString("COLUMN_NAME");
+        assertEquals("Column name match for index", "ivalue", cn);
+        System.out.println("Found index via dmd on :   " + cn);
     }
     
     @Test

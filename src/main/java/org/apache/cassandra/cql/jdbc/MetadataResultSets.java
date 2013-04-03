@@ -201,7 +201,7 @@ public  class MetadataResultSets
         if (schemaPattern!=null) query = query + " where keyspace_name = '" + schemaPattern + "'";
         
         String catalog = statement.connection.getCatalog();
-        Entry entryC = new Entry("TABLE_CATALOG",bytes(catalog),Entry.ASCII_TYPE);
+        Entry entryCatalog = new Entry("TABLE_CATALOG",bytes(catalog),Entry.ASCII_TYPE);
         
         CassandraResultSet result;
         List<Entry> col;
@@ -211,10 +211,10 @@ public  class MetadataResultSets
         
         while (result.next())
         {
-            Entry entryS = new Entry("TABLE_SCHEM",bytes(result.getString(1)),Entry.ASCII_TYPE);
+            Entry entrySchema = new Entry("TABLE_SCHEM",bytes(result.getString(1)),Entry.ASCII_TYPE);
             col = new ArrayList<Entry>();
-            col.add(entryS);
-            col.add(entryC);
+            col.add(entrySchema);
+            col.add(entryCatalog);
             rows.add(col);
         }
         
@@ -273,13 +273,13 @@ public  class MetadataResultSets
         // System.out.println(query.toString());
 
         String catalog = statement.connection.getCatalog();
-        Entry entryC = new Entry("TABLE_CAT", bytes(catalog), Entry.ASCII_TYPE);
-        Entry entryT = new Entry("TABLE_TYPE", bytes(TABLE_CONSTANT), Entry.ASCII_TYPE);
-        Entry entryTC = new Entry("TYPE_CAT", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
-        Entry entryTS = new Entry("TYPE_SCHEM", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
-        Entry entryTN = new Entry("TYPE_NAME", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
+        Entry entryCatalog = new Entry("TABLE_CAT", bytes(catalog), Entry.ASCII_TYPE);
+        Entry entryTableType = new Entry("TABLE_TYPE", bytes(TABLE_CONSTANT), Entry.ASCII_TYPE);
+        Entry entryTypeCatalog = new Entry("TYPE_CAT", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
+        Entry entryTypeSchema = new Entry("TYPE_SCHEM", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
+        Entry entryTypeName = new Entry("TYPE_NAME", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
         Entry entrySRCN = new Entry("SELF_REFERENCING_COL_NAME", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
-        Entry entryRG = new Entry("REF_GENERATION", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
+        Entry entryRefGeneration = new Entry("REF_GENERATION", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
 
         CassandraResultSet result;
         List<Entry> col;
@@ -290,24 +290,24 @@ public  class MetadataResultSets
                 
         while (result.next())
         {
-            Entry entryS = new Entry("TABLE_SCHEM", bytes(result.getString(1)), Entry.ASCII_TYPE);
-            Entry entryN = new Entry("TABLE_NAME",
+            Entry entrySchema = new Entry("TABLE_SCHEM", bytes(result.getString(1)), Entry.ASCII_TYPE);
+            Entry entryTableName = new Entry("TABLE_NAME",
                 (result.getString(2) == null) ? ByteBufferUtil.EMPTY_BYTE_BUFFER : bytes(result.getString(2)),
                 Entry.ASCII_TYPE);
-            Entry entryR = new Entry("REMARKS",
+            Entry entryRemarks = new Entry("REMARKS",
                 (result.getString(3) == null) ? ByteBufferUtil.EMPTY_BYTE_BUFFER : bytes(result.getString(3)),
                 Entry.ASCII_TYPE);
             col = new ArrayList<Entry>();
-            col.add(entryC);
-            col.add(entryS);
-            col.add(entryN);
-            col.add(entryT);
-            col.add(entryR);
-            col.add(entryTC);
-            col.add(entryTS);
-            col.add(entryTN);
+            col.add(entryCatalog);
+            col.add(entrySchema);
+            col.add(entryTableName);
+            col.add(entryTableType);
+            col.add(entryRemarks);
+            col.add(entryTypeCatalog);
+            col.add(entryTypeSchema);
+            col.add(entryTypeName);
             col.add(entrySRCN);
-            col.add(entryRG);
+            col.add(entryRefGeneration);
             rows.add(col);
         }
 
@@ -372,7 +372,7 @@ public  class MetadataResultSets
         if ("%".equals(tableNamePattern)) tableNamePattern = null;
         if ("%".equals(columnNamePattern)) columnNamePattern = null;
 
-        StringBuilder query = new StringBuilder("SELECT keyspace_name, columnfamily_name, column_name, component_index, index_name, index_options, index_type, validator FROM system.schema_columns");
+        StringBuilder query = new StringBuilder("SELECT keyspace_name, columnfamily_name, column_name, validator FROM system.schema_columns");
 
 
         int filterCount = 0;
@@ -395,20 +395,20 @@ public  class MetadataResultSets
         // System.out.println(query.toString());
 
         String catalog = statement.connection.getCatalog();
-        Entry entryC = new Entry("TABLE_CAT", bytes(catalog), Entry.ASCII_TYPE);
-        Entry entryBL = new Entry("BUFFER_LENGTH", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.INT32_TYPE);
-        Entry entryR = new Entry("REMARKS", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
+        Entry entryCatalog = new Entry("TABLE_CAT", bytes(catalog), Entry.ASCII_TYPE);
+        Entry entryBufferLength = new Entry("BUFFER_LENGTH", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.INT32_TYPE);
+        Entry entryRemarks = new Entry("REMARKS", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
         Entry entryNullable = new Entry("NULLABLE", bytes(DatabaseMetaData.columnNullable), Entry.INT32_TYPE);
         Entry entryISNullable = new Entry("IS_NULLABLE", bytes("YES"), Entry.ASCII_TYPE);
-        Entry entryCD = new Entry("COLUMN_DEF", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
-        Entry entrySDT = new Entry("SQL_DATA_TYPE", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.INT32_TYPE);
-        Entry entrySDS = new Entry("SQL_DATETIME_SUB", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.INT32_TYPE);
-        Entry entrySC = new Entry("SCOPE_CATLOG", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
-        Entry entrySS = new Entry("SCOPE_SCHEMA", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
-        Entry entryST = new Entry("SCOPE_TABLE", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
+        Entry entryColumnDef = new Entry("COLUMN_DEF", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
+        Entry entrySQLDataType = new Entry("SQL_DATA_TYPE", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.INT32_TYPE);
+        Entry entrySQLDateTimeSub = new Entry("SQL_DATETIME_SUB", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.INT32_TYPE);
+        Entry entryScopeCatalog = new Entry("SCOPE_CATLOG", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
+        Entry entryScopeSchema = new Entry("SCOPE_SCHEMA", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
+        Entry entryScopeTable = new Entry("SCOPE_TABLE", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
         Entry entrySOURCEDT = new Entry("SOURCE_DATA_TYPE", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.INT32_TYPE);
-        Entry entryISAI = new Entry("IS_AUTOINCREMENT", bytes("NO"), Entry.ASCII_TYPE);
-        Entry entryISGEN = new Entry("IS_GENERATEDCOLUMN", bytes("NO"), Entry.ASCII_TYPE);
+        Entry entryISAutoIncrement = new Entry("IS_AUTOINCREMENT", bytes("NO"), Entry.ASCII_TYPE);
+        Entry entryISGeneratedColumn = new Entry("IS_GENERATEDCOLUMN", bytes("NO"), Entry.ASCII_TYPE);
 
         CassandraResultSet result;
         List<Entry> col;
@@ -420,62 +420,62 @@ public  class MetadataResultSets
         while (result.next())
         {
             ordinalPosition++;
-            Entry entryTS = new Entry("TABLE_SCHEM", bytes(result.getString(1)), Entry.ASCII_TYPE);
-            Entry entryTN = new Entry("TABLE_NAME",
+            Entry entrySchema = new Entry("TABLE_SCHEM", bytes(result.getString(1)), Entry.ASCII_TYPE);
+            Entry entryTableName = new Entry("TABLE_NAME",
                 (result.getString(2) == null) ? ByteBufferUtil.EMPTY_BYTE_BUFFER : bytes(result.getString(2)),
                 Entry.ASCII_TYPE);
-            Entry entryCN = new Entry("COLUMN_NAME",
+            Entry entryColumnName = new Entry("COLUMN_NAME",
                 (result.getString(3) == null) ? ByteBufferUtil.EMPTY_BYTE_BUFFER : bytes(result.getString(3)),
                 Entry.ASCII_TYPE);
-            String validator = result.getString(8);
+            String validator = result.getString(4);
             AbstractJdbcType jtype = TypesMap.getTypeForComparator(validator);
-            Entry entryDT = new Entry("DATA_TYPE", bytes(jtype == null ? Types.OTHER : jtype.getJdbcType()), Entry.INT32_TYPE);
+            Entry entryDataType = new Entry("DATA_TYPE", bytes(jtype == null ? Types.OTHER : jtype.getJdbcType()), Entry.INT32_TYPE);
             int idx = validator.lastIndexOf('.');
-            Entry entryTYN = new Entry("TYPE_NAME", bytes(validator.substring(idx + 1)), Entry.ASCII_TYPE);
+            Entry entryTypeName = new Entry("TYPE_NAME", bytes(validator.substring(idx + 1)), Entry.ASCII_TYPE);
             int lenght = -1;
             if (jtype instanceof JdbcBytes) lenght = Integer.MAX_VALUE / 2;
             if (jtype instanceof JdbcAscii || jtype instanceof JdbcUTF8) lenght = Integer.MAX_VALUE;
             if (jtype instanceof JdbcUUID) lenght = 36;
             if (jtype instanceof JdbcInt32) lenght = 4;
             if (jtype instanceof JdbcLong) lenght = 8;
-            Entry entryCS = new Entry("COLUMN_SIZE", bytes(lenght), Entry.INT32_TYPE);
+            Entry entryColumnSize = new Entry("COLUMN_SIZE", bytes(lenght), Entry.INT32_TYPE);
             ByteBuffer dd = ByteBufferUtil.EMPTY_BYTE_BUFFER;
             // if (jtype instanceof JdbcDouble) dd = bytes(17);
             // if (jtype instanceof JdbcFloat) dd = bytes(11);
-            Entry entryDD = new Entry("DECIMAL_DIGITS", dd, Entry.INT32_TYPE);
+            Entry entryDecimalDigits = new Entry("DECIMAL_DIGITS", dd, Entry.INT32_TYPE);
             int npr = 2;
             if (jtype != null && (jtype.getJdbcType() == Types.DECIMAL || jtype.getJdbcType() == Types.NUMERIC)) npr = 10;
             Entry entryNPR = new Entry("NUM_PREC_RADIX", bytes(npr), Entry.INT32_TYPE);
             ByteBuffer charol = ByteBufferUtil.EMPTY_BYTE_BUFFER;
             if (jtype instanceof JdbcAscii || jtype instanceof JdbcUTF8) charol = bytes(Integer.MAX_VALUE);
-            Entry entryCOL = new Entry("CHAR_OCTET_LENGTH", charol, Entry.INT32_TYPE);
-            Entry entryOP = new Entry("ORDINAL_POSITION", bytes(ordinalPosition), Entry.INT32_TYPE);
+            Entry entryCharOctetLength = new Entry("CHAR_OCTET_LENGTH", charol, Entry.INT32_TYPE);
+            Entry entryOrdinalPosition = new Entry("ORDINAL_POSITION", bytes(ordinalPosition), Entry.INT32_TYPE);
 
             col = new ArrayList<Entry>();
-            col.add(entryC);
-            col.add(entryTS);
-            col.add(entryTN);
-            col.add(entryCN);
-            col.add(entryDT);
-            col.add(entryTYN);
-            col.add(entryCS);
-            col.add(entryBL);
-            col.add(entryDD);
+            col.add(entryCatalog);
+            col.add(entrySchema);
+            col.add(entryTableName);
+            col.add(entryColumnName);
+            col.add(entryDataType);
+            col.add(entryTypeName);
+            col.add(entryColumnSize);
+            col.add(entryBufferLength);
+            col.add(entryDecimalDigits);
             col.add(entryNPR);
             col.add(entryNullable);
-            col.add(entryR);
-            col.add(entryCD);
-            col.add(entrySDT);
-            col.add(entrySDS);
-            col.add(entryCOL);
-            col.add(entryOP);
+            col.add(entryRemarks);
+            col.add(entryColumnDef);
+            col.add(entrySQLDataType);
+            col.add(entrySQLDateTimeSub);
+            col.add(entryCharOctetLength);
+            col.add(entryOrdinalPosition);
             col.add(entryISNullable);
-            col.add(entrySC);
-            col.add(entrySS);
-            col.add(entryST);
+            col.add(entryScopeCatalog);
+            col.add(entryScopeSchema);
+            col.add(entryScopeTable);
             col.add(entrySOURCEDT);
-            col.add(entryISAI);
-            col.add(entryISGEN);
+            col.add(entryISAutoIncrement);
+            col.add(entryISGeneratedColumn);
             rows.add(col);
         }
 
@@ -497,11 +497,117 @@ public  class MetadataResultSets
         return result;
     }
     
-    private class Entry
+    public CassandraResultSet makeIndexes(CassandraStatement statement, String schema, String table, boolean unique, boolean approximate) throws SQLException
+	{
+		//1.TABLE_CAT String => table catalog (may be null) 
+		//2.TABLE_SCHEM String => table schema (may be null) 
+		//3.TABLE_NAME String => table name 
+		//4.NON_UNIQUE boolean => Can index values be non-unique. false when TYPE is tableIndexStatistic 
+		//5.INDEX_QUALIFIER String => index catalog (may be null); null when TYPE is tableIndexStatistic 
+		//6.INDEX_NAME String => index name; null when TYPE is tableIndexStatistic 
+		//7.TYPE short => index type: - tableIndexStatistic - this identifies table statistics that are returned in conjuction with a table's index descriptions 
+		//- tableIndexClustered - this is a clustered index 
+		//- tableIndexHashed - this is a hashed index 
+		//- tableIndexOther - this is some other style of index 
+		//
+		//8.ORDINAL_POSITION short => column sequence number within index; zero when TYPE is tableIndexStatistic 
+		//9.COLUMN_NAME String => column name; null when TYPE is tableIndexStatistic 
+		//10.ASC_OR_DESC String => column sort sequence, "A" => ascending, "D" => descending, may be null if sort sequence is not supported; null when TYPE is tableIndexStatistic 
+		//11.CARDINALITY int => When TYPE is tableIndexStatistic, then this is the number of rows in the table; otherwise, it is the number of unique values in the index. 
+		//12.PAGES int => When TYPE is tableIndexStatisic then this is the number of pages used for the table, otherwise it is the number of pages used for the current index. 
+		//13.FILTER_CONDITION String => Filter condition, if any. (may be null) 
+	
+	    StringBuilder query = new StringBuilder("SELECT keyspace_name, columnfamily_name, column_name, component_index, index_name, index_options, index_type FROM system.schema_columns");
+	
+	    int filterCount = 0;
+	    if (schema != null) filterCount++;
+	    if (table != null) filterCount++;
+	
+	    // check to see if it is qualified
+	    if (filterCount > 0)
+	    {
+	        String expr = "%s = '%s'";
+	        query.append(" WHERE ");
+	        if (schema != null) query.append(String.format(expr, "keyspace_name", schema));
+	        if (filterCount > 1) query.append(" AND ");
+	        if (table != null) query.append(String.format(expr, "columnfamily_name", table));
+	        query.append(" ALLOW FILTERING");
+	    }
+	    // System.out.println(query.toString());
+	
+	    String catalog = statement.connection.getCatalog();
+	    Entry entryCatalog = new Entry("TABLE_CAT", bytes(catalog), Entry.ASCII_TYPE);
+	
+	    CassandraResultSet result;
+	    List<Entry> col;
+	    List<List<Entry>> rows = new ArrayList<List<Entry>>();
+	
+        int ordinalPosition = 0;
+	    // define the columns
+	    result = (CassandraResultSet) statement.executeQuery(query.toString());
+	    while (result.next())
+	    {
+	        if (result.getString(7) == null) continue; //if there is no index_type its not an index
+	        ordinalPosition++;
+
+	        Entry entrySchema = new Entry("TABLE_SCHEM", bytes(result.getString(1)), Entry.ASCII_TYPE);
+	        Entry entryTableName = new Entry("TABLE_NAME",
+	            (result.getString(2) == null) ? ByteBufferUtil.EMPTY_BYTE_BUFFER : bytes(result.getString(2)),
+	            Entry.ASCII_TYPE);
+	        Entry entryNonUnique = new Entry("NON_UNIQUE", bytes("true"),Entry.BOOLEAN_TYPE);
+	        Entry entryIndexQualifier = new Entry("INDEX_QUALIFIER", bytes(catalog), Entry.ASCII_TYPE);
+	        Entry entryIndexName = new Entry("INDEX_NAME", (result.getString(5) == null ? ByteBufferUtil.EMPTY_BYTE_BUFFER : bytes(result.getString(5))), Entry.ASCII_TYPE);
+	        Entry entryType = new Entry("TYPE", bytes(DatabaseMetaData.tableIndexHashed), Entry.INT32_TYPE);
+            Entry entryOrdinalPosition = new Entry("ORDINAL_POSITION", bytes(ordinalPosition), Entry.INT32_TYPE);
+            Entry entryColumnName = new Entry("COLUMN_NAME",
+                    (result.getString(3) == null) ? ByteBufferUtil.EMPTY_BYTE_BUFFER : bytes(result.getString(3)),
+                    Entry.ASCII_TYPE);
+            Entry entryAoD = new Entry("ASC_OR_DESC",ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
+            Entry entryCardinality = new Entry("CARDINALITY", bytes(-1), Entry.INT32_TYPE);
+            Entry entryPages = new Entry("PAGES", bytes(-1), Entry.INT32_TYPE);
+            Entry entryFilter = new Entry("FILTER_CONDITION",ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
+	
+	        col = new ArrayList<Entry>();
+	        col.add(entryCatalog);
+	        col.add(entrySchema);
+	        col.add(entryTableName);
+	        col.add(entryNonUnique);
+	        col.add(entryIndexQualifier);
+	        col.add(entryIndexName);
+	        col.add(entryType);
+	        col.add(entryOrdinalPosition);
+	        col.add(entryColumnName);
+	        col.add(entryAoD);
+	        col.add(entryCardinality);
+	        col.add(entryPages);
+	        col.add(entryFilter);
+	        rows.add(col);
+	    }
+	
+	    // just return the empty result if there were no rows
+	    if (rows.isEmpty()) return result;
+	
+	    // use schemas with the key in column number 2 (one based)
+	    CqlResult cqlresult;
+	    try
+	    {
+	        cqlresult = makeCqlResult(rows, 1);
+	    }
+	    catch (CharacterCodingException e)
+	    {
+	        throw new SQLTransientException(e);
+	    }
+	
+	    result = new CassandraResultSet(statement, cqlresult);
+	    return result;
+	}
+
+	private class Entry
     {
     	static final String UTF8_TYPE = "UTF8Type";
         static final String ASCII_TYPE = "AsciiType";
         static final String INT32_TYPE = "Int32Type";
+        static final String BOOLEAN_TYPE = "BooleanType";
 
         String name = null;
         ByteBuffer value = null;
