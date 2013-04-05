@@ -488,6 +488,26 @@ public class JdbcRegressionTest
     }
     
     @Test
+    public void testIssue75() throws Exception
+    {
+        System.out.println();
+        System.out.println("Test Issue #75");
+        System.out.println("--------------");
+
+        Statement stmt = con.createStatement();
+        String select = "select ivalue from "+TABLE;
+
+        ResultSet result = stmt.executeQuery(select);
+        assertFalse("Make sure we have no rows", result.next());
+        ResultSetMetaData rsmd = result.getMetaData();
+        assertTrue("Make sure we do get a result", rsmd.getColumnDisplaySize(1) != 0);
+        assertNotNull("Make sure we do get a label",rsmd.getColumnLabel(1));
+        System.out.println("Found a column in ResultsetMetaData even when there are no rows:   " + rsmd.getColumnLabel(1));
+        stmt.close();
+        con.close();
+    }
+
+    @Test
     public void isValid() throws Exception
     {
 //    	assert con.isValid(3);
