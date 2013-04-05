@@ -1248,7 +1248,8 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
         public int getColumnDisplaySize(int column) throws SQLException
         {
             checkIndex(column);
-            return values.get(column - 1).getValueString().length();
+            String stringValue = values.get(column - 1).getValueString();
+            return (stringValue == null ? -1 : stringValue.length());
         }
 
         public String getColumnLabel(int column) throws SQLException
