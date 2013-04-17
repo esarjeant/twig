@@ -478,6 +478,16 @@ public class JdbcRegressionTest
     }
 
     @Test
+    public void testIssue78() throws Exception
+    {
+        DatabaseMetaData md = con.getMetaData();
+
+        // load the columns, with no catalog and schema
+        ResultSet result = md.getColumns(null, "%", TABLE, "ivalue");
+        assertTrue("Make sure we have found an column", result.next());
+    }
+    
+    @Test
     public void isValid() throws Exception
     {
 //    	assert con.isValid(3);

@@ -267,8 +267,12 @@ public  class MetadataResultSets
         {
             String expr = "%s = '%s'";
             query.append(" WHERE ");
-            if (schemaPattern != null) query.append(String.format(expr, "keyspace_name", schemaPattern));
-            if (filterCount > 1) query.append(" AND ");
+            if (schemaPattern != null) 
+            {
+            	query.append(String.format(expr, "keyspace_name", schemaPattern));
+                filterCount--;
+                if (filterCount > 0) query.append(" AND ");
+            }
             if (tableNamePattern != null) query.append(String.format(expr, "columnfamily_name", tableNamePattern));
             query.append(" ALLOW FILTERING");
         }
@@ -387,10 +391,18 @@ public  class MetadataResultSets
         {
             String expr = "%s = '%s'";
             query.append(" WHERE ");
-            if (schemaPattern != null) query.append(String.format(expr, "keyspace_name", schemaPattern));
-            if (filterCount > 1) query.append(" AND ");
-            if (tableNamePattern != null) query.append(String.format(expr, "columnfamily_name", tableNamePattern));
-            if (filterCount > 2) query.append(" AND ");
+            if (schemaPattern != null) 
+            {
+            	query.append(String.format(expr, "keyspace_name", schemaPattern));
+                filterCount--;
+                if (filterCount > 0) query.append(" AND ");
+            }
+            if (tableNamePattern != null) 
+            {
+            	query.append(String.format(expr, "columnfamily_name", tableNamePattern));
+                filterCount--;
+                if (filterCount > 0) query.append(" AND ");
+            }
             if (columnNamePattern != null) query.append(String.format(expr, "column_name", columnNamePattern));
             query.append(" ALLOW FILTERING");
         }
@@ -596,8 +608,12 @@ public  class MetadataResultSets
 	    {
 	        String expr = "%s = '%s'";
 	        query.append(" WHERE ");
-	        if (schema != null) query.append(String.format(expr, "keyspace_name", schema));
-	        if (filterCount > 1) query.append(" AND ");
+	        if (schema != null) 
+	        {
+	        	query.append(String.format(expr, "keyspace_name", schema));
+                filterCount--;
+		        if (filterCount > 0) query.append(" AND ");
+	        }
 	        if (table != null) query.append(String.format(expr, "columnfamily_name", table));
 	        query.append(" ALLOW FILTERING");
 	    }
@@ -683,8 +699,12 @@ public  class MetadataResultSets
 	    {
 	        String expr = "%s = '%s'";
 	        query.append(" WHERE ");
-	        if (schema != null) query.append(String.format(expr, "keyspace_name", schema));
-	        if (filterCount > 1) query.append(" AND ");
+	        if (schema != null) 
+	        {
+	        	query.append(String.format(expr, "keyspace_name", schema));
+                filterCount--;
+		        if (filterCount > 0) query.append(" AND ");
+	        }
 	        if (table != null) query.append(String.format(expr, "columnfamily_name", table));
 	        query.append(" ALLOW FILTERING");
 	    }
