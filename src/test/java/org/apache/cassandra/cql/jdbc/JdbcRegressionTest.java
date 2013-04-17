@@ -289,10 +289,15 @@ public class JdbcRegressionTest
         assertTrue("Make sure we have found first column", result.next());
         assertEquals("Make sure table name match", TABLE, result.getString("TABLE_NAME"));
         String cn = result.getString("COLUMN_NAME");
+        System.out.println("Found (default) PK column       :   " + cn);
+        assertEquals("Column name check", "keyname", cn);
+        assertEquals("Column type check", Types.VARCHAR, result.getInt("DATA_TYPE"));
+        assertTrue("Make sure we have found second column", result.next());
+        cn = result.getString("COLUMN_NAME");
         System.out.println("Found column       :   " + cn);
         assertEquals("Column name check", "bvalue", cn);
         assertEquals("Column type check", Types.BOOLEAN, result.getInt("DATA_TYPE"));
-        assertTrue("Make sure we have found second column", result.next());
+        assertTrue("Make sure we have found thirth column", result.next());
         cn = result.getString("COLUMN_NAME");
         System.out.println("Found column       :   " + cn);
         assertEquals("Column name check", "ivalue", cn);
@@ -421,6 +426,10 @@ public class JdbcRegressionTest
         System.out.println("--------------");
 
         Statement stmt = con.createStatement();
+
+        String truncate = "TRUNCATE regressiontest;";
+        stmt.execute(truncate);
+
         String select = "select ivalue from "+TABLE;        
         
         ResultSet result = stmt.executeQuery(select);
@@ -430,7 +439,6 @@ public class JdbcRegressionTest
         assertNotNull("Make sure we do get a label",rsmd.getColumnLabel(1));
         System.out.println("Found a column in ResultsetMetaData even when there are no rows:   " + rsmd.getColumnLabel(1));
         stmt.close();
-        con.close();
     }
 
     @Test
@@ -450,7 +458,25 @@ public class JdbcRegressionTest
         assertEquals("Column name match for index", "ivalue", cn);
         System.out.println("Found index via dmd on :   " + cn);
     }
-    
+
+    @Test
+    public void testIssue77() throws Exception
+    {
+        DatabaseMetaData md = con.getMetaData();
+        System.out.println();
+        System.out.println("Test Issue #77");
+        System.out.println("--------------");
+
+        // test various retrieval methods
+        ResultSet result = md.getPrimaryKeys(con.getCatalog(), KEYSPACE, TABLE);
+        assertTrue("Make sure we have found an pk", result.next());
+
+        // check the column name from index
+        String cn = result.getString("COLUMN_NAME");
+        assertEquals("Column name match for pk", "keyname", cn);
+        System.out.println("Found pk via dmd :   " + cn);
+    }
+
     @Test
     public void isValid() throws Exception
     {

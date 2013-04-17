@@ -128,6 +128,7 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
     {
     	if (catalog == null || connection.getCatalog().equals(catalog))
     	{
+    		if (schemaPattern == null) schemaPattern = connection.getSchema(); //limit to current schema if set
 	        ResultSet rs = MetadataResultSets.instance.makeColumns(statement, schemaPattern, tableNamePattern,columnNamePattern);
 	        return rs;
     	}
@@ -223,6 +224,7 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
     {
     	if (catalog == null || connection.getCatalog().equals(catalog))
     	{
+    		if (schema == null) schema = connection.getSchema(); //limit to current schema if set
 	        ResultSet rs = MetadataResultSets.instance.makeIndexes(statement, schema, table,unique,approximate);
 	        return rs;
     	}
@@ -345,8 +347,14 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
         return "";
     }
 
-    public ResultSet getPrimaryKeys(String arg0, String arg1, String arg2) throws SQLException
+    public ResultSet getPrimaryKeys(String catalog, String schema, String table) throws SQLException
     {
+    	if (catalog == null || connection.getCatalog().equals(catalog))
+    	{
+    		if (schema == null) schema = connection.getSchema(); //limit to current schema if set
+	        ResultSet rs = MetadataResultSets.instance.makePrimaryKeys(statement, schema, table);
+	        return rs;
+    	}
         return new CassandraResultSet();
     }
 
@@ -457,6 +465,7 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
     	}
     	if ((catalog == null || connection.getCatalog().equals(catalog)) && askingForTable)
     	{
+    		if (schemaPattern == null) schemaPattern = connection.getSchema(); //limit to current schema if set
 	        ResultSet rs = MetadataResultSets.instance.makeTables(statement, schemaPattern, tableNamePattern);
 	        return rs;
     	}

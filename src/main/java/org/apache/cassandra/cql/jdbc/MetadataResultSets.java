@@ -26,11 +26,13 @@ import static org.apache.cassandra.utils.ByteBufferUtil.string;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLTransientException;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -398,8 +400,6 @@ public  class MetadataResultSets
         Entry entryCatalog = new Entry("TABLE_CAT", bytes(catalog), Entry.ASCII_TYPE);
         Entry entryBufferLength = new Entry("BUFFER_LENGTH", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.INT32_TYPE);
         Entry entryRemarks = new Entry("REMARKS", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
-        Entry entryNullable = new Entry("NULLABLE", bytes(DatabaseMetaData.columnNullable), Entry.INT32_TYPE);
-        Entry entryISNullable = new Entry("IS_NULLABLE", bytes("YES"), Entry.ASCII_TYPE);
         Entry entryColumnDef = new Entry("COLUMN_DEF", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
         Entry entrySQLDataType = new Entry("SQL_DATA_TYPE", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.INT32_TYPE);
         Entry entrySQLDateTimeSub = new Entry("SQL_DATETIME_SUB", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.INT32_TYPE);
@@ -410,16 +410,81 @@ public  class MetadataResultSets
         Entry entryISAutoIncrement = new Entry("IS_AUTOINCREMENT", bytes("NO"), Entry.ASCII_TYPE);
         Entry entryISGeneratedColumn = new Entry("IS_GENERATEDCOLUMN", bytes("NO"), Entry.ASCII_TYPE);
 
-        CassandraResultSet result;
         List<Entry> col;
         List<List<Entry>> rows = new ArrayList<List<Entry>>();
 
         int ordinalPosition = 0;
+
+        // define the PK columns
+		List<PKInfo> pks = getPrimaryKeys(statement, schemaPattern, tableNamePattern);
+		Iterator<PKInfo> it = pks.iterator();
+        while (it.hasNext()) 
+        {
+			PKInfo info = it.next();
+	        Entry entrySchema = new Entry("TABLE_SCHEM", bytes(info.schema), Entry.ASCII_TYPE);
+	        Entry entryTableName = new Entry("TABLE_NAME", bytes(info.table),Entry.ASCII_TYPE);
+	        if (columnNamePattern != null && !info.name.contains(columnNamePattern))
+	        {
+	        	continue;
+	        }
+	        Entry entryColumnName = new Entry("COLUMN_NAME", bytes(info.name), Entry.ASCII_TYPE);
+            Entry entryDataType = new Entry("DATA_TYPE", bytes(info.type), Entry.INT32_TYPE);
+            Entry entryTypeName = new Entry("TYPE_NAME", bytes(info.typeName), Entry.ASCII_TYPE);
+            int lenght = -1;
+            AbstractJdbcType jtype = TypesMap.getTypeForComparator(info.typeName);
+            if (jtype instanceof JdbcBytes) lenght = Integer.MAX_VALUE / 2;
+            if (jtype instanceof JdbcAscii || jtype instanceof JdbcUTF8) lenght = Integer.MAX_VALUE;
+            if (jtype instanceof JdbcUUID) lenght = 36;
+            if (jtype instanceof JdbcInt32) lenght = 4;
+            if (jtype instanceof JdbcLong) lenght = 8;
+            Entry entryColumnSize = new Entry("COLUMN_SIZE", bytes(lenght), Entry.INT32_TYPE);
+            ByteBuffer dd = ByteBufferUtil.EMPTY_BYTE_BUFFER;
+            // if (jtype instanceof JdbcDouble) dd = bytes(17);
+            // if (jtype instanceof JdbcFloat) dd = bytes(11);
+            Entry entryDecimalDigits = new Entry("DECIMAL_DIGITS", dd, Entry.INT32_TYPE);
+            int npr = 2;
+            if (jtype != null && (jtype.getJdbcType() == Types.DECIMAL || jtype.getJdbcType() == Types.NUMERIC)) npr = 10;
+            Entry entryNPR = new Entry("NUM_PREC_RADIX", bytes(npr), Entry.INT32_TYPE);
+            ByteBuffer charol = ByteBufferUtil.EMPTY_BYTE_BUFFER;
+            if (jtype instanceof JdbcAscii || jtype instanceof JdbcUTF8) charol = bytes(Integer.MAX_VALUE);
+            Entry entryCharOctetLength = new Entry("CHAR_OCTET_LENGTH", charol, Entry.INT32_TYPE);
+            ordinalPosition++;
+            Entry entryOrdinalPosition = new Entry("ORDINAL_POSITION", bytes(ordinalPosition), Entry.INT32_TYPE);
+            Entry entryNullable = new Entry("NULLABLE", bytes(DatabaseMetaData.columnNoNulls), Entry.INT32_TYPE);
+            Entry entryISNullable = new Entry("IS_NULLABLE", bytes("NO"), Entry.ASCII_TYPE);
+
+	        col = new ArrayList<Entry>();
+	        col.add(entryCatalog);
+	        col.add(entrySchema);
+	        col.add(entryTableName);
+	        col.add(entryColumnName);
+	        col.add(entryDataType);
+	        col.add(entryTypeName);
+	        col.add(entryColumnSize);
+	        col.add(entryBufferLength);
+	        col.add(entryDecimalDigits);
+	        col.add(entryNPR);
+	        col.add(entryNullable);
+	        col.add(entryRemarks);
+	        col.add(entryColumnDef);
+	        col.add(entrySQLDataType);
+	        col.add(entrySQLDateTimeSub);
+	        col.add(entryCharOctetLength);
+	        col.add(entryOrdinalPosition);
+	        col.add(entryISNullable);
+	        col.add(entryScopeCatalog);
+	        col.add(entryScopeSchema);
+	        col.add(entryScopeTable);
+	        col.add(entrySOURCEDT);
+	        col.add(entryISAutoIncrement);
+	        col.add(entryISGeneratedColumn);
+	        rows.add(col);
+	    }
+        
         // define the columns
-        result = (CassandraResultSet) statement.executeQuery(query.toString());
+        CassandraResultSet result = (CassandraResultSet) statement.executeQuery(query.toString());
         while (result.next())
         {
-            ordinalPosition++;
             Entry entrySchema = new Entry("TABLE_SCHEM", bytes(result.getString(1)), Entry.ASCII_TYPE);
             Entry entryTableName = new Entry("TABLE_NAME",
                 (result.getString(2) == null) ? ByteBufferUtil.EMPTY_BYTE_BUFFER : bytes(result.getString(2)),
@@ -449,7 +514,10 @@ public  class MetadataResultSets
             ByteBuffer charol = ByteBufferUtil.EMPTY_BYTE_BUFFER;
             if (jtype instanceof JdbcAscii || jtype instanceof JdbcUTF8) charol = bytes(Integer.MAX_VALUE);
             Entry entryCharOctetLength = new Entry("CHAR_OCTET_LENGTH", charol, Entry.INT32_TYPE);
+            ordinalPosition++;
             Entry entryOrdinalPosition = new Entry("ORDINAL_POSITION", bytes(ordinalPosition), Entry.INT32_TYPE);
+            Entry entryNullable = new Entry("NULLABLE", bytes(DatabaseMetaData.columnNullable), Entry.INT32_TYPE);
+            Entry entryISNullable = new Entry("IS_NULLABLE", bytes("YES"), Entry.ASCII_TYPE);
 
             col = new ArrayList<Entry>();
             col.add(entryCatalog);
@@ -600,6 +668,157 @@ public  class MetadataResultSets
 	
 	    result = new CassandraResultSet(statement, cqlresult);
 	    return result;
+	}
+
+	public List<PKInfo> getPrimaryKeys(CassandraStatement statement, String schema, String table) throws SQLException
+	{
+		StringBuilder query = new StringBuilder("SELECT keyspace_name, columnfamily_name, key_aliases, key_validator, column_aliases, comparator FROM system.schema_columnfamilies");
+		
+	    int filterCount = 0;
+	    if (schema != null) filterCount++;
+	    if (table != null) filterCount++;
+	
+	    // check to see if it is qualified
+	    if (filterCount > 0)
+	    {
+	        String expr = "%s = '%s'";
+	        query.append(" WHERE ");
+	        if (schema != null) query.append(String.format(expr, "keyspace_name", schema));
+	        if (filterCount > 1) query.append(" AND ");
+	        if (table != null) query.append(String.format(expr, "columnfamily_name", table));
+	        query.append(" ALLOW FILTERING");
+	    }
+	    // System.out.println(query.toString());
+	
+	    List<PKInfo> retval = new ArrayList<PKInfo>();
+	    CassandraResultSet result = (CassandraResultSet) statement.executeQuery(query.toString());
+	    if (result.next()) // all is reported back in one json row
+	    {
+	    	String rschema = result.getString(1);
+   	    	String rtable = result.getString(2);
+	        String validator = result.getString(4);
+	        String key_aliases = result.getString(3);
+	        buildPKInfo(retval,rschema,rtable,key_aliases,validator);
+	        
+	        String comparator = result.getString(6);
+	        String column_aliases = result.getString(5);
+	        buildPKInfo(retval,rschema,rtable,column_aliases,comparator);
+	    }
+	    return retval;
+	}
+	
+	private void buildPKInfo(List<PKInfo> retval,String schema, String table,String aliases,String validator)
+	{
+		String[] typeNames = new String[0];
+    	int[] types = new int[0]; 
+        if (validator != null)
+        {
+        	String[] validatorArray = new String[]{validator};
+        	String check = "CompositeType";
+        	int idx = validator.indexOf(check);
+        	if (idx > 0)
+        	{
+        		validator = validator.substring(idx+check.length()+1,validator.length()-1);
+        		validatorArray = validator.split(",");
+        	}
+        	types = new int[validatorArray.length];
+        	typeNames = new String[validatorArray.length];
+        	for (int i = 0; i < validatorArray.length; i++) 
+        	{
+	        	AbstractJdbcType jtype = TypesMap.getTypeForComparator(validatorArray[i]);
+	        	types[i] = (jtype != null ? jtype.getJdbcType() : Types.OTHER);
+
+	            int dotidx = validatorArray[i].lastIndexOf('.');
+	            typeNames[i] = validatorArray[i].substring(dotidx + 1);
+        	}
+        }
+
+        if (aliases != null)
+        {
+        	aliases = aliases.replace("[","");
+        	aliases = aliases.replace("]","");
+        	aliases = aliases.replace("\"","");
+        	if (aliases.trim().length() != 0)
+        	{
+	        	String[] kaArray = aliases.split(",");
+	        	for (int i = 0; i < kaArray.length; i++) 
+	        	{
+	        		PKInfo pki = new PKInfo();
+	        		pki.name = kaArray[i];
+	        		pki.schema = schema;
+	        		pki.table = table;
+	        		pki.type = (i < types.length ? types[i] : Types.OTHER);
+	        		pki.typeName = (i < typeNames.length ? typeNames[i] : "unknown");
+	        		retval.add(pki);
+				}
+        	}
+        }
+	}
+	
+	private class PKInfo
+	{
+		public String typeName;
+		public String schema;
+		public String table;
+		public String name;
+		public int type;
+	}
+	
+	public CassandraResultSet makePrimaryKeys(CassandraStatement statement, String schema, String table) throws SQLException
+	{
+		//1.TABLE_CAT String => table catalog (may be null) 
+		//2.TABLE_SCHEM String => table schema (may be null) 
+		//3.TABLE_NAME String => table name 
+		//4.COLUMN_NAME String => column name 
+		//5.KEY_SEQ short => sequence number within primary key( a value of 1 represents the first column of the primary key, a value of 2 would represent the second column within the primary key). 
+		//6.PK_NAME String => primary key name (may be null) 
+
+		List<PKInfo> pks = getPrimaryKeys(statement, schema, table);
+		Iterator<PKInfo> it = pks.iterator();
+		
+	    String catalog = statement.connection.getCatalog();
+	    Entry entryCatalog = new Entry("TABLE_CAT", bytes(catalog), Entry.ASCII_TYPE);
+
+	    List<Entry> col;
+	    List<List<Entry>> rows = new ArrayList<List<Entry>>();
+	
+        int seq = 0;
+	    // define the columns
+        while (it.hasNext()) 
+        {
+			PKInfo info = it.next();
+	        Entry entrySchema = new Entry("TABLE_SCHEM", bytes(info.schema), Entry.ASCII_TYPE);
+	        Entry entryTableName = new Entry("TABLE_NAME", bytes(info.table),Entry.ASCII_TYPE);
+	        Entry entryColumnName = new Entry("COLUMN_NAME", bytes(info.name), Entry.ASCII_TYPE);
+	        seq++;
+	        Entry entryKeySeq = new Entry("KEY_SEQ", bytes(seq), Entry.INT32_TYPE);
+	        Entry entryPKName = new Entry("PK_NAME", ByteBufferUtil.EMPTY_BYTE_BUFFER, Entry.ASCII_TYPE);
+	
+	        col = new ArrayList<Entry>();
+	        col.add(entryCatalog);
+	        col.add(entrySchema);
+	        col.add(entryTableName);
+	        col.add(entryColumnName);
+	        col.add(entryKeySeq);
+	        col.add(entryPKName);
+	        rows.add(col);
+	    }
+	
+	    // just return the empty result if there were no rows
+	    if (rows.isEmpty()) return new CassandraResultSet();
+	
+	    // use schemas with the key in column number 2 (one based)
+	    CqlResult cqlresult;
+	    try
+	    {
+	        cqlresult = makeCqlResult(rows, 1);
+	    }
+	    catch (CharacterCodingException e)
+	    {
+	        throw new SQLTransientException(e);
+	    }
+	
+	    return new CassandraResultSet(statement, cqlresult);
 	}
 
 	private class Entry

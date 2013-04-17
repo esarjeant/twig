@@ -111,7 +111,7 @@ class CassandraConnection extends AbstractConnection implements Connection
         {
             String host = props.getProperty(TAG_SERVER_NAME);
             int port = Integer.parseInt(props.getProperty(TAG_PORT_NUMBER));
-            currentKeyspace = props.getProperty(TAG_DATABASE_NAME,"system");
+            currentKeyspace = props.getProperty(TAG_DATABASE_NAME);
             username = props.getProperty(TAG_USER);
             String password = props.getProperty(TAG_PASSWORD);
             String version = props.getProperty(TAG_CQL_VERSION,DEFAULT_CQL_VERSION);
@@ -142,9 +142,7 @@ class CassandraConnection extends AbstractConnection implements Connection
             
             decoder = new ColumnDecoder(client.describe_keyspaces());
                     
-            client.set_keyspace("system");
-
-            client.set_keyspace(currentKeyspace);
+            if (currentKeyspace != null) client.set_keyspace(currentKeyspace);
 
             Object[] args = {host, port,currentKeyspace,cluster,version};
             logger.debug("Connected to {}:{} in Cluster '{}' using Keyspace '{}' and CQL version '{}'",args);                       
