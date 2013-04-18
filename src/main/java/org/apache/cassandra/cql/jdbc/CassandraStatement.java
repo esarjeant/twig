@@ -35,6 +35,7 @@ import java.sql.SQLTransientConnectionException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
 
+import org.apache.cassandra.thrift.ConsistencyLevel;
 import org.apache.cassandra.thrift.CqlResult;
 import org.apache.cassandra.thrift.InvalidRequestException;
 import org.apache.cassandra.thrift.SchemaDisagreementException;
@@ -48,7 +49,7 @@ import org.slf4j.LoggerFactory;
  * Cassandra statement: implementation class for {@link PreparedStatement}.
  */
 
-class CassandraStatement extends AbstractStatement implements Statement, Comparable<Object>
+class CassandraStatement extends AbstractStatement implements CassandraStatementExtras, Comparable<Object>, Statement
 {
     private static final Logger logger = LoggerFactory.getLogger(CassandraStatement.class);
     /**
@@ -80,16 +81,17 @@ class CassandraStatement extends AbstractStatement implements Statement, Compara
     protected int updateCount = -1;
 
     protected boolean escapeProcessing = true;
+    
+    protected ConsistencyLevel consistencyLevel;
 
     CassandraStatement(CassandraConnection con) throws SQLException
     {
-        this(con, null);
+        this(con, null, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.HOLD_CURSORS_OVER_COMMIT);
     }
 
     CassandraStatement(CassandraConnection con, String cql) throws SQLException
     {
-        this.connection = con;
-        this.cql = cql;
+        this(con, cql, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.HOLD_CURSORS_OVER_COMMIT);
     }
 
     CassandraStatement(CassandraConnection con, String cql, int resultSetType, int resultSetConcurrency) throws SQLException
@@ -102,6 +104,7 @@ class CassandraStatement extends AbstractStatement implements Statement, Compara
     {
         this.connection = con;
         this.cql = cql;
+        this.consistencyLevel = con.defaultConsistencyLevel;
 
         if (!(resultSetType == ResultSet.TYPE_FORWARD_ONLY
               || resultSetType == ResultSet.TYPE_SCROLL_INSENSITIVE
@@ -158,7 +161,7 @@ class CassandraStatement extends AbstractStatement implements Statement, Compara
             if (logger.isTraceEnabled()) logger.trace("CQL: "+ cql);
             
             resetResults();
-            CqlResult rSet = connection.execute(cql);
+            CqlResult rSet = connection.execute(cql, consistencyLevel);
 
             switch (rSet.getType())
             {
@@ -426,7 +429,19 @@ class CassandraStatement extends AbstractStatement implements Statement, Compara
 
     public <T> T unwrap(Class<T> iface) throws SQLException
     {
-        throw new SQLFeatureNotSupportedException(String.format(NO_INTERFACE, iface.getSimpleName()));
+        if(iface.isInstance(this)) return iface.cast(this);
+    	throw new SQLFeatureNotSupportedException(String.format(NO_INTERFACE, iface.getSimpleName()));
+    }
+        
+    
+    public ConsistencyLevel getConsistencyLevel()
+    {
+        return consistencyLevel;
+    }
+
+    public void setConsistencyLevel(ConsistencyLevel consistencyLevel)
+    {
+        this.consistencyLevel = consistencyLevel;
     }
 
     public int compareTo(Object target)

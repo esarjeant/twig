@@ -96,11 +96,7 @@ public class TypedColumn
     
     public String getValueString()
     {
-<<<<<<< Upstream, based on origin/trunk
     	if (rawColumn.value == null) return null;
-=======
-       if (rawColumn.value == null) return null;
->>>>>>> fe36b44 Fix for Issue #75 Fails with null pointer for empty results
         return valueType.getString(rawColumn.value);
     }
     

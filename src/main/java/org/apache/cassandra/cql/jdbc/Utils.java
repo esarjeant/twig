@@ -22,19 +22,24 @@
 package org.apache.cassandra.cql.jdbc;
 
 import java.io.ByteArrayOutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLDecoder;
 import java.nio.ByteBuffer;
 import java.sql.SQLException;
 import java.sql.SQLNonTransientConnectionException;
 import java.sql.SQLSyntaxErrorException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.Deflater;
 
 import org.apache.cassandra.thrift.Compression;
+import org.apache.cassandra.thrift.ConsistencyLevel;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,7 +59,13 @@ class Utils
     public static final String PROTOCOL = "jdbc:cassandra:";
     public static final String DEFAULT_HOST = "localhost";
     public static final int DEFAULT_PORT = 9160;
+    public static final ConsistencyLevel DEFAULT_CONSISTENCY = ConsistencyLevel.ONE;
+    
 
+    public static final String KEY_VERSION = "version";
+    public static final String KEY_CONSISTENCY = "consistency";
+    
+    
     public static final String TAG_DESCRIPTION = "description";
     public static final String TAG_USER = "user";
     public static final String TAG_PASSWORD = "password";
@@ -65,6 +76,7 @@ class Utils
     public static final String TAG_CQL_VERSION = "cqlVersion";
     public static final String TAG_BUILD_VERSION = "buildVersion";
     public static final String TAG_THRIFT_VERSION = "thriftVersion";
+    public static final String TAG_CONSISTENCY_LEVEL = "consistencyLevel";
 
     protected static final String WAS_CLOSED_CON = "method was called on a closed Connection";
     protected static final String WAS_CLOSED_STMT = "method was called on a closed Statement";
@@ -98,8 +110,8 @@ class Utils
     protected static final String HOST_IN_URL = "Connection url must specify a host, e.g., jdbc:cassandra://localhost:9170/Keyspace1";
     protected static final String HOST_REQUIRED = "a 'host' name is required to build a Connection";
     protected static final String BAD_KEYSPACE = "Keyspace names must be composed of alphanumerics and underscores (parsed: '%s')";
-    protected static final String URI_IS_SIMPLE = "Connection url may only include host, port, and keyspace and version option, e.g., jdbc:cassandra://localhost:9170/Keyspace1?version=2.0.0";
-    protected static final String NOT_OPTION = "Connection url only support the 'version' option";
+    protected static final String URI_IS_SIMPLE = "Connection url may only include host, port, and keyspace, consistency and version option, e.g., jdbc:cassandra://localhost:9170/Keyspace1?version=3.0.0&consistency=ONE";
+    protected static final String NOT_OPTION = "Connection url only supports the 'version' and 'consistency' options";
     protected static final String FORWARD_ONLY = "Can not position cursor with a type of TYPE_FORWARD_ONLY";
 
     protected static final Logger logger = LoggerFactory.getLogger(Utils.class);
@@ -190,13 +202,23 @@ class Utils
             String query = uri.getQuery();
             if ((query != null) && (!query.isEmpty()))
             {
-               String[] items = query.split("&");
-               if (items.length != 1) throw new SQLNonTransientConnectionException(URI_IS_SIMPLE);
-               
-               String[] option = query.split("=");
-               if (!option[0].equalsIgnoreCase("version")) throw new SQLNonTransientConnectionException(NOT_OPTION);
-               if (option.length!=2) throw new SQLNonTransientConnectionException(NOT_OPTION);
-               props.setProperty(TAG_CQL_VERSION, option[1]);
+                Map<String,String> params = parseQueryPart(query);
+                if (params.containsKey(KEY_VERSION) )
+                {
+                    props.setProperty(TAG_CQL_VERSION,params.get(KEY_VERSION));
+                }
+                if (params.containsKey(KEY_CONSISTENCY) )
+                {
+                    props.setProperty(TAG_CONSISTENCY_LEVEL,params.get(KEY_CONSISTENCY));
+                }
+
+//               String[] items = query.split("&");
+//               if (items.length != 1) throw new SQLNonTransientConnectionException(URI_IS_SIMPLE);
+//               
+//               String[] option = query.split("=");
+//               if (!option[0].equalsIgnoreCase("version")) throw new SQLNonTransientConnectionException(NOT_OPTION);
+//               if (option.length!=2) throw new SQLNonTransientConnectionException(NOT_OPTION);
+//               props.setProperty(TAG_CQL_VERSION, option[1]);
             }
         }
 
@@ -223,9 +245,7 @@ class Utils
         
         String host = props.getProperty(TAG_SERVER_NAME);
         if (host==null)throw new SQLNonTransientConnectionException(HOST_REQUIRED);
-        
-        String version = (props.getProperty(TAG_CQL_VERSION)==null)? null : "version="+ props.getProperty(TAG_CQL_VERSION);
-        
+                
         // construct a valid URI from parts... 
         URI uri;
         try
@@ -236,7 +256,7 @@ class Utils
                 host,
                 props.getProperty(TAG_PORT_NUMBER)==null ? DEFAULT_PORT : Integer.parseInt(props.getProperty(TAG_PORT_NUMBER)),
                 keyspace,
-                version,
+                makeQueryString(props),
                 null);
         }
         catch (Exception e)
@@ -299,5 +319,41 @@ class Utils
             result.put(bb.duplicate());
         }
         return (ByteBuffer)result.flip();
+    }
+    
+    protected static String makeQueryString(Properties props)
+    {
+        StringBuilder sb = new StringBuilder();
+        String version = (props.getProperty(TAG_CQL_VERSION));
+        String consistency = (props.getProperty(TAG_CONSISTENCY_LEVEL));
+        if (consistency!=null) sb.append(KEY_CONSISTENCY).append("=").append(consistency);
+        if (version!=null)
+        {
+            if (sb.length() != 0) sb.append("&");
+            sb.append(KEY_VERSION).append("=").append(version);
+        }
+        
+        return (sb.length()==0) ? null : sb.toString().trim();
+    }
+    
+    protected static Map<String,String> parseQueryPart(String query) throws SQLException
+    {
+        Map<String,String> params = new HashMap<String,String>();
+        for (String param : query.split("&"))
+        {
+            try
+            {
+                String pair[] = param.split("=");
+                String key = URLDecoder.decode(pair[0], "UTF-8").toLowerCase();
+                String value = "";
+                if (pair.length > 1) value = URLDecoder.decode(pair[1], "UTF-8"); 
+                params.put(key, value);
+            }
+            catch (UnsupportedEncodingException e)
+            {
+                throw new SQLSyntaxErrorException(e);
+            }
+        }
+        return params;
     }
 }

@@ -41,6 +41,8 @@ public class PooledTest
 	private static final String USER = "JohnDoe";
 	private static final String PASSWORD = "secret";
 	private static final String VERSION = "3.0.0";
+    private static final String CONSISTENCY = "ONE";
+    
 
 	private static java.sql.Connection con = null;
 
@@ -90,7 +92,7 @@ public class PooledTest
 	@Test
 	public void twoMillionConnections() throws Exception
 	{
-		CassandraDataSource connectionPoolDataSource = new CassandraDataSource(HOST, PORT, KEYSPACE, USER, PASSWORD, VERSION);
+		CassandraDataSource connectionPoolDataSource = new CassandraDataSource(HOST, PORT, KEYSPACE, USER, PASSWORD, VERSION,CONSISTENCY);
 
 		DataSource pooledCassandraDataSource = new PooledCassandraDataSource(connectionPoolDataSource);
 
@@ -104,7 +106,7 @@ public class PooledTest
 	@Test
 	public void twoMillionPreparedStatements() throws Exception
 	{
-		CassandraDataSource connectionPoolDataSource = new CassandraDataSource(HOST, PORT, KEYSPACE, USER, PASSWORD, VERSION);
+		CassandraDataSource connectionPoolDataSource = new CassandraDataSource(HOST, PORT, KEYSPACE, USER, PASSWORD, VERSION,CONSISTENCY);
 
 		DataSource pooledCassandraDataSource = new PooledCassandraDataSource(connectionPoolDataSource);
 
@@ -120,7 +122,7 @@ public class PooledTest
 	@Test
 	public void preparedStatement() throws Exception
 	{
-		CassandraDataSource connectionPoolDataSource = new CassandraDataSource(HOST, PORT, KEYSPACE, USER, PASSWORD, VERSION);
+		CassandraDataSource connectionPoolDataSource = new CassandraDataSource(HOST, PORT, KEYSPACE, USER, PASSWORD, VERSION,CONSISTENCY);
 
 		DataSource pooledCassandraDataSource = new PooledCassandraDataSource(connectionPoolDataSource);
 
@@ -142,7 +144,7 @@ public class PooledTest
 	@Test
 	public void preparedStatementClose() throws Exception
 	{
-		CassandraDataSource connectionPoolDataSource = new CassandraDataSource(HOST, PORT, KEYSPACE, USER, PASSWORD, VERSION);
+		CassandraDataSource connectionPoolDataSource = new CassandraDataSource(HOST, PORT, KEYSPACE, USER, PASSWORD, VERSION,CONSISTENCY);
 
 		DataSource pooledCassandraDataSource = new PooledCassandraDataSource(connectionPoolDataSource);
 
@@ -165,7 +167,7 @@ public class PooledTest
 	@Test
 	public void statement() throws Exception
 	{
-		CassandraDataSource connectionPoolDataSource = new CassandraDataSource(HOST, PORT, KEYSPACE, USER, PASSWORD, VERSION);
+		CassandraDataSource connectionPoolDataSource = new CassandraDataSource(HOST, PORT, KEYSPACE, USER, PASSWORD, VERSION,CONSISTENCY);
 
 		DataSource pooledCassandraDataSource = new PooledCassandraDataSource(connectionPoolDataSource);
 
@@ -186,7 +188,7 @@ public class PooledTest
 	@Test
 	public void statementClosed() throws Exception
 	{
-		CassandraDataSource connectionPoolDataSource = new CassandraDataSource(HOST, PORT, KEYSPACE, USER, PASSWORD, VERSION);
+		CassandraDataSource connectionPoolDataSource = new CassandraDataSource(HOST, PORT, KEYSPACE, USER, PASSWORD, VERSION,CONSISTENCY);
 
 		DataSource pooledCassandraDataSource = new PooledCassandraDataSource(connectionPoolDataSource);
 

@@ -78,23 +78,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
 
     CassandraPreparedStatement(CassandraConnection con, String cql) throws SQLException
     {
-        super(con, cql);
-        if (LOG.isTraceEnabled()) LOG.trace("CQL: " + this.cql);
-        try
-        {
-            CqlPreparedResult result = con.prepare(cql);
-
-            itemId = result.itemId;
-            count = result.count;
-        }
-        catch (InvalidRequestException e)
-        {
-            throw new SQLSyntaxErrorException(e);
-        }
-        catch (TException e)
-        {
-            throw new SQLNonTransientConnectionException(e);
-        }
+        this(con, cql, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.HOLD_CURSORS_OVER_COMMIT);
     }
     
     
@@ -122,9 +106,8 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
        {
            throw new SQLNonTransientConnectionException(e);
        }
-
-       
     }
+    
     String getCql()
     {
         return cql;
@@ -169,7 +152,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         try
         {
             resetResults();
-            CqlResult result = connection.execute(itemId, getBindValues());
+            CqlResult result = connection.execute(itemId, getBindValues(), consistencyLevel);
 
             switch (result.getType())
             {

@@ -31,6 +31,7 @@ import static org.apache.cassandra.cql.jdbc.Utils.TAG_PASSWORD;
 import static org.apache.cassandra.cql.jdbc.Utils.TAG_PORT_NUMBER;
 import static org.apache.cassandra.cql.jdbc.Utils.TAG_SERVER_NAME;
 import static org.apache.cassandra.cql.jdbc.Utils.TAG_USER;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_CONSISTENCY_LEVEL;
 import static org.apache.cassandra.cql.jdbc.Utils.createSubName;
 
 import java.io.PrintWriter;
@@ -72,12 +73,15 @@ public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
     protected String password;
 
     protected String version = null;
+    
+    protected String consistency = null;
 
-    public CassandraDataSource(String host, int port, String keyspace, String user, String password, String version)
+    public CassandraDataSource(String host, int port, String keyspace, String user, String password, String version, String consistency)
     {
         if (host != null) setServerName(host);
         if (port != -1) setPortNumber(port);
         if (version != null) setVersion(version);
+        if (consistency != null) setConsistency(consistency);
         setDatabaseName(keyspace);
         setUser(user);
         setPassword(password);
@@ -106,6 +110,16 @@ public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
     public void setVersion(String version)
     {
         this.version = version;
+    }
+
+    public String getConsistency()
+    {
+        return consistency;
+    }
+
+    public void setConsistency(String consistency)
+    {
+        this.consistency = consistency;
     }
 
     public int getPortNumber()
@@ -167,6 +181,7 @@ public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
         if (user!=null) props.setProperty(TAG_USER, user);
         if (password!=null) props.setProperty(TAG_PASSWORD, password);
         if (this.version != null) props.setProperty(TAG_CQL_VERSION, version);
+        if (this.consistency != null) props.setProperty(TAG_CONSISTENCY_LEVEL, consistency);
 
         String url = PROTOCOL+createSubName(props);
         return (CassandraConnection) DriverManager.getConnection(url, props);

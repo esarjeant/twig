@@ -44,6 +44,7 @@ public class DataSourceTest
     private static final String USER = "JohnDoe";
     private static final String PASSWORD = "secret";
     private static final String VERSION = "3.0.0";
+    private static final String CONSISTENCY = "ONE";
     
     private static java.sql.Connection con = null;
 
@@ -77,7 +78,7 @@ public class DataSourceTest
     @Test
     public void testConstructor() throws Exception
     {
-        CassandraDataSource cds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD,VERSION);
+        CassandraDataSource cds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD,VERSION,CONSISTENCY);
         assertEquals(HOST,cds.getServerName());
         assertEquals(PORT,cds.getPortNumber());
         assertEquals(KEYSPACE,cds.getDatabaseName());
@@ -85,7 +86,7 @@ public class DataSourceTest
         assertEquals(PASSWORD,cds.getPassword());
         assertEquals(VERSION, cds.getVersion());
         
-        DataSource ds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD,VERSION);
+        DataSource ds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD,VERSION,CONSISTENCY);
         assertNotNull(ds);
         
         // null username and password
@@ -106,7 +107,7 @@ public class DataSourceTest
     @Test
     public void testIsWrapperFor() throws Exception
     {
-        DataSource ds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD,VERSION);
+        DataSource ds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD,VERSION,CONSISTENCY);
         
         boolean isIt = false;
                 
@@ -122,7 +123,7 @@ public class DataSourceTest
     @Test(expected=SQLFeatureNotSupportedException.class)
     public void testUnwrap() throws Exception
     {
-        DataSource ds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD,VERSION);
+        DataSource ds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD,VERSION,CONSISTENCY);
 
         // it is a wrapper for DataSource
         DataSource newds = ds.unwrap(DataSource.class);        

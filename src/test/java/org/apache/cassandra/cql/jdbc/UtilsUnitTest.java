@@ -27,9 +27,12 @@ import java.util.Properties;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class UtilsUnitTest
 {
+    private static final Logger LOG = LoggerFactory.getLogger(CollectionsTest.class);
 
     @BeforeClass
     public static void setUpBeforeClass() throws Exception
@@ -38,13 +41,22 @@ public class UtilsUnitTest
     @Test
     public void testParseURL() throws Exception
     {
-        String happypath = "jdbc:cassandra://localhost:9170/Keyspace1?version=2.0.0";
+        String happypath = "jdbc:cassandra://localhost:9170/Keyspace1?version=3.0.0&consistency=QUORUM";
         Properties props = Utils.parseURL(happypath);
         assertEquals("localhost", props.getProperty(Utils.TAG_SERVER_NAME));
         assertEquals("9170", props.getProperty(Utils.TAG_PORT_NUMBER));
         assertEquals("Keyspace1", props.getProperty(Utils.TAG_DATABASE_NAME));
-        assertEquals("2.0.0", props.getProperty(Utils.TAG_CQL_VERSION));
-        
+        assertEquals("3.0.0", props.getProperty(Utils.TAG_CQL_VERSION));
+        assertEquals("QUORUM", props.getProperty(Utils.TAG_CONSISTENCY_LEVEL));
+                       
+        String consistencyonly = "jdbc:cassandra://localhost/Keyspace1?consistency=QUORUM";
+        props = Utils.parseURL(consistencyonly);
+        assertEquals("localhost", props.getProperty(Utils.TAG_SERVER_NAME));
+        assertEquals("9160", props.getProperty(Utils.TAG_PORT_NUMBER));
+        assertEquals("Keyspace1", props.getProperty(Utils.TAG_DATABASE_NAME));
+        assertEquals("QUORUM", props.getProperty(Utils.TAG_CONSISTENCY_LEVEL));
+        assertNull(props.getProperty(Utils.TAG_CQL_VERSION));
+       
         String noport = "jdbc:cassandra://localhost/Keyspace1?version=2.0.0";
         props = Utils.parseURL(noport);
         assertEquals("localhost", props.getProperty(Utils.TAG_SERVER_NAME));
@@ -77,10 +89,15 @@ public class UtilsUnitTest
     @Test
     public void testCreateSubName() throws Exception
     {
-        String happypath = "jdbc:cassandra://localhost:9170/Keyspace1?version=2.0.0";
+        String happypath = "jdbc:cassandra://localhost:9170/Keyspace1?consistency=QUORUM&version=3.0.0";
         Properties props = Utils.parseURL(happypath);
         
+        if (LOG.isDebugEnabled()) LOG.debug("happypath    = '{}'", happypath);
+
+        
         String result = Utils.createSubName(props);
+        if (LOG.isDebugEnabled()) LOG.debug("result       = '{}'", Utils.PROTOCOL+result);
+        
         assertEquals(happypath, Utils.PROTOCOL+result);
     }
 }
