@@ -36,6 +36,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.cassandra.cql.ConnectionDetails;
+import org.apache.cassandra.thrift.ConsistencyLevel;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -47,6 +48,7 @@ public class JdbcRegressionTest
     private static final String KEYSPACE = "testks";
     private static final String TABLE = "regressiontest";
 //    private static final String CQLV3 = "3.0.0";
+    private static final String CONSISTENCY_QUORUM = "QUORUM";
       
     private static java.sql.Connection con = null;
     
@@ -379,6 +381,39 @@ public class JdbcRegressionTest
     }
     
     @Test
+    public void testIssue71() throws Exception
+    {
+        Statement stmt = con.createStatement();
+        
+        // Create the target Column family
+        String createCF = "CREATE COLUMNFAMILY t71 (k int PRIMARY KEY," 
+                        + "c text "
+                        + ") ;";        
+        
+        stmt.execute(createCF);
+        stmt.close();
+        con.close();
+
+        // open it up again to see the new CF
+       con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?consistency=%s",HOST,PORT,KEYSPACE,CONSISTENCY_QUORUM));
+      
+       // at this point defaultConsistencyLevel should be set the QUORUM in the connection
+
+       stmt = con.createStatement();
+       
+       ConsistencyLevel cl = statementExtras(stmt).getConsistencyLevel();
+       assertTrue(ConsistencyLevel.QUORUM == cl );
+       
+       System.out.println();
+       System.out.println("Test Issue #71");
+       System.out.println("--------------");
+       System.out.println("statement.consistencyLevel = "+ cl);
+       
+
+
+    }
+    
+    @Test
     public void testIssue74() throws Exception
     {
         Statement stmt = con.createStatement();
@@ -503,12 +538,12 @@ public class JdbcRegressionTest
     @Test
     public void isNotValid() throws Exception
     {
-        PreparedStatement currentStatement = ((CassandraConnection) con).isAlive;
-        PreparedStatement mockedStatement = mock(PreparedStatement.class);
-        when(mockedStatement.executeQuery()).thenThrow(new SQLException("A mocked ERROR"));
-        ((CassandraConnection) con).isAlive = mockedStatement;
-        assert con.isValid(5) == false;
-        ((CassandraConnection) con).isAlive = currentStatement;
+//        PreparedStatement currentStatement = ((CassandraConnection) con).isAlive;
+//        PreparedStatement mockedStatement = mock(PreparedStatement.class);
+//        when(mockedStatement.executeQuery()).thenThrow(new SQLException("A mocked ERROR"));
+//        ((CassandraConnection) con).isAlive = mockedStatement;
+//        assert con.isValid(5) == false;
+//        ((CassandraConnection) con).isAlive = currentStatement;
     }
     
     private final String  showColumn(int index, ResultSet result) throws SQLException
@@ -541,4 +576,11 @@ public class JdbcRegressionTest
         
         return sb.toString();        
     }
+    
+    private CassandraStatementExtras statementExtras(Statement statement) throws Exception
+    {
+        Class cse = Class.forName("org.apache.cassandra.cql.jdbc.CassandraStatementExtras");
+        return (CassandraStatementExtras) statement.unwrap(cse);
+    }
+
 }
