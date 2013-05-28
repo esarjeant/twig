@@ -23,6 +23,7 @@ package org.apache.cassandra.cql.jdbc;
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
+import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -32,6 +33,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.sql.Timestamp;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -52,15 +54,12 @@ public class JdbcRegressionTest
       
     private static java.sql.Connection con = null;
     
-
     @BeforeClass
     public static void setUpBeforeClass() throws Exception
     {
         Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
-        String URL = String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,"system");
-        System.out.println("Connection URL = '"+URL +"'");
         
-        con = DriverManager.getConnection(URL);
+        con = createNewConnection("system");
         Statement stmt = con.createStatement();
         
         // Drop Keyspace
@@ -93,11 +92,18 @@ public class JdbcRegressionTest
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+        con = createNewConnection(KEYSPACE);
         System.out.println(con);
 
     }
-    
+
+	private static Connection createNewConnection(String ks) throws SQLException 
+	{
+		String URL = String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,ks);
+        System.out.println("Connection URL = '"+URL +"'");
+		return DriverManager.getConnection(URL);
+	}
+
     @AfterClass
     public static void tearDownAfterClass() throws Exception
     {
@@ -202,7 +208,7 @@ public class JdbcRegressionTest
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+        con = createNewConnection(KEYSPACE);
         
         // paraphrase of the snippet from the ISSUE #33 provided test
         PreparedStatement statement = con.prepareStatement("update t33 set c=? where k=123");
@@ -326,7 +332,7 @@ public class JdbcRegressionTest
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+        con = createNewConnection(KEYSPACE);
  
         PreparedStatement statement = con.prepareStatement("update t59 set c=? where k=123", ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
         statement.setString(1, "hello");
@@ -355,7 +361,7 @@ public class JdbcRegressionTest
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+        con = createNewConnection(KEYSPACE);
         
         Statement statement = con.createStatement();
         String insert = "INSERT INTO t65 (key, int1,int2,intset) VALUES ('key1',1,100,{10,20,30,40});";
@@ -428,7 +434,7 @@ public class JdbcRegressionTest
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+        con = createNewConnection(KEYSPACE);
         
         Statement statement = con.createStatement();
         
@@ -451,6 +457,53 @@ public class JdbcRegressionTest
 
         System.out.println(resultToDisplay(result,74, "current date"));
        
+    }
+
+    @Test
+    public void testColumnTypes() throws Exception
+    {
+        Statement stmt = con.createStatement();
+
+        // Create the target Column family
+        String createCF = "CREATE table ttypes (id BIGINT PRIMARY KEY, col_f float,col_d double,col_n int,col_t timestamp)";        
+        
+        stmt.execute(createCF);
+        stmt.close();
+        con.close();
+
+        // open it up again to see the new CF
+        con = createNewConnection(KEYSPACE);
+        
+        Statement statement = con.createStatement();
+        
+        String insert = "INSERT INTO ttypes (id, col_f,col_d,col_n,col_t) VALUES (?, ?, ?, ?,?);";
+        
+        PreparedStatement pstatement = con.prepareStatement(insert);
+        pstatement.setLong(1, 1L); 
+        pstatement.setFloat(2, 1f); 
+        pstatement.setDouble(3, 1d); 
+        pstatement.setInt(4, 1); 
+        pstatement.setDate(5, new java.sql.Date(System.currentTimeMillis())); 
+        pstatement.execute();
+
+        pstatement.setObject(1, new Long(2l)); 
+        pstatement.setObject(2, new Float(1f)); 
+        pstatement.setObject(3, new Double(1d)); 
+        pstatement.setObject(4, new Integer(1)); 
+        pstatement.setObject(5, new Date()); 
+        pstatement.execute();
+
+        pstatement.setObject(1, new Long(3l),Types.BIGINT); 
+        pstatement.setObject(2, new Float(1f),Types.FLOAT);
+        pstatement.setObject(3, new Double(1d),Types.DOUBLE); 
+        pstatement.setObject(4, new Integer(1),Types.INTEGER);
+        pstatement.setObject(5, new Date(),Types.TIMESTAMP); 
+        pstatement.execute();
+
+        ResultSet result = statement.executeQuery("SELECT * FROM ttypes;");
+        assertTrue(result.next());
+        assertTrue(result.next());
+        assertTrue(result.next());
     }
 
     @Test
