@@ -451,6 +451,18 @@ public class HandleObjects
                 assert varint != null;
                 return JdbcInteger.instance.decompose(varint);
 
+            case Types.REAL:
+            case Types.DOUBLE:
+            case Types.DECIMAL:
+                Double dvalue = objectToDOUBLE(objectClass, object);
+                assert dvalue != null;
+                return JdbcDouble.instance.decompose(dvalue);
+
+            case Types.FLOAT:
+                Float fvalue = objectToFLOAT(objectClass, object);
+                assert fvalue != null;
+                return JdbcFloat.instance.decompose(fvalue);
+
             case Types.INTEGER:
                 Integer value = objectToINTEGER(objectClass, object);
                 assert value != null;
@@ -526,4 +538,21 @@ public class HandleObjects
                 return null;
         }
     }
+
+
+	private static Float objectToFLOAT(Class<? extends Object> objectClass, Object object) 
+	{
+		// Strings should always work
+        if (objectClass == String.class) return new Float((String) object);
+        else if (objectClass == Number.class) return new Float(((Number) object).floatValue());
+        else return null; // this should not happen
+    }
+
+	private static Double objectToDOUBLE(Class<? extends Object> objectClass, Object object) 
+	{
+		// Strings should always work
+        if (objectClass == String.class) return new Double((String) object);
+        else if (objectClass == Number.class) return new Double(((Number) object).doubleValue());
+        else return null; // this should not happen
+	}
 }
