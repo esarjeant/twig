@@ -345,8 +345,32 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
 
     public void setObject(int parameterIndex, Object object) throws SQLException
     {
-        // For now all objects are forced to String type
-        setObject(parameterIndex, object, Types.VARCHAR, 0);
+    	int targetSqlType = Types.VARCHAR; // For now all objects are default to String type
+    	if (object instanceof Float)
+    	{
+    		targetSqlType = Types.FLOAT;
+    	}
+    	else if (object instanceof Double)
+    	{
+    		targetSqlType = Types.DOUBLE;
+    	}
+    	else if (object instanceof Integer)
+    	{
+    		targetSqlType = Types.INTEGER;
+    	}
+    	else if (object instanceof Long || object instanceof BigInteger)
+    	{
+    		targetSqlType = Types.BIGINT;
+    	}
+    	else if (object instanceof Boolean)
+    	{
+    		targetSqlType = Types.BOOLEAN;
+    	}
+    	else if (object instanceof Date || object instanceof java.util.Date)
+    	{
+    		targetSqlType = Types.TIMESTAMP;
+    	}
+        setObject(parameterIndex, object, targetSqlType);
     }
 
     public void setObject(int parameterIndex, Object object, int targetSqlType) throws SQLException
@@ -361,7 +385,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
 
         ByteBuffer variable = HandleObjects.makeBytes(object, targetSqlType, scaleOrLength);
 
-        if (variable == null) throw new SQLNonTransientException("Problem mapping object to JDBC Type");
+        if (variable == null) throw new SQLNonTransientException("Problem mapping object:"+(object != null ? object.getClass() : null)+" to JDBC Type:"+targetSqlType);
 
         bindValues.put(parameterIndex, variable);
     }
