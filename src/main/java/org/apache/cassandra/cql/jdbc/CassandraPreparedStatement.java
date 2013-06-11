@@ -93,10 +93,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
        if (LOG.isTraceEnabled()) LOG.trace("CQL: " + this.cql);
        try
        {
-           CqlPreparedResult result = con.prepare(cql);
-
-           itemId = result.itemId;
-           count = result.count;
+    	   createPreparedResult();
        }
        catch (InvalidRequestException e)
        {
@@ -108,6 +105,19 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
        }
     }
     
+    void createPreparedResult() throws InvalidRequestException, TException
+    {
+	    CqlPreparedResult result = connection.prepare(cql);
+	
+	    itemId = result.itemId;
+	    count = result.count;
+	}
+
+    int getItemId() 
+	{
+		return itemId;
+	}
+
     String getCql()
     {
         return cql;
@@ -152,7 +162,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         try
         {
             resetResults();
-            CqlResult result = connection.execute(itemId, getBindValues(), consistencyLevel);
+            CqlResult result = connection.execute(this, getBindValues(), consistencyLevel);
 
             switch (result.getType())
             {

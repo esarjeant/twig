@@ -20,28 +20,70 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
+import static org.apache.cassandra.cql.jdbc.CassandraResultSet.DEFAULT_CONCURRENCY;
+import static org.apache.cassandra.cql.jdbc.CassandraResultSet.DEFAULT_HOLDABILITY;
+import static org.apache.cassandra.cql.jdbc.CassandraResultSet.DEFAULT_TYPE;
+import static org.apache.cassandra.cql.jdbc.Utils.ALWAYS_AUTOCOMMIT;
+import static org.apache.cassandra.cql.jdbc.Utils.BAD_TIMEOUT;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_INTERFACE;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_TRANSACTIONS;
+import static org.apache.cassandra.cql.jdbc.Utils.PROTOCOL;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_ACTIVE_CQL_VERSION;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_CONSISTENCY_LEVEL;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_CQL_VERSION;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_DATABASE_NAME;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_PASSWORD;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_PORT_NUMBER;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_SERVER_NAME;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_USER;
+import static org.apache.cassandra.cql.jdbc.Utils.WAS_CLOSED_CON;
+import static org.apache.cassandra.cql.jdbc.Utils.createSubName;
+import static org.apache.cassandra.cql.jdbc.Utils.determineCurrentKeyspace;
+
 import java.nio.ByteBuffer;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
+import java.sql.SQLClientInfoException;
+import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
+import java.sql.SQLInvalidAuthorizationSpecException;
+import java.sql.SQLNonTransientConnectionException;
+import java.sql.SQLSyntaxErrorException;
+import java.sql.SQLTimeoutException;
+import java.sql.SQLWarning;
+import java.sql.Statement;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import org.apache.cassandra.thrift.*;
+import org.apache.cassandra.thrift.AuthenticationException;
+import org.apache.cassandra.thrift.AuthenticationRequest;
+import org.apache.cassandra.thrift.AuthorizationException;
+import org.apache.cassandra.thrift.Cassandra;
+import org.apache.cassandra.thrift.Compression;
+import org.apache.cassandra.thrift.ConsistencyLevel;
+import org.apache.cassandra.thrift.CqlPreparedResult;
+import org.apache.cassandra.thrift.CqlResult;
+import org.apache.cassandra.thrift.InvalidRequestException;
+import org.apache.cassandra.thrift.SchemaDisagreementException;
+import org.apache.cassandra.thrift.TimedOutException;
+import org.apache.cassandra.thrift.TokenRange;
+import org.apache.cassandra.thrift.UnavailableException;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.transport.TFramedTransport;
 import org.apache.thrift.transport.TSocket;
 import org.apache.thrift.transport.TTransport;
-
-import static org.apache.cassandra.cql.jdbc.Utils.*;
-import static org.apache.cassandra.cql.jdbc.CassandraResultSet.*;
+import org.apache.thrift.transport.TTransportException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -81,8 +123,17 @@ class CassandraConnection extends AbstractConnection implements Connection
      */
     private Set<Statement> statements = new ConcurrentSkipListSet<Statement>();
 
+	/**
+     * Ohter node info for defined keyspace, null if no keyspace is provided
+     */
+	private Set<String> otherNodes = new HashSet<String>();
+
+	/**
+     * remote connection fields
+     */
     private Cassandra.Client client;
     private TTransport transport;
+    private TSocket socket;
 
     protected long timeOfLastFailure = 0;
     protected int numFailures = 0;
@@ -93,7 +144,6 @@ class CassandraConnection extends AbstractConnection implements Connection
     int majorCqlVersion;
     ColumnDecoder decoder;
 
-    private TSocket socket;
     
     PreparedStatement isAlive = null;
     
@@ -121,11 +171,7 @@ class CassandraConnection extends AbstractConnection implements Connection
             majorCqlVersion = getMajor(version);
             defaultConsistencyLevel = ConsistencyLevel.valueOf(props.getProperty(TAG_CONSISTENCY_LEVEL,ConsistencyLevel.ONE.name()));
 
-            socket = new TSocket(host, port);
-            transport = new TFramedTransport(socket);
-            TProtocol protocol = new TBinaryProtocol(transport);
-            client = new Cassandra.Client(protocol);
-            socket.open();
+            createSocketWIthTransportAndClient(host, port);
             
             cluster = client.describe_cluster_name();
 
@@ -142,10 +188,31 @@ class CassandraConnection extends AbstractConnection implements Connection
             {
                 client.set_cql_version(version);
             }
-            
+
             decoder = new ColumnDecoder(client.describe_keyspaces());
                     
-            if (currentKeyspace != null) client.set_keyspace(currentKeyspace);
+            if (currentKeyspace != null) 
+            {
+            	try
+            	{
+            		List<TokenRange> ringInfo = client.describe_ring(currentKeyspace);//collect info in case current node fails
+            		for (TokenRange tokenRange : ringInfo) 
+            		{
+						if (tokenRange.isSetRpc_endpoints())
+						{
+							otherNodes.addAll(tokenRange.getRpc_endpoints());
+						}
+						if (otherNodes.size() > 5) break; //enough info incase of failure
+					}
+            		
+            		//remove target node if present
+                	otherNodes.remove(socket.getSocket().getInetAddress().getHostAddress());
+            	}
+                catch (InvalidRequestException e)
+                {
+                	//silently ignore
+                }
+            }
 
             Object[] args = {host, port,currentKeyspace,cluster,version, defaultConsistencyLevel.name()};
             logger.debug("Connected to {}:{} in Cluster '{}' using Keyspace '{}', CQL version '{}' and Consistency level {}",args);                       
@@ -168,7 +235,28 @@ class CassandraConnection extends AbstractConnection implements Connection
         }
     }
     
-    // get the Major portion of a string like : Major.minor.patch where 2 is the default
+    private void createSocketWIthTransportAndClient(String host, int port) throws TException 
+    {
+        socket = new TSocket(host, port);
+        transport = new TFramedTransport(socket);
+        TProtocol protocol = new TBinaryProtocol(transport);
+        client = new Cassandra.Client(protocol);
+        socket.open();
+        
+        try
+        {
+	        if (currentKeyspace != null) 
+	        {
+	        	client.set_keyspace(currentKeyspace);
+	        }
+		} 
+        catch (InvalidRequestException e) 
+        {
+			//should never happen
+		}
+	}
+
+	// get the Major portion of a string like : Major.minor.patch where 2 is the default
     private final int getMajor(String version)
     {
         int major = 0;
@@ -459,7 +547,7 @@ class CassandraConnection extends AbstractConnection implements Connection
      * @throws SchemaDisagreementException when the client side and server side are at different versions of schema (Thrift)
      * @throws TException                  when there is a error in Thrift processing
      */
-    protected CqlResult execute(String queryStr, Compression compression, ConsistencyLevel consistencyLevel) throws InvalidRequestException, UnavailableException, TimedOutException, SchemaDisagreementException, TException
+    private CqlResult execute(String queryStr, Compression compression, ConsistencyLevel consistencyLevel, int attempt) throws InvalidRequestException, UnavailableException, TimedOutException, SchemaDisagreementException, TException
     {
         currentKeyspace = determineCurrentKeyspace(queryStr, currentKeyspace);
 
@@ -468,11 +556,20 @@ class CassandraConnection extends AbstractConnection implements Connection
             if (majorCqlVersion==3) return client.execute_cql3_query(Utils.compressQuery(queryStr, compression), compression, consistencyLevel);
             else                    return client.execute_cql_query(Utils.compressQuery(queryStr, compression), compression);
         }
-        catch (TException error)
+        catch (TException e)
         {
             numFailures++;
             timeOfLastFailure = System.currentTimeMillis();
-            throw error;
+            if (e instanceof TTransportException && attempt < 3 && knowsMoreNodes())
+            {
+            	attempt++;
+            	connectToOtherNode();
+            	return execute(queryStr, compression, consistencyLevel, attempt);
+            }
+            else
+            {
+            	throw e;
+            }
         }
     }
 
@@ -489,39 +586,90 @@ class CassandraConnection extends AbstractConnection implements Connection
      * @throws TException                  when there is a error in Thrift processing
      */
     protected CqlResult execute(String queryStr, ConsistencyLevel consistencyLevel)
-              throws InvalidRequestException, UnavailableException, TimedOutException, SchemaDisagreementException, TException
+    		throws InvalidRequestException, UnavailableException, TimedOutException, SchemaDisagreementException, TException
     {
-        return execute(queryStr, defaultCompression, consistencyLevel);
+        return execute(queryStr, defaultCompression, consistencyLevel,0);
     }
 
-    protected CqlResult execute(int itemId, List<ByteBuffer> values, ConsistencyLevel consistencyLevel)
-              throws InvalidRequestException, UnavailableException, TimedOutException, SchemaDisagreementException, TException
+    protected CqlResult execute(CassandraPreparedStatement cps, List<ByteBuffer> values, ConsistencyLevel consistencyLevel)
+    		throws InvalidRequestException, UnavailableException, TimedOutException, SchemaDisagreementException, TException
+    {
+    	return execute(cps, values, consistencyLevel, 0);
+    }
+    private CqlResult execute(CassandraPreparedStatement cps, List<ByteBuffer> values, ConsistencyLevel consistencyLevel, int attempt)
+    		throws InvalidRequestException, UnavailableException, TimedOutException, SchemaDisagreementException, TException
     {
         try
         {
+        	int itemId = cps.getItemId();
             if (majorCqlVersion==3) return client.execute_prepared_cql3_query(itemId, values, consistencyLevel);
             else                    return client.execute_prepared_cql_query(itemId, values);
         }
-        catch (TException error)
+        catch (TException e)
         {
             numFailures++;
             timeOfLastFailure = System.currentTimeMillis();
-            throw error;
+            if (e instanceof TTransportException && attempt < 3 && knowsMoreNodes())
+            {
+            	attempt++;
+            	connectToOtherNode();
+            	cps.createPreparedResult();//fixup internals
+            	return execute(cps, values, consistencyLevel, attempt);
+            }
+            else
+            {
+            	throw e;
+            }
         }
     }
-    
-    protected CqlPreparedResult prepare(String queryStr, Compression compression)throws InvalidRequestException, TException
+
+	private boolean knowsMoreNodes()
+	{
+		if (otherNodes.size() == 0) 
+		{
+			return false;
+		}
+		return true;
+	}
+
+    private void connectToOtherNode() throws TException 
+    {
+    	Iterator<String> it = otherNodes.iterator();
+    	if (it.hasNext())
+    	{
+	    	String newHost = it.next();
+	    	it.remove(); //make sure we do not retry incase this one also fails
+	    	
+	    	int port = Integer.parseInt(connectionProps.getProperty(TAG_PORT_NUMBER));
+			createSocketWIthTransportAndClient(newHost, port);
+    	}
+	}
+
+	protected CqlPreparedResult prepare(String queryStr, Compression compression) throws InvalidRequestException, TException
+	{
+		return prepare(queryStr, compression, 0);
+	}
+	private CqlPreparedResult prepare(String queryStr, Compression compression, int attempt) throws InvalidRequestException, TException
     {
         try
         {
             if (majorCqlVersion==3) return client.prepare_cql3_query(Utils.compressQuery(queryStr, compression), compression);
             else                    return client.prepare_cql_query(Utils.compressQuery(queryStr, compression), compression);
         }
-        catch (TException error)
+        catch (TException e)
         {
             numFailures++;
             timeOfLastFailure = System.currentTimeMillis();
-            throw error;
+            if (e instanceof TTransportException && attempt < 3 && knowsMoreNodes())
+            {
+            	attempt++;
+            	connectToOtherNode();
+            	return prepare(queryStr, compression, attempt);
+            }
+            else
+            {
+            	throw e;
+            }
         }
     }
     
