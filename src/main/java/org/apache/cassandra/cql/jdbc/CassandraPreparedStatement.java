@@ -141,7 +141,11 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
 
     public void close()
     {
-        connection.removeStatement(this);
+        try{
+        	connection.removeStatement(this);
+        }catch(Exception e){
+        	
+        }
 
         connection = null;
     }
@@ -173,6 +177,11 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         }
         catch (UnavailableException e)
         {
+        	try{
+        		this.connection.disconnect();
+        	}catch(Exception e1){
+        		
+        	}
             throw new SQLNonTransientConnectionException(NO_SERVER, e);
         }
         catch (TimedOutException e)
@@ -185,6 +194,11 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         }
         catch (TException e)
         {
+        	try{
+        		this.connection.disconnect();
+        	}catch(Exception e1){
+        		
+        	}
             throw new SQLNonTransientConnectionException(e);
         }
     }

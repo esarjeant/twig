@@ -194,6 +194,12 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
         }
         catch (TException e)
         {
+        	try{
+        		// Try to close the connection in order to force client to reconnect
+        		connection.close();
+        	}catch(Exception e1){
+        		
+        	}
             throw new SQLNonTransientConnectionException(e);
         }
 

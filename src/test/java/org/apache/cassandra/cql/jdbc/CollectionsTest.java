@@ -143,7 +143,10 @@ public class CollectionsTest
         if (LOG.isDebugEnabled()) LOG.debug("Test: 'testReadList'\n");
 
         Statement statement = con.createStatement();
-
+        
+        String insert = "INSERT INTO testcollection (k,L) VALUES( 1,[1, 3, 12345]);";
+        statement.executeUpdate(insert);
+        
         ResultSet result = statement.executeQuery("SELECT * FROM testcollection WHERE k = 1;");
         result.next();
 
@@ -226,7 +229,10 @@ public class CollectionsTest
 
         Statement statement = con.createStatement();
 
-
+        String update1 = "UPDATE testcollection SET S = {'red', 'white', 'blue'} WHERE k = 1;";        
+        statement.executeUpdate(update1);
+        
+        
         ResultSet result = statement.executeQuery("SELECT * FROM testcollection WHERE k = 1;");
         result.next();
 
@@ -303,7 +309,8 @@ public class CollectionsTest
 
         Statement statement = con.createStatement();
 
-
+        String update2 = "UPDATE testcollection SET M = {2.0: true, 4.0: false, 6.0 : true} WHERE k = 1;";
+        statement.executeUpdate(update2);
         ResultSet result = statement.executeQuery("SELECT * FROM testcollection WHERE k = 1;");
         result.next();
 

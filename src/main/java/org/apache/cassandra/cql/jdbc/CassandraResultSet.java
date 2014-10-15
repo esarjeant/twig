@@ -131,6 +131,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     public static final int DEFAULT_TYPE = ResultSet.TYPE_FORWARD_ONLY;
     public static final int DEFAULT_CONCURRENCY = ResultSet.CONCUR_READ_ONLY;
     public static final int DEFAULT_HOLDABILITY = ResultSet.HOLD_CURSORS_OVER_COMMIT;
+    private ArrayList<String> fieldName = null;
 
     /**
      * The rows iterator.
@@ -215,13 +216,16 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     {
         values.clear();
         indexMap.clear();
+        
+        // Modified to order fields the way they are in the SELECT clause
         for (ByteBuffer name : this.schema.name_types.keySet())
-        {
-            TypedColumn c = createColumn(new Column(name));
-            String columnName = c.getNameString();
-            values.add(c);
-            indexMap.put(columnName, values.size()); // one greater than 0 based index of a list
-        }
+        	{
+        		TypedColumn c = createColumn(new Column(name));
+        		String columnName = c.getNameString();            
+        		values.add(c);            
+        		indexMap.put(columnName, values.size()); // one greater than 0 based index of a list
+        	}
+        
     }
 
     private final void populateColumns()
@@ -241,6 +245,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
             String columnName = c.getNameString();
             values.add(c);
             indexMap.put(columnName, values.size()); // one greater than 0 based index of a list
+            
         }
     }
 
@@ -1151,23 +1156,29 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
         AbstractJdbcType<?> comparator = TypesMap.getTypeForComparator(nameType == null ? schema.default_name_type : nameType);
         String valueType = schema.value_types.get(column.name);
         AbstractJdbcType<?> validator = TypesMap.getTypeForComparator(valueType == null ? schema.default_value_type : valueType);
-        if (validator == null)
-        {
-            int index = valueType.indexOf("(");
-            assert index > 0;
-
-            String collectionClass = valueType.substring(0, index);
-            if (collectionClass.endsWith("ListType")) type = CollectionType.LIST;
-            else if (collectionClass.endsWith("SetType")) type = CollectionType.SET;
-            else if (collectionClass.endsWith("MapType")) type = CollectionType.MAP;
-
-            String[] split = valueType.substring(index + 1, valueType.length() - 1).split(",");
-            if (split.length > 1)
-            {
-                keyType = TypesMap.getTypeForComparator(split[0]);
-                validator = TypesMap.getTypeForComparator(split[1]);
-            }
-            else validator = TypesMap.getTypeForComparator(split[0]);
+        if (validator == null){
+        	if(valueType.equals("org.apache.cassandra.db.marshal.TimestampType")){
+        		validator = TypesMap.getTypeForComparator("org.apache.cassandra.db.marshal.DateType");
+        	}else{         
+	            int index = valueType.indexOf("(");
+	            String collectionClass = "";
+	            if(index>0){
+	            	collectionClass = valueType.substring(0, index);
+	            }else{
+	            	collectionClass = valueType;
+	            }
+	            if (collectionClass.endsWith("ListType")) type = CollectionType.LIST;
+	            else if (collectionClass.endsWith("SetType")) type = CollectionType.SET;
+	            else if (collectionClass.endsWith("MapType")) type = CollectionType.MAP;
+	
+	            String[] split = valueType.substring(index + 1, valueType.length() - 1).split(",");
+	            if (split.length > 1)
+	            {
+	                keyType = TypesMap.getTypeForComparator(split[0]);
+	                validator = TypesMap.getTypeForComparator(split[1]);
+	            }
+	            else validator = TypesMap.getTypeForComparator(split[0]);
+        	}
 
         }
 
@@ -1218,6 +1229,8 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     {
         return wasNull;
     }
+    
+    
 
     /**
      * RSMD implementation. The metadata returned refers to the column
@@ -1376,5 +1389,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
         {
             throw new SQLFeatureNotSupportedException(String.format(NO_INTERFACE, iface.getSimpleName()));
         }
+        
+        
     }
 }

@@ -64,7 +64,9 @@ class Utils
 
     public static final String KEY_VERSION = "version";
     public static final String KEY_CONSISTENCY = "consistency";
-    
+    public static final String KEY_PRIMARY_DC = "primarydc";
+    public static final String KEY_BACKUP_DC = "backupdc";
+    public static final String KEY_CONNECTION_RETRIES = "retries";
     
     public static final String TAG_DESCRIPTION = "description";
     public static final String TAG_USER = "user";
@@ -77,6 +79,10 @@ class Utils
     public static final String TAG_BUILD_VERSION = "buildVersion";
     public static final String TAG_THRIFT_VERSION = "thriftVersion";
     public static final String TAG_CONSISTENCY_LEVEL = "consistencyLevel";
+    
+    public static final String TAG_PRIMARY_DC = "primaryDatacenter";
+    public static final String TAG_BACKUP_DC = "backupDatacenter";
+    public static final String TAG_CONNECTION_RETRIES = "retries";
 
     protected static final String WAS_CLOSED_CON = "method was called on a closed Connection";
     protected static final String WAS_CLOSED_STMT = "method was called on a closed Statement";
@@ -206,10 +212,22 @@ class Utils
                 if (params.containsKey(KEY_VERSION) )
                 {
                     props.setProperty(TAG_CQL_VERSION,params.get(KEY_VERSION));
-                }
+                }                
                 if (params.containsKey(KEY_CONSISTENCY) )
                 {
                     props.setProperty(TAG_CONSISTENCY_LEVEL,params.get(KEY_CONSISTENCY));
+                }
+                if (params.containsKey(KEY_PRIMARY_DC) )
+                {
+                    props.setProperty(TAG_PRIMARY_DC,params.get(KEY_PRIMARY_DC));
+                }
+                if (params.containsKey(KEY_BACKUP_DC) )
+                {
+                    props.setProperty(TAG_BACKUP_DC,params.get(KEY_BACKUP_DC));
+                }
+                if (params.containsKey(KEY_CONNECTION_RETRIES) )
+                {
+                    props.setProperty(TAG_CONNECTION_RETRIES,params.get(KEY_CONNECTION_RETRIES));
                 }
 
 //               String[] items = query.split("&");

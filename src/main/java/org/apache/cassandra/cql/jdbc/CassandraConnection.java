@@ -22,11 +22,15 @@ package org.apache.cassandra.cql.jdbc;
 
 import java.nio.ByteBuffer;
 import java.sql.*;
+import java.util.Calendar;
+import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Random;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 import org.slf4j.Logger;
@@ -51,7 +55,7 @@ class CassandraConnection extends AbstractConnection implements Connection
 {
 
     private static final Logger logger = LoggerFactory.getLogger(CassandraConnection.class);
-
+    public static Integer roundRobinIndex;
     static final String IS_VALID_CQLQUERY_2_0_0 = "SELECT COUNT(1) FROM system.Versions WHERE component = 'cql';";
     static final String IS_VALID_CQLQUERY_3_0_0 = "SELECT COUNT(1) FROM system.\"Versions\" WHERE component = 'cql';";
     
@@ -90,6 +94,8 @@ class CassandraConnection extends AbstractConnection implements Connection
     protected String url = null;
     protected String cluster;//current catalog
     protected String currentKeyspace;//current schema
+    protected TreeSet<String> hostListPrimary;
+    protected TreeSet<String> hostListBackup;
     int majorCqlVersion;
     ColumnDecoder decoder;
 
@@ -106,49 +112,117 @@ class CassandraConnection extends AbstractConnection implements Connection
      */
     public CassandraConnection(Properties props) throws SQLException
     {
+    	Calendar now = new GregorianCalendar();
+    	hostListPrimary = new TreeSet<String>();
+    	hostListBackup = new TreeSet<String>();
         connectionProps = (Properties)props.clone();
         clientInfo = new Properties();
         url = PROTOCOL + createSubName(props);
         try
         {
-            String host = props.getProperty(TAG_SERVER_NAME);
+        	String[] hosts = {}; 
+            String host = props.getProperty(TAG_SERVER_NAME);           
             int port = Integer.parseInt(props.getProperty(TAG_PORT_NUMBER));
+            int connectionRetries = Integer.parseInt(props.getProperty(TAG_CONNECTION_RETRIES,"10"));
             currentKeyspace = props.getProperty(TAG_DATABASE_NAME);
             username = props.getProperty(TAG_USER);
             String password = props.getProperty(TAG_PASSWORD);
             String version = props.getProperty(TAG_CQL_VERSION,DEFAULT_CQL_VERSION);
+            String primaryDc = props.getProperty(TAG_PRIMARY_DC,"");
+            String backupDc = props.getProperty(TAG_BACKUP_DC,"");
             connectionProps.setProperty(TAG_ACTIVE_CQL_VERSION, version);
             majorCqlVersion = getMajor(version);
             defaultConsistencyLevel = ConsistencyLevel.valueOf(props.getProperty(TAG_CONSISTENCY_LEVEL,ConsistencyLevel.ONE.name()));
-
-            socket = new TSocket(host, port);
-            transport = new TFramedTransport(socket);
-            TProtocol protocol = new TBinaryProtocol(transport);
-            client = new Cassandra.Client(protocol);
-            socket.open();
+            boolean connected=false;            
+            int retries=0;
+            // dealing with multiple hosts passed as seeds in the JDBC URL : jdbc:cassandra://lyn4e900.tlt--lyn4e901.tlt--lyn4e902.tlt:9160/fluks
+            // in this phase we get the list of all the nodes of the cluster
+            String currentHost ="";
+            while(!connected && retries<10){
+            	try{
+		            if(host.contains("--")){
+		            	hosts = new String[host.split("--").length];
+		            	int i=0;
+		            	for(String h:host.split("--")){
+		            		hosts[i]=h;
+		            		i++;
+		            	}
+		            }else{
+		            	hosts = new String[1];
+		            	hosts[0] = host;
+		            }
+		            
+		            Random rand = new Random();  
+		            
+		            currentHost = hosts[rand.nextInt( hosts.length)];
+		            logger.debug("Chosen seed : " + currentHost);
+		            socket = new TSocket(currentHost, port);
+		            transport = new TFramedTransport(socket);
+		            TProtocol protocol = new TBinaryProtocol(transport);
+		            client = new Cassandra.Client(protocol);
+		            socket.open();
+		            connected = true;
+            	}catch(Exception e){
+            		logger.error("Connexion impossible au serveur " + currentHost + " : " + e.toString());
+            		retries++;
+            	}
+	            
+            }
             
             cluster = client.describe_cluster_name();
-
-            if (username != null)
-            {
-                Map<String, String> credentials = new HashMap<String, String>();
-                credentials.put("username", username);
-                if (password != null) credentials.put("password", password);
-                AuthenticationRequest areq = new AuthenticationRequest(credentials);
-                client.login(areq);
+            List<TokenRange> ring =null;
+            boolean gotRing=false;
+            try{
+            	ring = client.describe_ring(currentKeyspace);
+            	gotRing=true;
+            }catch(Exception e){
+            	logger.warn("Couldn't get ring description for keyspace " + currentKeyspace + "... trying to connect to first host");
+            }
+            if(gotRing){
+	            int i = 0;
+	            for(TokenRange range:ring){
+	            	List<EndpointDetails> endpoints = range.getEndpoint_details();
+	            	for(EndpointDetails endpoint:endpoints){
+	            		if(!primaryDc.equals("")){
+	            			if(backupDc.equals(endpoint.getDatacenter())){
+	            				hostListBackup.add(endpoint.getHost());
+	            			}
+	            			if(primaryDc.equals(endpoint.getDatacenter())){
+	            				hostListPrimary.add(endpoint.getHost());
+	            			}
+	            		}else{
+	            			hostListPrimary.add(endpoint.getHost());
+	            		}
+	            	}
+	            }
+	
+	            socket.close();
+	            transport.close();
+	                                    
+	            logger.debug("Primary : " + hostListPrimary);
+	            logger.debug("Backup : " + hostListBackup);
+	            connected = tryToConnect(hostListPrimary,port,version,password,connectionRetries);
+	            if(!connected){
+	            	connected = tryToConnect(hostListBackup,port,version,password,connectionRetries);
+	            }
+	            if(!connected){
+	            	throw new SQLNonTransientConnectionException("All connections attempt have failed. Please check your JDBC url and server status.");
+	            }
+            }else{
+            	hostListPrimary.add(hosts[0]);
+            	connected = tryToConnect(hostListPrimary,port,version,password,connectionRetries);
             }
             
-            if (majorCqlVersion > 2)
-            {
-                client.set_cql_version(version);
-            }
+            
             
             decoder = new ColumnDecoder(client.describe_keyspaces());
                     
             if (currentKeyspace != null) client.set_keyspace(currentKeyspace);
 
             Object[] args = {host, port,currentKeyspace,cluster,version, defaultConsistencyLevel.name()};
-            logger.debug("Connected to {}:{} in Cluster '{}' using Keyspace '{}', CQL version '{}' and Consistency level {}",args);                       
+            logger.debug("Connected to {}:{} in Cluster '{}' using Keyspace '{}', CQL version '{}' and Consistency level {}",args);
+            Calendar then = new GregorianCalendar();
+            logger.debug("Connection took " + (then.getTimeInMillis() - now.getTimeInMillis()) + "ms");                   
         }
         catch (InvalidRequestException e)
         {
@@ -158,14 +232,14 @@ class CassandraConnection extends AbstractConnection implements Connection
         {
             throw new SQLNonTransientConnectionException(e);
         }
-        catch (AuthenticationException e)
+        /*catch (AuthenticationException e)
         {
             throw new SQLInvalidAuthorizationSpecException(e);
         }
         catch (AuthorizationException e)
         {
             throw new SQLInvalidAuthorizationSpecException(e);
-        }
+        }*/
     }
     
     // get the Major portion of a string like : Major.minor.patch where 2 is the default
@@ -570,5 +644,68 @@ class CassandraConnection extends AbstractConnection implements Connection
         builder.append(connectionProps);
         builder.append("]");
         return builder.toString();
-    }    
+    }
+    
+    private boolean tryToConnect(TreeSet<String> hostList, int port, String version, String password, int nbRetries){
+    	// Attempt to connect to one of the hosts passed in the hostList argument
+    	try {
+    		if(hostList.size()==0){
+    			return false;
+    		}
+			String currentHost="";
+			boolean connected = false;
+			int retries=0;
+			while(!connected && retries<nbRetries){
+				try{		            		           
+			        Random rand = new Random();
+			        
+			        if(CassandraConnection.roundRobinIndex==null){
+			        	CassandraConnection.roundRobinIndex=rand.nextInt(hostList.size());
+			        }else{
+			        	CassandraConnection.roundRobinIndex++;
+			        }
+			        if (CassandraConnection.roundRobinIndex>=hostList.size()){
+			        	CassandraConnection.roundRobinIndex=0;
+			        }
+			        logger.debug("C* RR index = " + CassandraConnection.roundRobinIndex); 
+			        
+			        //currentHost = hostList.toArray(new String[hostList.size()])[rand.nextInt(hostList.size())];
+			        currentHost = hostList.toArray(new String[hostList.size()])[CassandraConnection.roundRobinIndex];
+			        
+					
+			        logger.debug("Retries " + retries + ": " + currentHost);
+			        socket = new TSocket(currentHost, port);
+			        transport = new TFramedTransport(socket);
+			        TProtocol protocol = new TBinaryProtocol(transport);
+			        client = new Cassandra.Client(protocol);
+			        socket.open();
+			        
+			        if (username != null)
+			        {
+			            Map<String, String> credentials = new HashMap<String, String>();
+			            credentials.put("username", username);
+			            if (password != null) credentials.put("password", password);
+			            AuthenticationRequest areq = new AuthenticationRequest(credentials);
+			            client.login(areq);
+			        }
+			        
+			        if (majorCqlVersion > 2)
+			        {
+			            client.set_cql_version(version);
+			        }
+			        connected = true;
+			        logger.debug("C* JDBC connected to : " + currentHost);
+				}catch(Exception e){
+					logger.error("Impossible to connect to " + currentHost + " : " + e.toString());
+					retries++;
+				}
+			    
+			}
+			return connected;
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return false;
+		}
+    }
 }
