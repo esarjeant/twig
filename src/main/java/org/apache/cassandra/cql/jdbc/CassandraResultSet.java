@@ -1174,10 +1174,26 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
 	            String[] split = valueType.substring(index + 1, valueType.length() - 1).split(",");
 	            if (split.length > 1)
 	            {
-	                keyType = TypesMap.getTypeForComparator(split[0]);
-	                validator = TypesMap.getTypeForComparator(split[1]);
+	            	if(split[0].equals("org.apache.cassandra.db.marshal.TimestampType")){
+	            		keyType = TypesMap.getTypeForComparator("org.apache.cassandra.db.marshal.DateType");
+	                }else{
+	                	keyType = TypesMap.getTypeForComparator(split[0]);
+	                }
+	                
+	                if(split[1].equals("org.apache.cassandra.db.marshal.TimestampType")){
+	                	validator = TypesMap.getTypeForComparator("org.apache.cassandra.db.marshal.DateType");
+	                }else{
+	                	validator = TypesMap.getTypeForComparator(split[1]);
+	                }
+	                
 	            }
-	            else validator = TypesMap.getTypeForComparator(split[0]);
+	            else {
+	            	if(split[0].equals("org.apache.cassandra.db.marshal.TimestampType")){
+	            		validator = TypesMap.getTypeForComparator("org.apache.cassandra.db.marshal.DateType");
+	            	}else{
+	            		validator = TypesMap.getTypeForComparator(split[0]);
+	            	}
+	            }
         	}
 
         }

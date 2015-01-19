@@ -23,6 +23,7 @@ package org.apache.cassandra.cql.jdbc;
 import static org.junit.Assert.*;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -103,7 +104,7 @@ public class CollectionsTest
 
 
         // Create the target Table (CF)
-        String createTable = "CREATE TABLE testcollection (" + " k int PRIMARY KEY," + " L list<bigint>," + " M map<double, boolean>," + " S set<text>" + ") ;";
+        String createTable = "CREATE TABLE testcollection (" + " k int PRIMARY KEY," + " L list<bigint>," + " M map<double, boolean>, M2 map<text, timestamp>, S set<text>" + ") ;";
         if (LOG.isDebugEnabled()) LOG.debug("createTable = '{}'", createTable);
 
         stmt.execute(createTable);
@@ -379,6 +380,40 @@ public class CollectionsTest
         
         if (LOG.isDebugEnabled()) LOG.debug("m (prepared)= '{}'\n", myObj);
     }
+    
+    @Test
+    public void testWriteReadTimestampMap() throws Exception
+    {
+    	if (LOG.isDebugEnabled()) LOG.debug("Test: 'testWriteReadTimestampMap'\n");
+        
+        Statement statement = con.createStatement();        
+        
+        // add some items to the set        
+        String sql = "insert into testcollection(k,M2) values(?,?)" ;
+        Map<String,Date> is = new HashMap<String, Date>();
+        is.put("K"+System.currentTimeMillis(),new Date());
+        PreparedStatement ps = con.prepareStatement(sql);
+        
+        {
+        	ps.setInt(1,1);
+        	ps.setObject(2,is, java.sql.Types.OTHER);
+        	ps.executeUpdate();
+        }
+        ResultSet result = statement.executeQuery("SELECT * FROM testcollection WHERE k = 1;");
+        result.next();
+
+        assertEquals(1, result.getInt("k"));
+        //Object myObj = result.getObject("m");
+        Map<String,Date> map = (Map<String,Date>)result.getObject("m2");
+        //Map<Double,Boolean> myMap = (Map<Double,Boolean>) myObj;
+        assertEquals(1, map.size());        
+        if (LOG.isDebugEnabled()) LOG.debug("map key : " + map);
+        
+
+        
+    	
+    }
+    
 
 
     private CassandraResultSetExtras extras(ResultSet result) throws Exception

@@ -70,7 +70,7 @@ public class TypedColumn
             case SET:
                 value = SetMaker.getInstance(valueType).compose(column.value);
                 break;
-            case MAP:
+            case MAP:            	
                 value = MapMaker.getInstance(keyType, valueType).compose(column.value);
                 break;
            default:
