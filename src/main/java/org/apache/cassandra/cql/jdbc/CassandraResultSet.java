@@ -20,18 +20,6 @@
 
 package org.apache.cassandra.cql.jdbc;
 
-import static org.apache.cassandra.cql.jdbc.Utils.*;
-import static org.apache.cassandra.utils.ByteBufferUtil.string;
-
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.net.URL;
-import java.nio.ByteBuffer;
-import java.nio.charset.CharacterCodingException;
-import java.sql.*;
-import java.sql.Date;
-import java.util.*;
-
 import org.apache.cassandra.cql.jdbc.TypedColumn.CollectionType;
 import org.apache.cassandra.thrift.Column;
 import org.apache.cassandra.thrift.CqlMetadata;
@@ -40,6 +28,45 @@ import org.apache.cassandra.thrift.CqlRow;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.net.URL;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.StandardCharsets;
+import java.sql.Date;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.RowId;
+import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
+import java.sql.SQLNonTransientException;
+import java.sql.SQLRecoverableException;
+import java.sql.SQLSyntaxErrorException;
+import java.sql.SQLWarning;
+import java.sql.Statement;
+import java.sql.Time;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import static org.apache.cassandra.cql.jdbc.Utils.BAD_FETCH_DIR;
+import static org.apache.cassandra.cql.jdbc.Utils.BAD_FETCH_SIZE;
+import static org.apache.cassandra.cql.jdbc.Utils.FORWARD_ONLY;
+import static org.apache.cassandra.cql.jdbc.Utils.MUST_BE_POSITIVE;
+import static org.apache.cassandra.cql.jdbc.Utils.NOT_BOOLEAN;
+import static org.apache.cassandra.cql.jdbc.Utils.NOT_TRANSLATABLE;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_INTERFACE;
+import static org.apache.cassandra.cql.jdbc.Utils.VALID_LABELS;
+import static org.apache.cassandra.cql.jdbc.Utils.WAS_CLOSED_RSLT;
+import static org.apache.cassandra.utils.ByteBufferUtil.string;
 
 /**
  * <p>
@@ -822,11 +849,81 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
         Object value = column.getValue();
         
         // handle date properly for expectations of a JDBC caller
-        if (value != null && column.getValueType() == JdbcDate.instance && value instanceof java.util.Date) 
-            value = new java.sql.Timestamp(((java.util.Date) value).getTime());
+        if (value != null) {
+
+            switch (column.getCollectionType()) {
+
+                case MAP:
+                    // map...
+                    value = "[MAP]";
+                    break;
+
+                case SET:
+                    // set...
+                    value = "[SET]";
+                    break;
+
+                case LIST:
+                    // list..
+                    value = "[LIST]";
+                    break;
+
+                case NOT_COLLECTION:
+                default:
+
+                    if (column.getValueType() == JdbcDate.instance && value instanceof java.util.Date) {
+                        value = new java.sql.Timestamp(((java.util.Date) value).getTime());
+                    }
+
+                    if (column.getValueType() == JdbcBytes.instance) {
+                        value = convertHeapByteBuffer(value);
+                    }
+                    break;
+
+            }
+
+        }
 
         wasNull = value == null;
         return (wasNull) ? null : value;
+    }
+
+    private String convertObject(Object key) {
+
+        if (key instanceof String) {
+            return (String)key;
+        }
+
+        if (key instanceof Long) {
+            return ((Long)key).toString();
+        }
+
+        if (key instanceof ByteBuffer) {
+            ByteBuffer bb = (ByteBuffer) key;
+            CharBuffer charBuffer = StandardCharsets.UTF_8.decode(bb);
+            return charBuffer.toString();
+        }
+
+        return key.toString();
+
+    }
+
+    private String convertHeapByteBuffer(Object value) {
+
+        String conv = "[UNKNOWN]";
+
+        if (value != null) {
+            if (value instanceof java.nio.ByteBuffer) {
+                ByteBuffer bb = (ByteBuffer) value;
+                CharBuffer charBuffer = StandardCharsets.UTF_8.decode(bb);
+                conv = charBuffer.toString();
+            } else {
+                conv = String.format("[%s]", value.getClass().getName());
+            }
+        }
+
+        return conv;
+
     }
 
     public int getRow() throws SQLException
@@ -1312,14 +1409,24 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
         {
             checkIndex(column);
             TypedColumn col = values.get(column - 1);
-            return col.getValueType().getPrecision(col.getValue());
+            if (col.getValueType() == JdbcBytes.instance) {
+                String value = convertHeapByteBuffer(col.getValue());
+                return value.length();
+            } else {
+                return col.getValueType().getPrecision(col.getValue());
+            }
         }
 
         public int getScale(int column) throws SQLException
         {
             checkIndex(column);
             TypedColumn tc = values.get(column - 1);
-            return tc.getValueType().getScale(tc.getValue());
+            if (tc.getValueType() == JdbcBytes.instance) {
+                String value = convertHeapByteBuffer(tc.getValue());
+                return value.length();
+            } else {
+                return tc.getValueType().getScale(tc.getValue());
+            }
         }
 
         /**
@@ -1333,7 +1440,8 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
 
         public String getTableName(int column) throws SQLException
         {
-            throw new SQLFeatureNotSupportedException();
+            checkIndex(column);
+            return statement.getTableName();
         }
 
         public boolean isAutoIncrement(int column) throws SQLException

@@ -20,8 +20,39 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
+import org.apache.cassandra.thrift.AuthenticationRequest;
+import org.apache.cassandra.thrift.Cassandra;
+import org.apache.cassandra.thrift.Compression;
+import org.apache.cassandra.thrift.ConsistencyLevel;
+import org.apache.cassandra.thrift.CqlPreparedResult;
+import org.apache.cassandra.thrift.CqlResult;
+import org.apache.cassandra.thrift.EndpointDetails;
+import org.apache.cassandra.thrift.InvalidRequestException;
+import org.apache.cassandra.thrift.SchemaDisagreementException;
+import org.apache.cassandra.thrift.TimedOutException;
+import org.apache.cassandra.thrift.TokenRange;
+import org.apache.cassandra.thrift.UnavailableException;
+import org.apache.thrift.TException;
+import org.apache.thrift.protocol.TBinaryProtocol;
+import org.apache.thrift.protocol.TProtocol;
+import org.apache.thrift.transport.TFramedTransport;
+import org.apache.thrift.transport.TSocket;
+import org.apache.thrift.transport.TTransport;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.nio.ByteBuffer;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
+import java.sql.SQLClientInfoException;
+import java.sql.SQLException;
+import java.sql.SQLFeatureNotSupportedException;
+import java.sql.SQLNonTransientConnectionException;
+import java.sql.SQLSyntaxErrorException;
+import java.sql.SQLTimeoutException;
+import java.sql.SQLWarning;
+import java.sql.Statement;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
@@ -33,19 +64,28 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentSkipListSet;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import org.apache.cassandra.thrift.*;
-import org.apache.thrift.TException;
-import org.apache.thrift.protocol.TBinaryProtocol;
-import org.apache.thrift.protocol.TProtocol;
-import org.apache.thrift.transport.TFramedTransport;
-import org.apache.thrift.transport.TSocket;
-import org.apache.thrift.transport.TTransport;
-
-import static org.apache.cassandra.cql.jdbc.Utils.*;
-import static org.apache.cassandra.cql.jdbc.CassandraResultSet.*;
+import static org.apache.cassandra.cql.jdbc.CassandraResultSet.DEFAULT_CONCURRENCY;
+import static org.apache.cassandra.cql.jdbc.CassandraResultSet.DEFAULT_HOLDABILITY;
+import static org.apache.cassandra.cql.jdbc.CassandraResultSet.DEFAULT_TYPE;
+import static org.apache.cassandra.cql.jdbc.Utils.ALWAYS_AUTOCOMMIT;
+import static org.apache.cassandra.cql.jdbc.Utils.BAD_TIMEOUT;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_INTERFACE;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_TRANSACTIONS;
+import static org.apache.cassandra.cql.jdbc.Utils.PROTOCOL;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_ACTIVE_CQL_VERSION;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_BACKUP_DC;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_CONNECTION_RETRIES;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_CONSISTENCY_LEVEL;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_CQL_VERSION;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_DATABASE_NAME;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_PASSWORD;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_PORT_NUMBER;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_PRIMARY_DC;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_SERVER_NAME;
+import static org.apache.cassandra.cql.jdbc.Utils.TAG_USER;
+import static org.apache.cassandra.cql.jdbc.Utils.WAS_CLOSED_CON;
+import static org.apache.cassandra.cql.jdbc.Utils.createSubName;
+import static org.apache.cassandra.cql.jdbc.Utils.determineCurrentKeyspace;
 
 
 /**
@@ -524,7 +564,7 @@ class CassandraConnection extends AbstractConnection implements Connection
      * Execute a CQL query.
      *
      * @param queryStr    a CQL query string
-     * @param ConsistencyLevel	the CQL query consistency level
+     * @param consistencyLevel	the CQL query consistency level
      * @param compression query compression to use
      * @return the query results encoded as a CqlResult structure
      * @throws InvalidRequestException     on poorly constructed or illegal requests
@@ -554,7 +594,7 @@ class CassandraConnection extends AbstractConnection implements Connection
      * Execute a CQL query using the default compression methodology.
      *
      * @param queryStr a CQL query string
-     * @param ConsistencyLevel	the CQL query consistency level
+     * @param consistencyLevel	the CQL query consistency level
      * @return the query results encoded as a CqlResult structure
      * @throws InvalidRequestException     on poorly constructed or illegal requests
      * @throws UnavailableException        when not all required replicas could be created/read

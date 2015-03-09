@@ -20,9 +20,15 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
+import org.apache.cassandra.cql.ConnectionDetails;
+import org.apache.cassandra.thrift.ConsistencyLevel;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
+import javax.sql.rowset.serial.SerialBlob;
+import java.sql.Blob;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -30,16 +36,16 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Types;
 import java.sql.Timestamp;
+import java.sql.Types;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
-import org.apache.cassandra.cql.ConnectionDetails;
-import org.apache.cassandra.thrift.ConsistencyLevel;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 public class JdbcRegressionTest
 {
@@ -47,6 +53,7 @@ public class JdbcRegressionTest
     private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort()+""));
     private static final String KEYSPACE = "testks";
     private static final String TABLE = "regressiontest";
+    private static final String TYPETABLE = "datatypetest";
 //    private static final String CQLV3 = "3.0.0";
     private static final String CONSISTENCY_QUORUM = "QUORUM";
       
@@ -86,9 +93,19 @@ public class JdbcRegressionTest
                         + " iValue int"
                         + ");";
         stmt.execute(createCF);
-        
+
         //create an index
         stmt.execute("CREATE INDEX ON "+TABLE+" (iValue)");
+
+        String createCF2 = "CREATE COLUMNFAMILY " + TYPETABLE + " ( "
+                + " id uuid PRIMARY KEY, "
+                + " blobValue blob,"
+                + " blobSetValue set<blob>,"
+                + " dataMapValue map<text,blob>,"
+                + ") WITH comment = 'datatype TABLE in the Keyspace'"
+                + ";";
+        stmt.execute(createCF2);
+
         stmt.close();
         con.close();
 
@@ -523,6 +540,40 @@ public class JdbcRegressionTest
         // load the columns, with no catalog and schema
         ResultSet result = md.getColumns(null, "%", TABLE, "ivalue");
         assertTrue("Make sure we have found an column", result.next());
+    }
+
+    @Test
+    public void testBlob() throws Exception
+    {
+        UUID blobId = UUID.randomUUID();
+        String blobValue = RandomStringUtils.random(10);
+        String insert = "INSERT INTO " + TYPETABLE + " (id,blobValue,dataMapValue) " +
+                        " VALUES(" + blobId.toString() + ", ?, {'12345': bigintAsBlob(12345)});";
+
+        PreparedStatement statement = con.prepareStatement(insert);
+        statement.setObject(1, blobValue);
+
+        statement.executeUpdate();
+        statement.close();
+
+        Statement select1 = con.createStatement();
+        String query = "SELECT blobValue FROM "+TYPETABLE+" WHERE id=" + blobId.toString() + ";";
+        ResultSet result = select1.executeQuery(query);
+        result.next();
+
+        Object blobResult = result.getObject(1);
+        assertEquals(blobValue, blobResult);
+
+        Statement select2 = con.createStatement();
+        String query2 = "SELECT dataMapValue FROM "+TYPETABLE+" WHERE id=" + blobId.toString() + ";";
+        ResultSet result2 = select2.executeQuery(query2);
+        result2.next();
+
+        Object mapResult = result2.getObject(1);
+//        assertEquals(blobValue, blobResult);
+
+
+
     }
     
 

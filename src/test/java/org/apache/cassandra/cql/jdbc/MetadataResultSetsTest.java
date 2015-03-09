@@ -20,16 +20,18 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
+import org.apache.cassandra.cql.ConnectionDetails;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
+
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-import org.apache.cassandra.cql.ConnectionDetails;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
 
 
 public class MetadataResultSetsTest
@@ -86,7 +88,6 @@ public class MetadataResultSetsTest
                         + " t2iValue int"
                         + ") WITH comment = 'second TABLE in the Keyspace'"
                         + ";";
-        
         
         stmt.execute(createCF1);
         stmt.execute(createCF2);
@@ -185,7 +186,19 @@ public class MetadataResultSetsTest
         System.out.println(toString(result));       
         System.out.println();
     }
-    
+
+    @Test
+    public void testTableName() throws SQLException
+    {
+        CassandraPreparedStatement statement = (CassandraPreparedStatement) con.prepareStatement("select * from " + KEYSPACE1 + ".test1");
+        ResultSet result = MetadataResultSets.instance.makeSchemas(statement, null);
+
+        System.out.println("--- testTableName() ---");
+        ResultSetMetaData meta = result.getMetaData();
+        assertEquals(KEYSPACE1 + ".test1", meta.getTableName(1));
+
+    }
+
     @Test
     public void testTables() throws SQLException
     {
@@ -229,6 +242,27 @@ public class MetadataResultSetsTest
         System.out.println(getColumnNames(result.getMetaData()));
        
         System.out.println(toString(result));       
+        System.out.println();
+    }
+
+    @Test
+    public void testClob() throws SQLException
+    {
+        CassandraStatement statement = (CassandraStatement) con.createStatement();
+        ResultSet result = MetadataResultSets.instance.makeColumns(statement, KEYSPACE1, "test3" ,null);
+
+        System.out.println("--- testColumns() ---");
+        System.out.println(getColumnNames(result.getMetaData()));
+
+        System.out.println(toString(result));
+        System.out.println();
+
+        result = MetadataResultSets.instance.makeColumns(statement, KEYSPACE1, "test3" ,null);
+
+        System.out.println("--- testColumns() ---");
+        System.out.println(getColumnNames(result.getMetaData()));
+
+        System.out.println(toString(result));
         System.out.println();
     }
 }
