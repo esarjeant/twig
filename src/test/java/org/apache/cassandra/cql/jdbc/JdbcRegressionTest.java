@@ -27,7 +27,6 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import java.nio.CharBuffer;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
@@ -139,7 +138,7 @@ public class JdbcRegressionTest
 
         statement.executeUpdate(insert);
         statement.close();
-        
+
         statement = con.createStatement();
         ResultSet result = statement.executeQuery("SELECT bValue,iValue FROM regressiontest WHERE keyname='key0';");
         result.next();
@@ -387,10 +386,13 @@ public class JdbcRegressionTest
         String insert = "INSERT INTO t65 (key, int1,int2,intset) VALUES ('key1',1,100,{10,20,30,40});";
         statement.executeUpdate(insert);
         
-        ResultSet result = statement.executeQuery("SELECT * FROM t65;");
+        ResultSet result = statement.executeQuery("SELECT int1, int2, intset, key FROM t65;");
 
         System.out.println(resultToDisplay(result,65, "with set = {10,20,30,40}"));
-       
+
+        ResultSetMetaData md = result.getMetaData();
+        assertEquals("t65", md.getTableName(1));
+
         String update = "UPDATE t65 SET intset=? WHERE key=?;";
  
         PreparedStatement pstatement = con.prepareStatement(update);

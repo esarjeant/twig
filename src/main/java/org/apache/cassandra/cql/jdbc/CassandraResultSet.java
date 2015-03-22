@@ -1460,7 +1460,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
             } else if (col.getValue() instanceof Map) {
                 return ((Map)col.getValue()).size();
             } else {
-                return col.getValueType().getPrecision(col.getValue());
+                return (null == col.getValue()) ? 0 : col.getValueType().getPrecision(col.getValue());
             }
         }
 
@@ -1478,7 +1478,7 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
             } else if (tc.getValue() instanceof Map) {
                 return ((Map)tc.getValue()).size();
             } else {
-                return tc.getValueType().getScale(tc.getValue());
+                return (null == tc.getValue()) ? 0 : tc.getValueType().getScale(tc.getValue());
             }
         }
 

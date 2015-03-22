@@ -42,7 +42,8 @@ import java.sql.SQLSyntaxErrorException;
 import java.sql.SQLTransientConnectionException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
-import java.util.StringTokenizer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.apache.cassandra.cql.jdbc.Utils.BAD_AUTO_GEN;
 import static org.apache.cassandra.cql.jdbc.Utils.BAD_FETCH_DIR;
@@ -98,6 +99,11 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
     protected boolean escapeProcessing = true;
     
     protected ConsistencyLevel consistencyLevel;
+
+    /**
+     * regular expression to parse CQL
+     */
+    private static final Pattern CQL_STATEMENT = Pattern.compile("(select|insert|update|delete).*(into|from)\\s+(\\w+).*\\;?", Pattern.CASE_INSENSITIVE);
 
     CassandraStatement(CassandraConnection con) throws SQLException
     {
@@ -155,19 +161,10 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
 
         if (cql != null) {
 
-            StringTokenizer st = new StringTokenizer(cql, " ", false);
-            String field = "";
-            boolean nextFieldTable = false;
+            Matcher matcher = CQL_STATEMENT.matcher(cql);
 
-            while ((field = st.nextToken()) != null) {
-
-                if (nextFieldTable) {
-                    tableName = field;
-                    break;
-                }
-
-                nextFieldTable = "FROM".equalsIgnoreCase(field);
-
+            if (matcher.find()) {
+                tableName = matcher.group(3);
             }
 
         }
@@ -209,6 +206,8 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
             if (logger.isTraceEnabled()) logger.trace("CQL: "+ cql);
             
             resetResults();
+
+            this.cql = cql;
             CqlResult rSet = connection.execute(cql, consistencyLevel);
 
             switch (rSet.getType())
