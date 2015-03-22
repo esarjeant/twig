@@ -28,13 +28,13 @@ under the License.
     <version>7</version>
   </parent>
 
-  <groupId>org.apache-extras.cassandra-jdbc</groupId>
-  <artifactId>cassandra-jdbc</artifactId>
-  <version>1.2.5</version>
+  <groupId>org.apache-extras.cassandra-twig-jdbc</groupId>
+  <artifactId>cassandra-twig-jdbc</artifactId>
+  <version>1.0.0</version>
 
-  <name>JDBC driver for Cassandra/CQL</name>
-  <description>A JDBC-compliant driver for Cassandra using CQL.</description>
-  <url>http://code.google.com/a/apache-extras.org/p/cassandra-jdbc/</url>
+  <name>Twig JDBC driver for Cassandra/CQL</name>
+  <description>Driver for Cassandra that works in common JDBC clients (DbVisualizer, IntelliJ, etc.)</description>
+  <url>http://micromux.com/cassandra-twig-jdbc/</url>
   <inceptionYear>2011</inceptionYear>
   <licenses>
     <license>
@@ -82,16 +82,6 @@ under the License.
     </developer>
   </developers>
 
-  <scm>
-    <connection>scm:git:https://code.google.com/a/apache-extras.org/p/cassandra-jdbc/</connection>
-    <developerConnection>scm:git:https://code.google.com/a/apache-extras.org/p/cassandra-jdbc/</developerConnection>
-    <url>http://code.google.com/a/apache-extras.org/p/cassandra-jdbc/source/browse/</url>
-  </scm>
-  <issueManagement>
-    <system>code.google.com</system>
-    <url>http://code.google.com/a/apache-extras.org/p/cassandra-jdbc/issues/list</url>
-  </issueManagement>
-
   <properties>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <project.build.outputEncoding>UTF-8</project.build.outputEncoding>
@@ -110,7 +100,7 @@ under the License.
     <dependency>
       <groupId>org.apache.cassandra</groupId>
       <artifactId>cassandra-thrift</artifactId>
-      <version>1.2.5</version>
+      <version>2.1.2</version>
       <exclusions>
         <exclusion>
           <groupId>javax.servlet</groupId>

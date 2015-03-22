@@ -20,10 +20,16 @@
 
 package org.apache.cassandra.cql.jdbc;
 
-import static org.apache.cassandra.cql.jdbc.Utils.NO_RESULTSET;
-import static org.apache.cassandra.cql.jdbc.Utils.NO_SERVER;
-import static org.apache.cassandra.cql.jdbc.Utils.NO_UPDATE_COUNT;
-import static org.apache.cassandra.cql.jdbc.Utils.SCHEMA_MISMATCH;
+import org.apache.cassandra.thrift.CqlPreparedResult;
+import org.apache.cassandra.thrift.CqlResult;
+import org.apache.cassandra.thrift.InvalidRequestException;
+import org.apache.cassandra.thrift.SchemaDisagreementException;
+import org.apache.cassandra.thrift.TimedOutException;
+import org.apache.cassandra.thrift.UnavailableException;
+import org.apache.cassandra.utils.ByteBufferUtil;
+import org.apache.thrift.TException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -51,16 +57,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.cassandra.thrift.CqlPreparedResult;
-import org.apache.cassandra.thrift.CqlResult;
-import org.apache.cassandra.thrift.InvalidRequestException;
-import org.apache.cassandra.thrift.SchemaDisagreementException;
-import org.apache.cassandra.thrift.TimedOutException;
-import org.apache.cassandra.thrift.UnavailableException;
-import org.apache.cassandra.utils.ByteBufferUtil;
-import org.apache.thrift.TException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_RESULTSET;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_SERVER;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_UPDATE_COUNT;
+import static org.apache.cassandra.cql.jdbc.Utils.SCHEMA_MISMATCH;
 
 class CassandraPreparedStatement extends CassandraStatement implements PreparedStatement
 {

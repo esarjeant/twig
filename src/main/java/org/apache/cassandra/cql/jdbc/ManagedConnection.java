@@ -20,9 +20,6 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
-import static org.apache.cassandra.cql.jdbc.Utils.NO_INTERFACE;
-import static org.apache.cassandra.cql.jdbc.Utils.WAS_CLOSED_CON;
-
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -36,6 +33,9 @@ import java.sql.Statement;
 import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
+
+import static org.apache.cassandra.cql.jdbc.Utils.NO_INTERFACE;
+import static org.apache.cassandra.cql.jdbc.Utils.WAS_CLOSED_CON;
 
 class ManagedConnection extends AbstractConnection implements Connection
 {
@@ -436,5 +436,17 @@ class ManagedConnection extends AbstractConnection implements Connection
 			pooledCassandraConnection.connectionErrorOccurred(sqlException);
 			throw sqlException;
 		}
+	}
+
+	@Override
+	public String getSchema() throws SQLException {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public void setSchema(String arg0) throws SQLException {
+		// TODO Auto-generated method stub
+
 	}
 }
