@@ -21,19 +21,8 @@
 
 package org.apache.cassandra.cql.jdbc;
 
-import static org.apache.cassandra.cql.jdbc.Utils.HOST_REQUIRED;
-import static org.apache.cassandra.cql.jdbc.Utils.NOT_SUPPORTED;
-import static org.apache.cassandra.cql.jdbc.Utils.NO_INTERFACE;
-import static org.apache.cassandra.cql.jdbc.Utils.PROTOCOL;
-import static org.apache.cassandra.cql.jdbc.Utils.TAG_CQL_VERSION;
-import static org.apache.cassandra.cql.jdbc.Utils.TAG_DATABASE_NAME;
-import static org.apache.cassandra.cql.jdbc.Utils.TAG_PASSWORD;
-import static org.apache.cassandra.cql.jdbc.Utils.TAG_PORT_NUMBER;
-import static org.apache.cassandra.cql.jdbc.Utils.TAG_SERVER_NAME;
-import static org.apache.cassandra.cql.jdbc.Utils.TAG_USER;
-import static org.apache.cassandra.cql.jdbc.Utils.TAG_CONSISTENCY_LEVEL;
-import static org.apache.cassandra.cql.jdbc.Utils.createSubName;
-
+import javax.sql.ConnectionPoolDataSource;
+import javax.sql.DataSource;
 import java.io.PrintWriter;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -42,8 +31,7 @@ import java.sql.SQLNonTransientConnectionException;
 import java.util.Properties;
 import java.util.logging.Logger;
 
-import javax.sql.ConnectionPoolDataSource;
-import javax.sql.DataSource;
+import static org.apache.cassandra.cql.jdbc.Utils.*;
 
 public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
 {
@@ -64,7 +52,7 @@ public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
 
     protected String serverName;
 
-    protected int    portNumber = 9160;
+    protected int portNumber = 9042;
 
     protected String databaseName;
 
@@ -76,7 +64,10 @@ public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
     
     protected String consistency = null;
 
-    public CassandraDataSource(String host, int port, String keyspace, String user, String password, String version, String consistency)
+    private final String trustStore;
+    private final String trustPass;
+
+    public CassandraDataSource(String host, int port, String keyspace, String user, String password, String version, String consistency, String trustStore, String trustPass)
     {
         if (host != null) setServerName(host);
         if (port != -1) setPortNumber(port);
@@ -85,6 +76,9 @@ public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
         setDatabaseName(keyspace);
         setUser(user);
         setPassword(password);
+
+        this.trustStore = trustStore;
+        this.trustPass = trustPass;
     }
 
     public String getDescription()
@@ -182,6 +176,8 @@ public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
         if (password!=null) props.setProperty(TAG_PASSWORD, password);
         if (this.version != null) props.setProperty(TAG_CQL_VERSION, version);
         if (this.consistency != null) props.setProperty(TAG_CONSISTENCY_LEVEL, consistency);
+        if (this.trustStore != null) props.setProperty(TAG_TRUST_STORE, trustStore);
+        if (this.trustPass != null) props.setProperty(TAG_TRUST_PASSWORD, trustPass);
 
         String url = PROTOCOL+createSubName(props);
         return (CassandraConnection) DriverManager.getConnection(url, props);

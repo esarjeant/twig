@@ -21,6 +21,12 @@
 
 package org.apache.cassandra.cql.jdbc;
 
+import com.google.common.base.Charsets;
+import org.apache.cassandra.thrift.Compression;
+import org.apache.cassandra.thrift.ConsistencyLevel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
@@ -37,14 +43,6 @@ import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.Deflater;
-
-import org.apache.cassandra.thrift.Compression;
-import org.apache.cassandra.thrift.ConsistencyLevel;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.google.common.base.Charsets;
 
 /**
  * A set of static utility methods used by the JDBC Suite, and various default values and error message strings
@@ -79,7 +77,10 @@ class Utils
     public static final String TAG_BUILD_VERSION = "buildVersion";
     public static final String TAG_THRIFT_VERSION = "thriftVersion";
     public static final String TAG_CONSISTENCY_LEVEL = "consistencyLevel";
-    
+
+    public static final String TAG_TRUST_STORE = "truststore";
+    public static final String TAG_TRUST_PASSWORD = "trustpass";
+
     public static final String TAG_PRIMARY_DC = "primaryDatacenter";
     public static final String TAG_BACKUP_DC = "backupDatacenter";
     public static final String TAG_CONNECTION_RETRIES = "retries";
@@ -229,6 +230,13 @@ class Utils
                 {
                     props.setProperty(TAG_CONNECTION_RETRIES,params.get(KEY_CONNECTION_RETRIES));
                 }
+                if (params.containsKey(TAG_TRUST_STORE)) {
+
+                    props.setProperty(TAG_TRUST_STORE, params.get(TAG_TRUST_STORE));
+                }
+                if (params.containsKey(TAG_TRUST_PASSWORD)) {
+                    props.setProperty(TAG_TRUST_PASSWORD, params.get(TAG_TRUST_PASSWORD));
+                }
 
 //               String[] items = query.split("&");
 //               if (items.length != 1) throw new SQLNonTransientConnectionException(URI_IS_SIMPLE);
@@ -252,7 +260,7 @@ class Utils
      * @return A constructed "Subname" portion of a JDBC URL in the form of a CLI (ie: //myhost:9160/Test1?version=3.0.0 )
      * @throws SQLException
      */
-    public static final String createSubName(Properties props)throws SQLException
+    public static String createSubName(Properties props)throws SQLException
     {
         // make keyspace always start with a "/" for URI
         String keyspace = props.getProperty(TAG_DATABASE_NAME);

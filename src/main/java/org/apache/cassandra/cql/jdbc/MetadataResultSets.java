@@ -20,33 +20,22 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
-import static org.apache.cassandra.utils.ByteBufferUtil.bytes;
-import static org.apache.cassandra.utils.ByteBufferUtil.string;
+import org.apache.cassandra.cql.jdbc.meta.CassandraColumn;
+import org.apache.cassandra.cql.jdbc.meta.CassandraRow;
+import org.apache.cassandra.thrift.CqlMetadata;
+import org.apache.cassandra.utils.ByteBufferUtil;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.sql.DatabaseMetaData;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLTransientException;
 import java.sql.Types;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
-import org.apache.cassandra.thrift.Column;
-import org.apache.cassandra.thrift.CqlMetadata;
-import org.apache.cassandra.thrift.CqlResult;
-import org.apache.cassandra.thrift.CqlResultType;
-import org.apache.cassandra.thrift.CqlRow;
-import org.apache.cassandra.utils.ByteBufferUtil;
+import static org.apache.cassandra.utils.ByteBufferUtil.bytes;
 
-
-
-public  class MetadataResultSets
+public class MetadataResultSets
 {
     static final String TABLE_CONSTANT = "TABLE";
 
@@ -66,14 +55,17 @@ public  class MetadataResultSets
      * 
      * @return {@code Column}
      */
-    private static final Column makeColumn(String name, ByteBuffer value)
-    {
-      return new Column(bytes(name)).setValue(value).setTimestamp(System.currentTimeMillis());
+    private static final CassandraColumn makeColumn(String name, ByteBuffer value) {
+        CassandraColumn column = new CassandraColumn(name);
+        column.setValue(value);
+        column.setTimestamp(System.currentTimeMillis());
+
+        return column;
+
     }
 
-    private static final CqlRow makeRow(String key, List<Column> columnList)
-    {
-      return new CqlRow(bytes(key), columnList);
+    private static final CassandraRow makeRow(String key, List<CassandraColumn> columnList) {
+        return new CassandraRow(bytes(key), columnList);
     }
     
     private static CqlMetadata makeMetadataAllString(List<String> colNameList)
@@ -105,79 +97,87 @@ public  class MetadataResultSets
     }
 
 
-    private CqlResult makeCqlResult(Entry[][] rowsOfcolsOfKvps, int position)
+    private CassandraResultSet makeCqlResult(Entry[][] rowsOfcolsOfKvps, int position)
     {
-        CqlResult result = new CqlResult(CqlResultType.ROWS);
-        CqlMetadata meta = null;
-        CqlRow row = null;
-        Column column = null;
-        List<Column> columnlist = new LinkedList<Column>();
-        List<CqlRow> rowlist = new LinkedList<CqlRow>();
-        List<String> colNamesList = new ArrayList<String>();
-        
-        
-        for (int rowcnt = 0; rowcnt < rowsOfcolsOfKvps.length; rowcnt++ )
-        {
-            colNamesList = new ArrayList<String>();
-            columnlist = new LinkedList<Column>();
-            for (int colcnt = 0; colcnt < rowsOfcolsOfKvps[0].length; colcnt++ )
-            {
-                column = makeColumn(rowsOfcolsOfKvps[rowcnt][colcnt].name,rowsOfcolsOfKvps[rowcnt][colcnt].value);
-                columnlist.add(column);
-                colNamesList.add(rowsOfcolsOfKvps[rowcnt][colcnt].name);
-            }
-            row = makeRow(rowsOfcolsOfKvps[rowcnt][position-1].name,columnlist);
-            rowlist.add(row);
-        }
-        
-        meta = makeMetadataAllString(colNamesList);
-        result.setSchema(meta).setRows(rowlist);
-        return result;
+//        CassandraResultSet result = new CassandraResultSet(CqlResultType.ROWS);
+//        CqlMetadata meta = null;
+//        CassandraRow row = null;
+//        CassandraColumn column = null;
+//        List<CassandraColumn> columnlist = new LinkedList<CassandraColumn>();
+//        List<CassandraRow> rowlist = new LinkedList<CassandraRow>();
+//        List<String> colNamesList = new ArrayList<String>();
+//
+//
+//        for (int rowcnt = 0; rowcnt < rowsOfcolsOfKvps.length; rowcnt++ )
+//        {
+//            colNamesList = new ArrayList<String>();
+//            columnlist = new LinkedList<CassandraColumn>();
+//            for (int colcnt = 0; colcnt < rowsOfcolsOfKvps[0].length; colcnt++ )
+//            {
+//                column = makeColumn(rowsOfcolsOfKvps[rowcnt][colcnt].name,rowsOfcolsOfKvps[rowcnt][colcnt].value);
+//                columnlist.add(column);
+//                colNamesList.add(rowsOfcolsOfKvps[rowcnt][colcnt].name);
+//            }
+//            row = makeRow(rowsOfcolsOfKvps[rowcnt][position-1].name, columnlist);
+//            rowlist.add(row);
+//        }
+//
+//        meta = makeMetadataAllString(colNamesList);
+//
+//        result.add
+//        result.setSchema(meta).setRows(rowlist);
+//        return result;
+        return null;
     }
     
-    private CqlResult makeCqlResult(List<List<Entry>> rows, int position) throws CharacterCodingException
+    private com.datastax.driver.core.ResultSet makeCqlResult(List<List<Entry>> rows, int position) throws CharacterCodingException
     {
-        CqlResult result = new CqlResult(CqlResultType.ROWS);
-        CqlMetadata meta = null;
-        CqlRow row = null;
-        Column column = null;
-        List<Column> columnlist = new LinkedList<Column>();
-        List<CqlRow> rowlist = new LinkedList<CqlRow>();
-        
-        assert(!rows.isEmpty());
-        
-        for (List<Entry> aRow : rows )
-        {
-            columnlist = new LinkedList<Column>();
-            
-            assert (!aRow.isEmpty());
-            
-            // only need to do it once
-            if (meta == null) meta = makeMetadata(aRow);
-            
-            for (Entry entry : aRow )
-            {
-                column = makeColumn(entry.name,entry.value);
-                columnlist.add(column);
-            }
-            row = makeRow(string(columnlist.get(position-1).name),columnlist);
-            rowlist.add(row);
-        }
-        
-        result.setSchema(meta).setRows(rowlist);
-        return result;
+//        CqlResult result = new CqlResult(CqlResultType.ROWS);
+//        CqlMetadata meta = null;
+//        CqlRow row = null;
+//        CassandraColumn column = null;
+//        List<CassandraColumn> columnlist = new LinkedList<CassandraColumn>();
+//        List<CassandraRow> rowlist = new LinkedList<CassandraRow>();
+//
+//        assert(!rows.isEmpty());
+//
+//        for (List<Entry> aRow : rows )
+//        {
+//            columnlist = new LinkedList<CassandraColumn>();
+//
+//            assert (!aRow.isEmpty());
+//
+//            // only need to do it once
+//            if (meta == null) meta = makeMetadata(aRow);
+//
+//            for (Entry entry : aRow )
+//            {
+//                column = makeColumn(entry.name,entry.value);
+//                columnlist.add(column);
+//            }
+//            row = makeRow(string(columnlist.get(position-1).getName()), columnlist);
+//            rowlist.add(row);
+//        }
+//
+//        result.setSchema(meta).setRows(rowlist);
+//        return result;
+        return null;
     }
- 
-    
 
-    public  CassandraResultSet makeTableTypes(CassandraStatement statement) throws SQLException
+    /**
+     * The table types available in this database.
+     * @param statement  Statement that needs meta-data.
+     * @return The resultset containing the available table types.
+     * @throws SQLException  Fatal database error.
+     */
+    public CassandraResultSet makeTableTypes(CassandraStatement statement) throws SQLException
     {
         final  Entry[][] tableTypes = { { new Entry("TABLE_TYPE",bytes(TABLE_CONSTANT),Entry.ASCII_TYPE)} };
         
         // use tableTypes with the key in column number 1 (one based)
-        CqlResult cqlresult =  makeCqlResult(tableTypes, 1);
+        CassandraResultSet result =  makeCqlResult(tableTypes, 1);
         
-        CassandraResultSet result = new CassandraResultSet(statement,cqlresult);
+        //CassandraResultSet result = new CassandraResultSet(statement, cqlresult);
         return result;
     }
 
@@ -186,9 +186,9 @@ public  class MetadataResultSets
         final Entry[][] catalogs = { { new Entry("TABLE_CAT",bytes(statement.connection.getCatalog()),Entry.ASCII_TYPE)} };
 
         // use catalogs with the key in column number 1 (one based)
-        CqlResult cqlresult =  makeCqlResult(catalogs, 1);
+        CassandraResultSet result = makeCqlResult(catalogs, 1);
         
-        CassandraResultSet result = new CassandraResultSet(statement,cqlresult);
+        //CassandraResultSet result = new CassandraResultSet(statement, cqlresult);
         return result;
     }
     
@@ -224,7 +224,7 @@ public  class MetadataResultSets
         if (rows.isEmpty() )return result;
 
         // use schemas with the key in column number 2 (one based)
-        CqlResult cqlresult;
+        com.datastax.driver.core.ResultSet cqlresult;
         try
         {
             cqlresult = makeCqlResult(rows, 1);
@@ -234,7 +234,7 @@ public  class MetadataResultSets
             throw new SQLTransientException(e);
         }
         
-        result = new CassandraResultSet(statement,cqlresult);
+        result = new CassandraResultSet(statement, cqlresult);
         return result;
     }
     
@@ -319,8 +319,9 @@ public  class MetadataResultSets
 
         // just return the empty result if there were no rows
         if (rows.isEmpty()) return result;
+
         // use schemas with the key in column number 2 (one based)
-        CqlResult cqlresult;
+        com.datastax.driver.core.ResultSet cqlresult;
         try
         {
             cqlresult = makeCqlResult(rows, 1);
@@ -563,7 +564,7 @@ public  class MetadataResultSets
         if (rows.isEmpty()) return result;
 
         // use schemas with the key in column number 2 (one based)
-        CqlResult cqlresult;
+        com.datastax.driver.core.ResultSet cqlresult;
         try
         {
             cqlresult = makeCqlResult(rows, 1);
@@ -672,7 +673,7 @@ public  class MetadataResultSets
 	    if (rows.isEmpty()) return result;
 	
 	    // use schemas with the key in column number 2 (one based)
-	    CqlResult cqlresult;
+        com.datastax.driver.core.ResultSet cqlresult;
 	    try
 	    {
 	        cqlresult = makeCqlResult(rows, 1);
@@ -828,7 +829,7 @@ public  class MetadataResultSets
 	    if (rows.isEmpty()) return new CassandraResultSet();
 	
 	    // use schemas with the key in column number 2 (one based)
-	    CqlResult cqlresult;
+        com.datastax.driver.core.ResultSet cqlresult;
 	    try
 	    {
 	        cqlresult = makeCqlResult(rows, 1);

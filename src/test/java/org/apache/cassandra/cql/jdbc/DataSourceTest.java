@@ -20,21 +20,22 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import org.apache.cassandra.cql.ConnectionDetails;
+import org.apache.commons.lang3.StringUtils;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
+import javax.sql.DataSource;
+import java.net.URLEncoder;
 import java.sql.DriverManager;
 import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Statement;
 
-import javax.sql.DataSource;
-
-import org.apache.cassandra.cql.ConnectionDetails;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 public class DataSourceTest
 {
@@ -45,15 +46,28 @@ public class DataSourceTest
     private static final String PASSWORD = "secret";
     private static final String VERSION = "3.0.0";
     private static final String CONSISTENCY = "ONE";
-    
+
+    // use these for encyrpted connections
+    private static final String TRUST_STORE = System.getProperty("trustStore");
+    private static final String TRUST_PASS = System.getProperty("trustPass", "cassandra");
+
+    private static String OPTIONS = "";
+
     private static java.sql.Connection con = null;
 
 
     @BeforeClass
     public static void setUpBeforeClass() throws Exception
     {
+
+        // configure OPTIONS
+        if (!StringUtils.isEmpty(TRUST_STORE)) {
+            OPTIONS = String.format("trustStore=%s&trustPass=%s",
+                    URLEncoder.encode(TRUST_STORE), TRUST_PASS);
+        }
+
         Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,"system"));
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?%s",HOST,PORT,"system",OPTIONS));
         Statement stmt = con.createStatement();
         
         // Drop Keyspace
@@ -78,7 +92,7 @@ public class DataSourceTest
     @Test
     public void testConstructor() throws Exception
     {
-        CassandraDataSource cds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD,VERSION,CONSISTENCY);
+        CassandraDataSource cds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD,VERSION,CONSISTENCY,TRUST_STORE,TRUST_PASS);
         assertEquals(HOST,cds.getServerName());
         assertEquals(PORT,cds.getPortNumber());
         assertEquals(KEYSPACE,cds.getDatabaseName());
@@ -86,7 +100,7 @@ public class DataSourceTest
         assertEquals(PASSWORD,cds.getPassword());
         assertEquals(VERSION, cds.getVersion());
         
-        DataSource ds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD,VERSION,CONSISTENCY);
+        DataSource ds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD,VERSION,CONSISTENCY,TRUST_STORE,TRUST_PASS);
         assertNotNull(ds);
         
         // null username and password
@@ -107,7 +121,7 @@ public class DataSourceTest
     @Test
     public void testIsWrapperFor() throws Exception
     {
-        DataSource ds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD,VERSION,CONSISTENCY);
+        DataSource ds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD,VERSION,CONSISTENCY,TRUST_STORE,TRUST_PASS);
         
         boolean isIt = false;
                 
@@ -123,7 +137,7 @@ public class DataSourceTest
     @Test(expected=SQLFeatureNotSupportedException.class)
     public void testUnwrap() throws Exception
     {
-        DataSource ds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD,VERSION,CONSISTENCY);
+        DataSource ds = new CassandraDataSource(HOST,PORT,KEYSPACE,USER,PASSWORD,VERSION,CONSISTENCY,TRUST_STORE,TRUST_PASS);
 
         // it is a wrapper for DataSource
         DataSource newds = ds.unwrap(DataSource.class);        

@@ -23,25 +23,19 @@ package org.apache.cassandra.cql.jdbc;
 import org.apache.cassandra.cql.ConnectionDetails;
 import org.apache.cassandra.thrift.ConsistencyLevel;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import javax.sql.rowset.serial.SerialBlob;
-import java.sql.Blob;
-import java.sql.DatabaseMetaData;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Timestamp;
-import java.sql.Types;
+import java.net.URLEncoder;
+import java.sql.*;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import static junit.framework.Assert.assertNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -54,7 +48,13 @@ public class JdbcRegressionTest
     private static final String KEYSPACE = "testks";
     private static final String TABLE = "regressiontest";
     private static final String TYPETABLE = "datatypetest";
-//    private static final String CQLV3 = "3.0.0";
+
+    // use these for encyrpted connections
+    private static final String TRUST_STORE = System.getProperty("trustStore");
+    private static final String TRUST_PASS = System.getProperty("trustPass", "cassandra");
+
+    private static String OPTIONS = "";
+
     private static final String CONSISTENCY_QUORUM = "QUORUM";
       
     private static java.sql.Connection con = null;
@@ -63,8 +63,15 @@ public class JdbcRegressionTest
     @BeforeClass
     public static void setUpBeforeClass() throws Exception
     {
+
+        // configure OPTIONS
+        if (!StringUtils.isEmpty(TRUST_STORE)) {
+            OPTIONS = String.format("trustStore=%s&trustPass=%s",
+                    URLEncoder.encode(TRUST_STORE), TRUST_PASS);
+        }
+
         Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
-        String URL = String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,"system");
+        String URL = String.format("jdbc:cassandra://%s:%d/%s?%s", HOST, PORT, "system", OPTIONS);
         System.out.println("Connection URL = '"+URL +"'");
         
         con = DriverManager.getConnection(URL);
@@ -110,7 +117,7 @@ public class JdbcRegressionTest
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?%s", HOST, PORT, KEYSPACE, OPTIONS));
         System.out.println(con);
 
     }
@@ -121,9 +128,11 @@ public class JdbcRegressionTest
         if (con!=null) con.close();
     }
 
-
+    /**
+     * Test an update statement; confirm that the results can be read back.
+     */
     @Test
-    public void testIssue10() throws Exception
+    public void testExecuteUpdate() throws Exception
     {
         String insert = "INSERT INTO regressiontest (keyname,bValue,iValue) VALUES( 'key0',true, 2000);";
         Statement statement = con.createStatement();
@@ -142,23 +151,14 @@ public class JdbcRegressionTest
         assertEquals(2000, i);
    }
 
+    /**
+     * Verify that the driver navigates a resultset according to the JDBC rules.
+     * In all cases, the resultset should be pointing to the first record, which can
+     * be read without invoking {@code next()}.
+     * @throws Exception  Fatal error.
+     */
     @Test
-    public void testIssue15() throws Exception
-    {
-//        con.close();
-//
-//        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?version=%s",HOST,PORT,KEYSPACE,CQLV3));
-//        System.out.println(con);
-//        con.close();
-
-//        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
-//        System.out.println(con);
-//        con.close();
-
-    }
-    
-    @Test
-    public void testIssue18() throws Exception
+    public void testResultSetNavigation() throws Exception
     {
        Statement statement = con.createStatement();
 
@@ -203,84 +203,80 @@ public class JdbcRegressionTest
            System.out.println();
        }
     }
-    
+
+    /**
+     * Create a column group and confirm that the {@code ResultSetMetaData} works.
+     */
     @Test
-    public void testIssue33() throws Exception
-    {
+    public void testResultSetMetaData() throws Exception {
+
         Statement stmt = con.createStatement();
-        
+
         // Create the target Column family
-        String createCF = "CREATE COLUMNFAMILY t33 (k int PRIMARY KEY," 
-                        + "c text "
-                        + ") ;";        
-        
+        String createCF = "CREATE COLUMNFAMILY t33 (k int PRIMARY KEY,"
+                + "c text "
+                + ") ;";
+
         stmt.execute(createCF);
         stmt.close();
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
-        
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?%s", HOST, PORT, KEYSPACE, OPTIONS));
+
         // paraphrase of the snippet from the ISSUE #33 provided test
         PreparedStatement statement = con.prepareStatement("update t33 set c=? where k=123");
         statement.setString(1, "mark");
         statement.executeUpdate();
 
-        ResultSet result = statement.executeQuery("SELECT * FROM t33;");
-        
-        ResultSetMetaData metadata = result.getMetaData();        
-        
+        ResultSet result = statement.executeQuery("SELECT k, c FROM t33;");
+
+        ResultSetMetaData metadata = result.getMetaData();
+
         int colCount = metadata.getColumnCount();
-        
+
         System.out.println("Test Issue #33");
         DatabaseMetaData md = con.getMetaData();
-        System.out.println();        
+        System.out.println();
         System.out.println("--------------");
         System.out.println("Driver Version :   " + md.getDriverVersion());
         System.out.println("DB Version     :   " + md.getDatabaseProductVersion());
         System.out.println("Catalog term   :   " + md.getCatalogTerm());
         System.out.println("Catalog        :   " + con.getCatalog());
         System.out.println("Schema term    :   " + md.getSchemaTerm());
-        
+
         System.out.println("--------------");
-        while (result.next())
-        {
+        while (result.next()) {
             metadata = result.getMetaData();
             colCount = metadata.getColumnCount();
-            System.out.printf("(%d) ",result.getRow());
-            for (int i = 1; i <= colCount; i++)
-            {
-                System.out.print(showColumn(i,result)+ " "); 
+
+            assertEquals("Total column count should match schema for t33", 2, metadata.getColumnCount());
+
+            System.out.printf("(%d) ", result.getRow());
+            for (int i = 1; i <= colCount; i++) {
+                System.out.print(showColumn(i, result) + " ");
+
+                switch (i) {
+                    case 1:
+                        assertEquals("First Column: k", "k", metadata.getColumnName(1));
+                        assertEquals("First Column Type: int", Types.INTEGER, metadata.getColumnType(1));
+                        break;
+                    case 2:
+                        assertEquals("Second Column: c", "c", metadata.getColumnName(2));
+                        assertEquals("Second Column Type: text", Types.NVARCHAR, metadata.getColumnType(2));
+                        break;
+                }
             }
             System.out.println();
         }
-   }
-
-/* 
- * 		DEACTIVATED BECAUSE ALREADY EXECUTED IN testIssue33 and often fails due to arbitrary order execution of tests in Junit
- *    @Test
-    public void testIssue38() throws Exception
-    {
-        
-        // test catching exception for beforeFirst() and afterLast()
-        Statement stmt = con.createStatement();
-
-        ResultSet result = stmt.executeQuery("SELECT * FROM t33;");
-        
-        try
-        {
-            result.beforeFirst();
-        }
-        catch (Exception e)
-        {
-            System.out.println();
-            System.out.println("beforeFirst() test -> "+ e);
-        }
-        
     }
-  */  
+
+    /**
+     * Test the meta-data logic for the database. This should allow you to query the
+     * schema information dynamically.
+     */
     @Test
-    public void testIssue40() throws Exception
+    public void testDatabaseMetaData() throws Exception
     {
         DatabaseMetaData md = con.getMetaData();
         System.out.println();
@@ -328,10 +324,14 @@ public class JdbcRegressionTest
         result = md.getColumns(con.getCatalog(), KEYSPACE, TABLE, "bvalue");
         result.next();
         assertFalse("Make sure we have found requested column only", result.next());
-    }    
-    
+    }
+
+    /**
+     * Test a simple resultset. This technically also demonstrates the upsert functionality
+     * of Cassandra.
+     */
     @Test
-    public void testIssue59() throws Exception
+    public void testSimpleResultSet() throws Exception
     {
         Statement stmt = con.createStatement();
         
@@ -345,7 +345,7 @@ public class JdbcRegressionTest
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?%s",HOST,PORT,KEYSPACE,OPTIONS));
  
         PreparedStatement statement = con.prepareStatement("update t59 set c=? where k=123", ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
         statement.setString(1, "hello");
@@ -356,9 +356,12 @@ public class JdbcRegressionTest
         System.out.println(resultToDisplay(result,59,null));
 
     }
-    
+
+    /**
+     * Test the {@code Set} object in Cassandra.
+     */
     @Test
-    public void testIssue65() throws Exception
+    public void testObjectSet() throws Exception
     {
         Statement stmt = con.createStatement();
         
@@ -374,15 +377,30 @@ public class JdbcRegressionTest
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?%s",HOST,PORT,KEYSPACE,OPTIONS));
         
         Statement statement = con.createStatement();
         String insert = "INSERT INTO t65 (key, int1,int2,intset) VALUES ('key1',1,100,{10,20,30,40});";
         statement.executeUpdate(insert);
         
-        ResultSet result = statement.executeQuery("SELECT * FROM t65;");
+        ResultSet result = statement.executeQuery("SELECT intset FROM t65 where key = 'key1';");
 
-        System.out.println(resultToDisplay(result,65, "with set = {10,20,30,40}"));
+        // read the Set of Integer back out again
+        Object rsObject = result.getObject(1);
+        assertNotNull("Object Should Exist", rsObject);
+        assertTrue("Object Should be Set", (rsObject instanceof Set));
+
+        int sum = 0;
+
+        // sum up the set - it should be 100
+        for (Object rsEntry : ((Set)rsObject).toArray()) {
+            assertTrue("Entry should be Integer", (rsEntry instanceof Integer));
+            sum += ((Integer)rsEntry).intValue();
+        }
+
+        assertEquals("Total Should be 100", 100, sum);
+
+        //System.out.println(resultToDisplay(result,65, "with set = {10,20,30,40}"));
        
         String update = "UPDATE t65 SET intset=? WHERE key=?;";
  
@@ -398,9 +416,12 @@ public class JdbcRegressionTest
         System.out.println(resultToDisplay(result,65," with set = <empty>"));
 
     }
-    
+
+    /**
+     * Confirm that the connection can accept a different consistency level.
+     */
     @Test
-    public void testIssue71() throws Exception
+    public void testConsistencyLevel() throws Exception
     {
         Statement stmt = con.createStatement();
         
@@ -414,10 +435,9 @@ public class JdbcRegressionTest
         con.close();
 
         // open it up again to see the new CF
-       con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?consistency=%s",HOST,PORT,KEYSPACE,CONSISTENCY_QUORUM));
+       con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?%s&consistency=%s",HOST,PORT,KEYSPACE,OPTIONS,CONSISTENCY_QUORUM));
       
        // at this point defaultConsistencyLevel should be set the QUORUM in the connection
-
        stmt = con.createStatement();
        
        ConsistencyLevel cl = statementExtras(stmt).getConsistencyLevel();
@@ -433,7 +453,7 @@ public class JdbcRegressionTest
     }
     
     @Test
-    public void testIssue74() throws Exception
+    public void testObjectTimestamp() throws Exception
     {
         Statement stmt = con.createStatement();
         java.util.Date now = new java.util.Date();
@@ -448,7 +468,7 @@ public class JdbcRegressionTest
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?%s",HOST,PORT,KEYSPACE,OPTIONS));
         
         Statement statement = con.createStatement();
         
@@ -463,22 +483,26 @@ public class JdbcRegressionTest
         
         assertTrue(result.next());
         assertEquals(1L, result.getLong(1));
+
+        // try reading Timestamp directly
         Timestamp stamp = result.getTimestamp(2);
-        
         assertEquals(now, stamp);
-        stamp = (Timestamp)result.getObject(2); // maybe exception here
+
+        // try reading Timestamp as an object
+        stamp = result.getObject(2, Timestamp.class);
         assertEquals(now, stamp);
 
         System.out.println(resultToDisplay(result,74, "current date"));
        
     }
 
+    /**
+     * Verify that even with an empty ResultSet; the resultset meta-data can still
+     * be queried. Previously, this was <i>Issue 75</i>.
+     */
     @Test
-    public void testIssue75() throws Exception
+    public void testEmptyResultSet() throws Exception
     {
-        System.out.println();
-        System.out.println("Test Issue #75");
-        System.out.println("--------------");
 
         Statement stmt = con.createStatement();
 
@@ -496,13 +520,13 @@ public class JdbcRegressionTest
         stmt.close();
     }
 
+    /**
+     * Previously this was <i>Issue 76</i>.
+     */
     @Test
-    public void testIssue76() throws Exception
+    public void testDatabaseMetaViaResultSet() throws Exception
     {
         DatabaseMetaData md = con.getMetaData();
-        System.out.println();
-        System.out.println("Test Issue #76");
-        System.out.println("--------------");
 
         // test various retrieval methods
         ResultSet result = md.getIndexInfo(con.getCatalog(), KEYSPACE, TABLE, false, false);
@@ -546,12 +570,12 @@ public class JdbcRegressionTest
     public void testBlob() throws Exception
     {
         UUID blobId = UUID.randomUUID();
-        String blobValue = RandomStringUtils.random(10);
+        CassandraBlob blobValue = new CassandraBlob(RandomStringUtils.random(10));
         String insert = "INSERT INTO " + TYPETABLE + " (id,blobValue,dataMapValue) " +
                         " VALUES(" + blobId.toString() + ", ?, {'12345': bigintAsBlob(12345)});";
 
         PreparedStatement statement = con.prepareStatement(insert);
-        statement.setObject(1, blobValue);
+        statement.setBlob(1, blobValue);
 
         statement.executeUpdate();
         statement.close();
@@ -561,7 +585,7 @@ public class JdbcRegressionTest
         ResultSet result = select1.executeQuery(query);
         result.next();
 
-        Object blobResult = result.getObject(1);
+        Blob blobResult = result.getBlob(1);
         assertEquals(blobValue, blobResult);
 
         Statement select2 = con.createStatement();
@@ -570,12 +594,14 @@ public class JdbcRegressionTest
         result2.next();
 
         Object mapResult = result2.getObject(1);
-//        assertEquals(blobValue, blobResult);
 
-
+        assertTrue(mapResult instanceof Map);
+        assertEquals("There should be 1 record in the map", 1, ((Map)mapResult).size());
+        assertNotNull("Entry for '12345' should be in the map", ((Map)mapResult).get("12345"));
+        assertNull("Entry for '54321' should NOT be in the map", ((Map)mapResult).get("54321"));
 
     }
-    
+
 
     @Test
     public void isValid() throws Exception
@@ -600,7 +626,7 @@ public class JdbcRegressionTest
 //        ((CassandraConnection) con).isAlive = currentStatement;
     }
     
-    private final String  showColumn(int index, ResultSet result) throws SQLException
+    private String showColumn(int index, ResultSet result) throws SQLException
     {
         StringBuilder sb = new StringBuilder();
         sb.append("[").append(index).append("]");
@@ -608,7 +634,7 @@ public class JdbcRegressionTest
         return sb.toString();
     }
     
-    private final String resultToDisplay(ResultSet result, int issue, String note) throws Exception
+    private String resultToDisplay(ResultSet result, int issue, String note) throws Exception
     {
         StringBuilder sb = new StringBuilder("Test Issue #" + issue + " - "+ note + "\n");
        ResultSetMetaData metadata = result.getMetaData();
