@@ -43,9 +43,6 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
 {
     private static final Logger LOG = LoggerFactory.getLogger(CassandraPreparedStatement.class);
 
-    /** a Map of the current bound values encountered in setXXX methods */
-    //private Map<Integer, ByteBuffer> bindValues = new LinkedHashMap<Integer, ByteBuffer>();
-
     /**
      * Cassandra PreparedStatement - native implementation
      */
@@ -85,32 +82,6 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         return cql;
     }
 
-//    private final void checkIndex(int index) throws SQLException
-//    {
-//        if (index > count) throw new SQLRecoverableException(String.format("the column index : %d is greater than the count of bound variable markers in the CQL: %d",
-//            index,
-//            count));
-//        if (index < 1) throw new SQLRecoverableException(String.format("the column index must be a positive number : %d", index));
-//    }
-//
-//    private List<ByteBuffer> getBindValues() throws SQLException
-//    {
-//        List<ByteBuffer> values = new ArrayList<ByteBuffer>();
-//        if (bindValues.size() != count) throw new SQLRecoverableException(
-//            String.format("the number of bound variables: %d must match the count of bound variable markers in the CQL: %d",
-//            bindValues.size(),
-//            count));
-//
-//        for (int i = 1; i <= count; i++)
-//        {
-//            ByteBuffer value = bindValues.get(i);
-//            if (value == null) throw new SQLRecoverableException(String.format("the bound value for index: %d was not set", i));
-//            values.add(value);
-//        }
-//        return values;
-//    }
-
-
     public void close()
     {
         try{
@@ -121,59 +92,6 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
 
         connection = null;
     }
-
-//    private void doExecute() throws SQLException
-//    {
-//        if (LOG.isTraceEnabled()) LOG.trace("CQL: " + cql);
-//        try
-//        {
-//            resetResults();
-//            CqlResult result = connection.execute(itemId, getBindValues(), consistencyLevel);
-//
-//            switch (result.getType())
-//            {
-//                case ROWS:
-//                    currentResultSet = new CassandraResultSet(this, result);
-//                    break;
-//                case INT:
-//                    updateCount = result.getNum();
-//                    break;
-//                case VOID:
-//                    updateCount = 0;
-//                    break;
-//            }
-//        }
-//        catch (InvalidRequestException e)
-//        {
-//            throw new SQLSyntaxErrorException(e.getWhy() + "\n'" + cql + "'", e);
-//        }
-//        catch (UnavailableException e)
-//        {
-//        	try{
-//        		this.connection.disconnect();
-//        	}catch(Exception e1){
-//
-//        	}
-//            throw new SQLNonTransientConnectionException(NO_SERVER, e);
-//        }
-//        catch (TimedOutException e)
-//        {
-//            throw new SQLTransientConnectionException(e);
-//        }
-//        catch (SchemaDisagreementException e)
-//        {
-//            throw new SQLRecoverableException(SCHEMA_MISMATCH);
-//        }
-//        catch (TException e)
-//        {
-//        	try{
-//        		this.connection.disconnect();
-//        	}catch(Exception e1){
-//
-//        	}
-//            throw new SQLNonTransientConnectionException(e);
-//        }
-//    }
 
     public void addBatch() throws SQLException
     {
