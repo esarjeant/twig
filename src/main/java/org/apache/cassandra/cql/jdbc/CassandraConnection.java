@@ -350,10 +350,19 @@ class CassandraConnection extends AbstractConnection implements Connection
         return connectionProps;
     }
 
+    /**
+     * Retrieves this <code>Connection</code> object's current catalog name.
+     * For Cassandra this is treated as the Cluster name.
+     *
+     * @return the current catalog name or <code>null</code> if there is none
+     * @exception SQLException if a database access error occurs
+     * or this method is called on a closed connection
+     * @see #setCatalog
+     */
     public String getCatalog() throws SQLException
     {
         checkNotClosed();
-        return cluster;
+        return session.getCluster().getClusterName();
     }
 
     public void setSchema(String schema) throws SQLException
@@ -362,10 +371,20 @@ class CassandraConnection extends AbstractConnection implements Connection
         currentKeyspace = schema;
     }
 
+    /**
+     * Retrieves this <code>Connection</code> object's current schema name.
+     * For Cassandra this is the current <i>keyspace</i>.
+     *
+     * @return the current schema name or <code>null</code> if there is none
+     * @exception SQLException if a database access error occurs
+     * or this method is called on a closed connection
+     * @see #setSchema
+     * @since 1.7
+     */
     public String getSchema() throws SQLException
     {
         checkNotClosed();
-        return currentKeyspace;
+        return session.getLoggedKeyspace();
     }
 
     public Properties getClientInfo() throws SQLException

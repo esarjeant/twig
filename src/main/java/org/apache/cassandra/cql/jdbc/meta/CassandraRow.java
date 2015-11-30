@@ -1,275 +1,79 @@
 package org.apache.cassandra.cql.jdbc.meta;
 
-import com.datastax.driver.core.*;
-import com.google.common.reflect.TypeToken;
-
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.net.InetAddress;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
-public class CassandraRow implements Row {
+/**
+ * Encapsulate a {@link CassandraColumn} into a row of one or more columns.
+ */
+public class CassandraRow {
 
-    private ByteBuffer bytes;
-    private List<CassandraColumn> columnList;
+    private final List<CassandraColumn> columnList = new ArrayList<CassandraColumn>();
 
-    public CassandraRow(String value, int colid) {
-
+    /**
+     * Create a <i>row</i> from the columns. This includes both the column meta-data
+     * as well as the underlying data.
+     * @param columns  Set of columns to create the row from.
+     */
+    public CassandraRow(CassandraColumn... columns) {
+        columnList.addAll(Arrays.asList(columns));
     }
 
     public CassandraRow(ByteBuffer bytes, List<CassandraColumn> columnList) {
-        this.bytes = bytes;
-        this.columnList = columnList;
+        this.columnList.addAll(columnList);
     }
 
-    @Override
-    public ColumnDefinitions getColumnDefinitions() {
-        return null;
+    public final <T> T getColumnValue(int colId) throws SQLException {
+
+        if (colId < columnList.size()) {
+            CassandraColumn<T> cc = columnList.get(colId);
+            return cc.getValue();
+        } else {
+            throw new SQLException("Specified Column Does Not Exist: " + colId);
+        }
     }
 
-    @Override
-    public boolean isNull(int i) {
-        return false;
+    public final int findColumnId(String columnName) throws SQLException {
+
+        // SQL columns start at 1
+        int colId = 1;
+
+        // try to find a match...
+        for (CassandraColumn cc : columnList) {
+            if (cc.getName().equalsIgnoreCase(columnName)) {
+                return colId;
+            }
+
+            colId++;
+
+        }
+
+        throw new SQLException("Column Not Found: " + columnName);
+
     }
 
-    @Override
-    public boolean isNull(String name) {
-        return false;
+    /**
+     * Number of columns defined.
+     * @return  Number of columns defined.
+     */
+    public int getColumnCount() {
+        return columnList.size();
     }
 
-    @Override
-    public boolean getBool(int i) {
-        return false;
-    }
+    /**
+     * Name of the specified column.
+     * @param column
+     * @return
+     */
+    public String getColumnName(int column) throws SQLException {
 
-    @Override
-    public boolean getBool(String name) {
-        return false;
-    }
-
-    @Override
-    public int getInt(int i) {
-        return 0;
-    }
-
-    @Override
-    public int getInt(String name) {
-        return 0;
-    }
-
-    @Override
-    public long getLong(int i) {
-        return 0;
-    }
-
-    @Override
-    public long getLong(String name) {
-        return 0;
-    }
-
-    @Override
-    public Date getDate(int i) {
-        return null;
-    }
-
-    @Override
-    public Date getDate(String name) {
-        return null;
-    }
-
-    @Override
-    public float getFloat(int i) {
-        return 0;
-    }
-
-    @Override
-    public float getFloat(String name) {
-        return 0;
-    }
-
-    @Override
-    public double getDouble(int i) {
-        return 0;
-    }
-
-    @Override
-    public double getDouble(String name) {
-        return 0;
-    }
-
-    @Override
-    public ByteBuffer getBytesUnsafe(int i) {
-        return null;
-    }
-
-    @Override
-    public ByteBuffer getBytesUnsafe(String name) {
-        return null;
-    }
-
-    @Override
-    public ByteBuffer getBytes(int i) {
-        return null;
-    }
-
-    @Override
-    public ByteBuffer getBytes(String name) {
-        return null;
-    }
-
-    @Override
-    public String getString(int i) {
-        return null;
-    }
-
-    @Override
-    public String getString(String name) {
-        return null;
-    }
-
-    @Override
-    public BigInteger getVarint(int i) {
-        return null;
-    }
-
-    @Override
-    public BigInteger getVarint(String name) {
-        return null;
-    }
-
-    @Override
-    public BigDecimal getDecimal(int i) {
-        return null;
-    }
-
-    @Override
-    public BigDecimal getDecimal(String name) {
-        return null;
-    }
-
-    @Override
-    public UUID getUUID(int i) {
-        return null;
-    }
-
-    @Override
-    public UUID getUUID(String name) {
-        return null;
-    }
-
-    @Override
-    public InetAddress getInet(int i) {
-        return null;
-    }
-
-    @Override
-    public InetAddress getInet(String name) {
-        return null;
-    }
-
-    @Override
-    public Token getToken(int i) {
-        return null;
-    }
-
-    @Override
-    public Token getToken(String name) {
-        return null;
-    }
-
-    @Override
-    public Token getPartitionKeyToken() {
-        return null;
-    }
-
-    @Override
-    public <T> List<T> getList(int i, Class<T> elementsClass) {
-        return null;
-    }
-
-    @Override
-    public <T> List<T> getList(int i, TypeToken<T> elementsType) {
-        return null;
-    }
-
-    @Override
-    public <T> List<T> getList(String name, Class<T> elementsClass) {
-        return null;
-    }
-
-    @Override
-    public <T> List<T> getList(String name, TypeToken<T> elementsType) {
-        return null;
-    }
-
-    @Override
-    public <T> Set<T> getSet(int i, Class<T> elementsClass) {
-        return null;
-    }
-
-    @Override
-    public <T> Set<T> getSet(int i, TypeToken<T> elementsType) {
-        return null;
-    }
-
-    @Override
-    public <T> Set<T> getSet(String name, Class<T> elementsClass) {
-        return null;
-    }
-
-    @Override
-    public <T> Set<T> getSet(String name, TypeToken<T> elementsType) {
-        return null;
-    }
-
-    @Override
-    public <K, V> Map<K, V> getMap(int i, Class<K> keysClass, Class<V> valuesClass) {
-        return null;
-    }
-
-    @Override
-    public <K, V> Map<K, V> getMap(int i, TypeToken<K> keysType, TypeToken<V> valuesType) {
-        return null;
-    }
-
-    @Override
-    public UDTValue getUDTValue(int i) {
-        return null;
-    }
-
-    @Override
-    public TupleValue getTupleValue(int i) {
-        return null;
-    }
-
-    @Override
-    public Object getObject(int i) {
-        return null;
-    }
-
-    @Override
-    public <K, V> Map<K, V> getMap(String name, Class<K> keysClass, Class<V> valuesClass) {
-        return null;
-    }
-
-    @Override
-    public <K, V> Map<K, V> getMap(String name, TypeToken<K> keysType, TypeToken<V> valuesType) {
-        return null;
-    }
-
-    @Override
-    public UDTValue getUDTValue(String name) {
-        return null;
-    }
-
-    @Override
-    public TupleValue getTupleValue(String name) {
-        return null;
-    }
-
-    @Override
-    public Object getObject(String name) {
-        return null;
+        if (((column - 1) >= 0) && ((column - 1) < columnList.size())) {
+            return columnList.get(column - 1).getName();
+        } else {
+            throw new SQLException("Specified Column Not Found: " + column);
+        }
     }
 }

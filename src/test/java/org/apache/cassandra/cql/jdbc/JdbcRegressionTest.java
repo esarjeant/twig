@@ -49,7 +49,7 @@ public class JdbcRegressionTest
     private static final String TABLE = "regressiontest";
     private static final String TYPETABLE = "datatypetest";
 
-    // use these for encyrpted connections
+    // use these for encrypted connections
     private static final String TRUST_STORE = System.getProperty("trustStore");
     private static final String TRUST_PASS = System.getProperty("trustPass", "cassandra");
 
@@ -273,15 +273,12 @@ public class JdbcRegressionTest
 
     /**
      * Test the meta-data logic for the database. This should allow you to query the
-     * schema information dynamically.
+     * schema information dynamically. Previously this was <i>Issue 40</i>.
      */
     @Test
     public void testDatabaseMetaData() throws Exception
     {
         DatabaseMetaData md = con.getMetaData();
-        System.out.println();
-        System.out.println("Test Issue #40");
-        System.out.println("--------------");
 
         // test various retrieval methods
         ResultSet result = md.getTables(con.getCatalog(), null, "%", new String[]
