@@ -21,10 +21,12 @@
 package org.apache.cassandra.cql.jdbc;
 
 import org.apache.cassandra.cql.ConnectionDetails;
+import org.apache.commons.lang3.StringUtils;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.net.URLEncoder;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -44,13 +46,26 @@ public class MetadataResultSetsTest
     private static final String CREATE_KS = "CREATE KEYSPACE \"%s\" WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};";
       
     private static java.sql.Connection con = null;
-    
+
+    // use these for encrypted connections
+    private static final String TRUST_STORE = System.getProperty("trustStore");
+    private static final String TRUST_PASS = System.getProperty("trustPass", "cassandra");
+
+    private static String OPTIONS = "";
+
 
     @BeforeClass
     public static void setUpBeforeClass() throws Exception
     {
+
+        // configure OPTIONS
+        if (!StringUtils.isEmpty(TRUST_STORE)) {
+            OPTIONS = String.format("trustStore=%s&trustPass=%s",
+                    URLEncoder.encode(TRUST_STORE), TRUST_PASS);
+        }
+
         Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
-        String URL = String.format("jdbc:cassandra://%s:%d/%s?version=3.0.0",HOST,PORT,"system");
+        String URL = String.format("jdbc:cassandra://%s:%d/%s?version=3.0.0&%s",HOST,PORT,"system",OPTIONS);
         System.out.println("Connection URL = '"+URL +"'");
         
         con = DriverManager.getConnection(URL);
@@ -99,7 +114,7 @@ public class MetadataResultSetsTest
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?version=3.0.0",HOST,PORT,KEYSPACE1));
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?version=3.0.0&%s",HOST,PORT,KEYSPACE1,OPTIONS));
 
     }
     
@@ -152,7 +167,7 @@ public class MetadataResultSetsTest
     public void testTableType() throws SQLException
     {
         CassandraStatement statement = (CassandraStatement) con.createStatement();
-        ResultSet result = MetadataResultSets.instance.makeTableTypes(statement);
+        ResultSet result = MetadataResultSets.makeTableTypes(statement);
         
         System.out.println("--- testTableType() ---");
         System.out.println(toString(result));       
@@ -163,7 +178,7 @@ public class MetadataResultSetsTest
     public void testCatalogs() throws SQLException
     {
         CassandraStatement statement = (CassandraStatement) con.createStatement();
-        ResultSet result = MetadataResultSets.instance.makeCatalogs(statement);
+        ResultSet result = MetadataResultSets.makeCatalogs(statement);
         
         System.out.println("--- testCatalogs() ---");
         System.out.println(toString(result));       
@@ -174,7 +189,7 @@ public class MetadataResultSetsTest
     public void testSchemas() throws SQLException
     {
         CassandraStatement statement = (CassandraStatement) con.createStatement();
-        ResultSet result = MetadataResultSets.instance.makeSchemas(statement, null);
+        ResultSet result = MetadataResultSets.makeSchemas(statement, null);
         
         System.out.println("--- testSchemas() ---");
         System.out.println(getColumnNames(result.getMetaData()));
@@ -182,7 +197,7 @@ public class MetadataResultSetsTest
         System.out.println(toString(result));       
         System.out.println();
         
-        result = MetadataResultSets.instance.makeSchemas(statement, KEYSPACE2);
+        result = MetadataResultSets.makeSchemas(statement, KEYSPACE2);
         System.out.println(toString(result));       
         System.out.println();
     }
@@ -191,7 +206,7 @@ public class MetadataResultSetsTest
     public void testTableName() throws SQLException
     {
         CassandraPreparedStatement statement = (CassandraPreparedStatement) con.prepareStatement("select * from " + KEYSPACE1 + ".test1");
-        ResultSet result = MetadataResultSets.instance.makeSchemas(statement, null);
+        ResultSet result = MetadataResultSets.makeSchemas(statement, null);
 
         System.out.println("--- testTableName() ---");
         ResultSetMetaData meta = result.getMetaData();
@@ -203,7 +218,7 @@ public class MetadataResultSetsTest
     public void testTables() throws SQLException
     {
         CassandraStatement statement = (CassandraStatement) con.createStatement();
-        ResultSet result = MetadataResultSets.instance.makeTables(statement, null, null);
+        ResultSet result = MetadataResultSets.makeTables(statement, null, null);
         
         System.out.println("--- testTables() ---");
         System.out.println(getColumnNames(result.getMetaData()));
@@ -211,15 +226,15 @@ public class MetadataResultSetsTest
         System.out.println(toString(result));       
         System.out.println();
         
-        result = MetadataResultSets.instance.makeTables(statement, KEYSPACE2, null);
+        result = MetadataResultSets.makeTables(statement, KEYSPACE2, null);
         System.out.println(toString(result));       
         System.out.println();
 
-        result = MetadataResultSets.instance.makeTables(statement, null, "test1");
+        result = MetadataResultSets.makeTables(statement, null, "test1");
         System.out.println(toString(result));       
         System.out.println();
 
-        result = MetadataResultSets.instance.makeTables(statement, KEYSPACE2, "test1");
+        result = MetadataResultSets.makeTables(statement, KEYSPACE2, "test1");
         System.out.println(toString(result));       
         System.out.println();
     }
@@ -228,7 +243,7 @@ public class MetadataResultSetsTest
     public void testColumns() throws SQLException
     {
         CassandraStatement statement = (CassandraStatement) con.createStatement();
-        ResultSet result = MetadataResultSets.instance.makeColumns(statement, KEYSPACE1, "test1" ,null);
+        ResultSet result = MetadataResultSets.makeColumns(statement, KEYSPACE1, "test1" ,null);
         
         System.out.println("--- testColumns() ---");
         System.out.println(getColumnNames(result.getMetaData()));
@@ -236,7 +251,7 @@ public class MetadataResultSetsTest
         System.out.println(toString(result));       
         System.out.println();
 
-        result = MetadataResultSets.instance.makeColumns(statement, KEYSPACE1, "test2" ,null);
+        result = MetadataResultSets.makeColumns(statement, KEYSPACE1, "test2" ,null);
         
         System.out.println("--- testColumns() ---");
         System.out.println(getColumnNames(result.getMetaData()));
@@ -249,7 +264,7 @@ public class MetadataResultSetsTest
     public void testClob() throws SQLException
     {
         CassandraStatement statement = (CassandraStatement) con.createStatement();
-        ResultSet result = MetadataResultSets.instance.makeColumns(statement, KEYSPACE1, "test3" ,null);
+        ResultSet result = MetadataResultSets.makeColumns(statement, KEYSPACE1, "test3" ,null);
 
         System.out.println("--- testColumns() ---");
         System.out.println(getColumnNames(result.getMetaData()));
@@ -257,7 +272,7 @@ public class MetadataResultSetsTest
         System.out.println(toString(result));
         System.out.println();
 
-        result = MetadataResultSets.instance.makeColumns(statement, KEYSPACE1, "test3" ,null);
+        result = MetadataResultSets.makeColumns(statement, KEYSPACE1, "test3" ,null);
 
         System.out.println("--- testColumns() ---");
         System.out.println(getColumnNames(result.getMetaData()));

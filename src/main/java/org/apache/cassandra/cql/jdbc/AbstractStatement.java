@@ -22,15 +22,7 @@ package org.apache.cassandra.cql.jdbc;
 
 import java.io.InputStream;
 import java.io.Reader;
-import java.sql.Array;
-import java.sql.Blob;
-import java.sql.Clob;
-import java.sql.NClob;
-import java.sql.Ref;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
-import java.sql.SQLXML;
+import java.sql.*;
 
 abstract class AbstractStatement
 {
@@ -122,20 +114,20 @@ abstract class AbstractStatement
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
-    public void setBlob(int parameterIndex, Blob x) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setBlob(int parameterIndex, InputStream inputStream) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
+//    public void setBlob(int parameterIndex, Blob x) throws SQLException
+//    {
+//        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
+//    }
+//
+//    public void setBlob(int parameterIndex, InputStream inputStream) throws SQLException
+//    {
+//        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
+//    }
+//
+//    public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException
+//    {
+//        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
+//    }
 
     public void setCharacterStream(int parameterIndex, Reader reader) throws SQLException
     {

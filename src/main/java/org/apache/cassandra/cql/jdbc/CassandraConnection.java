@@ -20,77 +20,40 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
-import org.apache.cassandra.thrift.AuthenticationRequest;
-import org.apache.cassandra.thrift.Cassandra;
-import org.apache.cassandra.thrift.Compression;
+import com.datastax.driver.core.*;
+import org.apache.cassandra.thrift.*;
 import org.apache.cassandra.thrift.ConsistencyLevel;
-import org.apache.cassandra.thrift.CqlPreparedResult;
-import org.apache.cassandra.thrift.CqlResult;
-import org.apache.cassandra.thrift.InvalidRequestException;
-import org.apache.cassandra.thrift.SchemaDisagreementException;
-import org.apache.cassandra.thrift.TimedOutException;
-import org.apache.cassandra.thrift.TokenRange;
-import org.apache.cassandra.thrift.UnavailableException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.thrift.TException;
-import org.apache.thrift.protocol.TBinaryProtocol;
-import org.apache.thrift.protocol.TProtocol;
-import org.apache.thrift.transport.TFramedTransport;
-import org.apache.thrift.transport.TSocket;
-import org.apache.thrift.transport.TTransport;
-import org.apache.thrift.transport.TTransportException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.ByteBuffer;
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.security.*;
+import java.security.cert.CertificateException;
+import java.sql.*;
 import java.sql.PreparedStatement;
-import java.sql.SQLClientInfoException;
-import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
-import java.sql.SQLNonTransientConnectionException;
-import java.sql.SQLSyntaxErrorException;
-import java.sql.SQLTimeoutException;
-import java.sql.SQLWarning;
 import java.sql.Statement;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 import static org.apache.cassandra.cql.jdbc.CassandraResultSet.DEFAULT_CONCURRENCY;
 import static org.apache.cassandra.cql.jdbc.CassandraResultSet.DEFAULT_HOLDABILITY;
 import static org.apache.cassandra.cql.jdbc.CassandraResultSet.DEFAULT_TYPE;
-import static org.apache.cassandra.cql.jdbc.Utils.ALWAYS_AUTOCOMMIT;
-import static org.apache.cassandra.cql.jdbc.Utils.BAD_TIMEOUT;
-import static org.apache.cassandra.cql.jdbc.Utils.NO_INTERFACE;
-import static org.apache.cassandra.cql.jdbc.Utils.NO_TRANSACTIONS;
-import static org.apache.cassandra.cql.jdbc.Utils.PROTOCOL;
-import static org.apache.cassandra.cql.jdbc.Utils.TAG_ACTIVE_CQL_VERSION;
-import static org.apache.cassandra.cql.jdbc.Utils.TAG_CONSISTENCY_LEVEL;
-import static org.apache.cassandra.cql.jdbc.Utils.TAG_CQL_VERSION;
-import static org.apache.cassandra.cql.jdbc.Utils.TAG_DATABASE_NAME;
-import static org.apache.cassandra.cql.jdbc.Utils.TAG_PASSWORD;
-import static org.apache.cassandra.cql.jdbc.Utils.TAG_PORT_NUMBER;
-import static org.apache.cassandra.cql.jdbc.Utils.TAG_SERVER_NAME;
-import static org.apache.cassandra.cql.jdbc.Utils.TAG_USER;
-import static org.apache.cassandra.cql.jdbc.Utils.WAS_CLOSED_CON;
-import static org.apache.cassandra.cql.jdbc.Utils.createSubName;
-import static org.apache.cassandra.cql.jdbc.Utils.determineCurrentKeyspace;
+import static org.apache.cassandra.cql.jdbc.Utils.*;
 
 
 /**
- * Implementation class for {@link Connection}.
+ * Implementation class for {@link java.sql.Connection}.
  */
 class CassandraConnection extends AbstractConnection implements Connection
 {
 
     private static final Logger logger = LoggerFactory.getLogger(CassandraConnection.class);
-
+    public static Integer roundRobinIndex;
     static final String IS_VALID_CQLQUERY_2_0_0 = "SELECT COUNT(1) FROM system.Versions WHERE component = 'cql';";
     static final String IS_VALID_CQLQUERY_3_0_0 = "SELECT COUNT(1) FROM system.\"Versions\" WHERE component = 'cql';";
     
@@ -120,17 +83,14 @@ class CassandraConnection extends AbstractConnection implements Connection
      */
     private Set<Statement> statements = new ConcurrentSkipListSet<Statement>();
 
-	/**
-     * Ohter node info for defined keyspace, null if no keyspace is provided
+    /**
+     * Cassandra 3.x Session
      */
-	private Set<String> otherNodes = new HashSet<String>();
+    private Session session;
 
-	/**
-     * remote connection fields
-     */
-    private Cassandra.Client client;
-    private TTransport transport;
-    private TSocket socket;
+    // TODO: DEPRECATE
+    //private Cassandra.Client client;
+    //private TTransport transport;
 
     protected long timeOfLastFailure = 0;
     protected int numFailures = 0;
@@ -138,9 +98,11 @@ class CassandraConnection extends AbstractConnection implements Connection
     protected String url = null;
     protected String cluster;//current catalog
     protected String currentKeyspace;//current schema
+    protected TreeSet<String> hostListPrimary;
+    protected TreeSet<String> hostListBackup;
     int majorCqlVersion;
-    ColumnDecoder decoder;
 
+    //private TSocket socket;
     
     PreparedStatement isAlive = null;
     
@@ -153,100 +115,157 @@ class CassandraConnection extends AbstractConnection implements Connection
      */
     public CassandraConnection(Properties props) throws SQLException
     {
+
+        hostListPrimary = new TreeSet<String>();
+    	hostListBackup = new TreeSet<String>();
         connectionProps = (Properties)props.clone();
         clientInfo = new Properties();
+
         url = PROTOCOL + createSubName(props);
-        try
+
+        String[] hosts = {};
+        String host = props.getProperty(TAG_SERVER_NAME);
+        int port = Integer.parseInt(props.getProperty(TAG_PORT_NUMBER));
+
+        currentKeyspace = props.getProperty(TAG_DATABASE_NAME);
+        username = props.getProperty(TAG_USER);
+        String password = props.getProperty(TAG_PASSWORD);
+        String version = props.getProperty(TAG_CQL_VERSION,DEFAULT_CQL_VERSION);
+
+        connectionProps.setProperty(TAG_ACTIVE_CQL_VERSION, version);
+        majorCqlVersion = getMajor(version);
+        defaultConsistencyLevel = ConsistencyLevel.valueOf(props.getProperty(TAG_CONSISTENCY_LEVEL, ConsistencyLevel.ONE.name()));
+
+        // dealing with multiple hosts passed as seeds in the JDBC URL : jdbc:cassandra://lyn4e900.tlt--lyn4e901.tlt--lyn4e902.tlt:9160/fluks
+        // in this phase we get the list of all the nodes of the cluster
+        String currentHost = "";
+
+        try {
+
+            if(host.contains("--")){
+                hosts = new String[host.split("--").length];
+                int i=0;
+                for(String h:host.split("--")){
+                    hosts[i]=h;
+                    i++;
+                }
+            }else{
+                hosts = new String[1];
+                hosts[0] = host;
+            }
+
+            Random rand = new Random();
+
+            currentHost = hosts[rand.nextInt( hosts.length)];
+            logger.debug("Chosen seed : " + currentHost);
+
+            Cluster.Builder connectionBuilder = Cluster.builder().addContactPoint(host);
+
+            if (port > 0) {
+                connectionBuilder.withPort(port);
+            }
+
+            if (!StringUtils.isEmpty(username)) {
+                connectionBuilder.withCredentials(username, password);
+            }
+
+            // configure SSL if specified
+            SSLOptions sslOptions = createSSLOptions(props);
+
+            if (sslOptions != null) {
+                connectionBuilder.withSSL(sslOptions);
+            }
+
+            Cluster cluster = connectionBuilder.build();
+            session = cluster.connect();
+
+            // if keyspace was specified - use it
+            if (!session.isClosed() && !StringUtils.isEmpty(currentKeyspace)) {
+                session.execute(String.format("USE %s;", currentKeyspace));
+            }
+
+        } catch (Exception e){
+            String msg = String.format("Connection Fails to %s: %s", currentHost, e.toString());
+            logger.error(msg, e);
+            throw new SQLException(msg, e);
+        }
+
+    }
+
+    private static SSLOptions createSSLOptions(Properties properties)
+    {
+        String storePath = properties.getProperty(TAG_TRUST_STORE);
+        String storePass = properties.getProperty(TAG_TRUST_PASSWORD);
+
+        if ((storePath != null) && (storePass != null))
         {
-            String host = props.getProperty(TAG_SERVER_NAME);
-            int port = Integer.parseInt(props.getProperty(TAG_PORT_NUMBER));
-            currentKeyspace = props.getProperty(TAG_DATABASE_NAME);
-            username = props.getProperty(TAG_USER);
-            String password = props.getProperty(TAG_PASSWORD);
-            String version = props.getProperty(TAG_CQL_VERSION,DEFAULT_CQL_VERSION);
-            connectionProps.setProperty(TAG_ACTIVE_CQL_VERSION, version);
-            majorCqlVersion = getMajor(version);
-            defaultConsistencyLevel = ConsistencyLevel.valueOf(props.getProperty(TAG_CONSISTENCY_LEVEL,ConsistencyLevel.ONE.name()));
-
-            createSocketWIthTransportAndClient(host, port);
-            
-            cluster = client.describe_cluster_name();
-
-            if (username != null)
+            SSLContext context;
+            try
             {
-                Map<String, String> credentials = new HashMap<String, String>();
-                credentials.put("username", username);
-                if (password != null) credentials.put("password", password);
-                AuthenticationRequest areq = new AuthenticationRequest(credentials);
-                client.login(areq);
+                context = getSSLContext(storePath, storePass);
+
+                return new SSLOptions(context, SSLOptions.DEFAULT_SSL_CIPHER_SUITES);
+
             }
-            
-            if (majorCqlVersion > 2)
-            {
-                client.set_cql_version(version);
+            catch (UnrecoverableKeyException xk) {
+                logger.error("Key Fails for Trust Store: " + storePath, xk);
+            } catch (KeyManagementException mx) {
+                logger.error("Key Management Error for Trust Store: " + storePath, mx);
+            } catch (NoSuchAlgorithmException nx) {
+                logger.error("Algorithm Not Found for Trust Store: " + storePath, nx);
+            } catch (KeyStoreException kx) {
+                logger.error("Key Store Error for Trust Store: " + storePath, kx);
+            } catch (CertificateException cx) {
+                logger.error("Certificate Error for Trust Store: " + storePath, cx);
+            } catch (IOException ix) {
+                logger.error("Unable to Read Store Trust Store: " + storePath, ix);
             }
 
-            decoder = new ColumnDecoder(client.describe_keyspaces());
-                    
-            if (currentKeyspace != null) 
-            {
-            	try
-            	{
-            		List<TokenRange> ringInfo = client.describe_ring(currentKeyspace);//collect info in case current node fails
-            		for (TokenRange tokenRange : ringInfo) 
-            		{
-						if (tokenRange.isSetRpc_endpoints())
-						{
-							otherNodes.addAll(tokenRange.getRpc_endpoints());
-						}
-						if (otherNodes.size() > 5) break; //enough info incase of failure
-					}
-            		
-            		//remove target node if present
-                	otherNodes.remove(socket.getSocket().getInetAddress().getHostAddress());
-            	}
-                catch (InvalidRequestException e)
-                {
-                	//silently ignore
+        }
+
+        return null;
+
+    }
+
+    private static SSLContext getSSLContext(String trustPath, String trustPass)
+            throws NoSuchAlgorithmException, KeyStoreException, CertificateException, IOException, UnrecoverableKeyException, KeyManagementException {
+
+        FileInputStream tsf = null;
+        SSLContext ctx = null;
+
+        try {
+
+            tsf = new FileInputStream(trustPath);
+            ctx = SSLContext.getInstance("SSL");
+
+            KeyStore ts = KeyStore.getInstance("JKS");
+            ts.load(tsf, trustPass.toCharArray());
+            TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            tmf.init(ts);
+
+            ctx.init(null, tmf.getTrustManagers(), new SecureRandom());
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (tsf != null) {
+                try {
+                    tsf.close();
+                } catch (IOException ix) {
+                    logger.warn("Error Closing Trust Store: " + trustPath, ix);
                 }
             }
 
-            Object[] args = {host, port,currentKeyspace,cluster,version, defaultConsistencyLevel.name()};
-            logger.debug("Connected to {}:{} in Cluster '{}' using Keyspace '{}', CQL version '{}' and Consistency level {}",args);                       
         }
-        catch (InvalidRequestException e)
-        {
-            throw new SQLSyntaxErrorException(e);
-        }
-        catch (TException e)
-        {
-            throw new SQLNonTransientConnectionException(e);
-        }
-    }
-    
-    private void createSocketWIthTransportAndClient(String host, int port) throws TException 
-    {
-        socket = new TSocket(host, port);
-        transport = new TFramedTransport(socket);
-        TProtocol protocol = new TBinaryProtocol(transport);
-        client = new Cassandra.Client(protocol);
-        socket.open();
-        
-        try
-        {
-	        if (currentKeyspace != null) 
-	        {
-	        	client.set_keyspace(currentKeyspace);
-	        }
-		} 
-        catch (InvalidRequestException e) 
-        {
-			//should never happen
-		}
-	}
 
-	// get the Major portion of a string like : Major.minor.patch where 2 is the default
-    private final int getMajor(String version)
+        return ctx;
+
+    }
+
+    /**
+     * Get the Major portion of a string like : Major.minor.patch where 2 is the default
+     */
+    private int getMajor(String version)
     {
         int major = 0;
         String[] parts = version.split("\\.");
@@ -331,10 +350,19 @@ class CassandraConnection extends AbstractConnection implements Connection
         return connectionProps;
     }
 
+    /**
+     * Retrieves this <code>Connection</code> object's current catalog name.
+     * For Cassandra this is treated as the Cluster name.
+     *
+     * @return the current catalog name or <code>null</code> if there is none
+     * @exception SQLException if a database access error occurs
+     * or this method is called on a closed connection
+     * @see #setCatalog
+     */
     public String getCatalog() throws SQLException
     {
         checkNotClosed();
-        return cluster;
+        return session.getCluster().getClusterName();
     }
 
     public void setSchema(String schema) throws SQLException
@@ -343,10 +371,20 @@ class CassandraConnection extends AbstractConnection implements Connection
         currentKeyspace = schema;
     }
 
+    /**
+     * Retrieves this <code>Connection</code> object's current schema name.
+     * For Cassandra this is the current <i>keyspace</i>.
+     *
+     * @return the current schema name or <code>null</code> if there is none
+     * @exception SQLException if a database access error occurs
+     * or this method is called on a closed connection
+     * @see #setSchema
+     * @since 1.7
+     */
     public String getSchema() throws SQLException
     {
         checkNotClosed();
-        return currentKeyspace;
+        return session.getLoggedKeyspace();
     }
 
     public Properties getClientInfo() throws SQLException
@@ -399,36 +437,17 @@ class CassandraConnection extends AbstractConnection implements Connection
         return false;
     }
 
+    /**
+     * Returns true if the connection has not been closed and is still valid.
+     * @param timeout  Time in seconds to wait for the database verification operation to complete.
+     * @return Result is {@code true} if connection is alive or {@code false} if it tries
+     *         to verify and times out.
+     * @throws SQLTimeoutException
+     */
+    @Override
     public boolean isValid(int timeout) throws SQLTimeoutException
     {
-        if (timeout < 0) throw new SQLTimeoutException(BAD_TIMEOUT);
-
-        // set timeout
-        socket.setTimeout(timeout * 1000);
-
-        try
-        {
-        	if (isClosed()) {
-        		return false;
-        	}
-        	
-            if (isAlive == null)
-            {
-                isAlive = prepareStatement(currentCqlVersion == "2.0.0" ? IS_VALID_CQLQUERY_2_0_0 : IS_VALID_CQLQUERY_3_0_0);
-            }
-            // the result is not important
-            isAlive.executeQuery().close();
-        }
-        catch (SQLException e)
-        {
-        	return false;
-        }
-        finally {
-            // reset timeout
-            socket.setTimeout(0);
-        }
-
-        return true;
+        return ((session != null) && !session.isClosed());
     }
 
     public boolean isWrapperFor(Class<?> arg0) throws SQLException
@@ -527,8 +546,8 @@ class CassandraConnection extends AbstractConnection implements Connection
      * Execute a CQL query.
      *
      * @param queryStr    a CQL query string
-     * @param consistencyLevel	the CQL query consistency level
      * @param compression query compression to use
+     * @param consistencyLevel    the CQL query consistency level
      * @return the query results encoded as a CqlResult structure
      * @throws InvalidRequestException     on poorly constructed or illegal requests
      * @throws UnavailableException        when not all required replicas could be created/read
@@ -536,30 +555,10 @@ class CassandraConnection extends AbstractConnection implements Connection
      * @throws SchemaDisagreementException when the client side and server side are at different versions of schema (Thrift)
      * @throws TException                  when there is a error in Thrift processing
      */
-    private CqlResult execute(String queryStr, Compression compression, ConsistencyLevel consistencyLevel, int attempt) throws InvalidRequestException, UnavailableException, TimedOutException, SchemaDisagreementException, TException
+    protected com.datastax.driver.core.ResultSet execute(String queryStr, Compression compression, ConsistencyLevel consistencyLevel)
     {
-        currentKeyspace = determineCurrentKeyspace(queryStr, currentKeyspace);
-
-        try
-        {
-            if (majorCqlVersion==3) return client.execute_cql3_query(Utils.compressQuery(queryStr, compression), compression, consistencyLevel);
-            else                    return client.execute_cql_query(Utils.compressQuery(queryStr, compression), compression);
-        }
-        catch (TException e)
-        {
-            numFailures++;
-            timeOfLastFailure = System.currentTimeMillis();
-            if (e instanceof TTransportException && attempt < 3 && knowsMoreNodes())
-            {
-            	attempt++;
-            	connectToOtherNode();
-            	return execute(queryStr, compression, consistencyLevel, attempt);
-            }
-            else
-            {
-            	throw e;
-            }
-        }
+        //currentKeyspace = determineCurrentKeyspace(queryStr, currentKeyspace);
+        return session.execute(queryStr);
     }
 
     /**
@@ -574,106 +573,34 @@ class CassandraConnection extends AbstractConnection implements Connection
      * @throws SchemaDisagreementException when the client side and server side are at different versions of schema (Thrift)
      * @throws TException                  when there is a error in Thrift processing
      */
-    protected CqlResult execute(String queryStr, ConsistencyLevel consistencyLevel)
-    		throws InvalidRequestException, UnavailableException, TimedOutException, SchemaDisagreementException, TException
+    protected com.datastax.driver.core.ResultSet execute(String queryStr, ConsistencyLevel consistencyLevel)
     {
-        return execute(queryStr, defaultCompression, consistencyLevel,0);
+        return execute(queryStr, defaultCompression, consistencyLevel);
     }
 
-    protected CqlResult execute(CassandraPreparedStatement cps, List<ByteBuffer> values, ConsistencyLevel consistencyLevel)
-    		throws InvalidRequestException, UnavailableException, TimedOutException, SchemaDisagreementException, TException
+//    protected com.datastax.driver.core.ResultSet execute(int itemId, List<ByteBuffer> values, ConsistencyLevel consistencyLevel)
+//    {
+//        try
+//        {
+//            if (majorCqlVersion==3) return client.execute_prepared_cql3_query(itemId, values, consistencyLevel);
+//            else                    return client.execute_prepared_cql_query(itemId, values);
+//        }
+//        catch (TException error)
+//        {
+//            numFailures++;
+//            timeOfLastFailure = System.currentTimeMillis();
+//            throw error;
+//        }
+//    }
+    
+    protected com.datastax.driver.core.PreparedStatement prepare(String queryStr, Compression compression)
     {
-    	return execute(cps, values, consistencyLevel, 0);
-    }
-    private CqlResult execute(CassandraPreparedStatement cps, List<ByteBuffer> values, ConsistencyLevel consistencyLevel, int attempt)
-    		throws InvalidRequestException, UnavailableException, TimedOutException, SchemaDisagreementException, TException
-    {
-        try
-        {
-        	int itemId = cps.getItemId();
-            if (majorCqlVersion==3) return client.execute_prepared_cql3_query(itemId, values, consistencyLevel);
-            else                    return client.execute_prepared_cql_query(itemId, values);
-        }
-        catch (TException e)
-        {
-            numFailures++;
-            timeOfLastFailure = System.currentTimeMillis();
-            if (e instanceof TTransportException && attempt < 3 && knowsMoreNodes())
-            {
-            	attempt++;
-            	connectToOtherNode();
-            	cps.createPreparedResult();//fixup internals
-            	return execute(cps, values, consistencyLevel, attempt);
-            }
-            else
-            {
-            	throw e;
-            }
-        }
-    }
-
-	private boolean knowsMoreNodes()
-	{
-		if (otherNodes.size() == 0) 
-		{
-			return false;
-		}
-		return true;
-	}
-
-    private void connectToOtherNode() throws TException 
-    {
-    	Iterator<String> it = otherNodes.iterator();
-    	if (it.hasNext())
-    	{
-	    	String newHost = it.next();
-	    	it.remove(); //make sure we do not retry incase this one also fails
-	    	
-	    	int port = Integer.parseInt(connectionProps.getProperty(TAG_PORT_NUMBER));
-			createSocketWIthTransportAndClient(newHost, port);
-    	}
-	}
-
-	protected CqlPreparedResult prepare(String queryStr, Compression compression) throws InvalidRequestException, TException
-	{
-		return prepare(queryStr, compression, 0);
-	}
-	private CqlPreparedResult prepare(String queryStr, Compression compression, int attempt) throws InvalidRequestException, TException
-    {
-        try
-        {
-            if (majorCqlVersion==3) return client.prepare_cql3_query(Utils.compressQuery(queryStr, compression), compression);
-            else                    return client.prepare_cql_query(Utils.compressQuery(queryStr, compression), compression);
-        }
-        catch (TException e)
-        {
-            numFailures++;
-            timeOfLastFailure = System.currentTimeMillis();
-            if (e instanceof TTransportException && attempt < 3 && knowsMoreNodes())
-            {
-            	attempt++;
-            	connectToOtherNode();
-            	return prepare(queryStr, compression, attempt);
-            }
-            else
-            {
-            	throw e;
-            }
-        }
+        return session.prepare(queryStr);
     }
     
-    protected CqlPreparedResult prepare(String queryStr) throws InvalidRequestException, TException
+    protected com.datastax.driver.core.PreparedStatement prepare(String queryStr)
     {
-        try
-        {
-            return prepare(queryStr, defaultCompression);
-        }
-        catch (TException error)
-        {
-            numFailures++;
-            timeOfLastFailure = System.currentTimeMillis();
-            throw error;
-        }
+        return prepare(queryStr, defaultCompression);
     }
     
     /**
@@ -689,7 +616,7 @@ class CassandraConnection extends AbstractConnection implements Connection
      */
     protected void disconnect()
     {
-        transport.close();
+        session.close();
     }
 
     /**
@@ -697,7 +624,7 @@ class CassandraConnection extends AbstractConnection implements Connection
      */
     protected boolean isConnected()
     {
-        return transport.isOpen();
+        return ((session != null) && !session.isClosed());
     }
 
     public String toString()
@@ -707,5 +634,9 @@ class CassandraConnection extends AbstractConnection implements Connection
         builder.append(connectionProps);
         builder.append("]");
         return builder.toString();
-    }    
+    }
+
+    protected final com.datastax.driver.core.ResultSet execute(BoundStatement boundStatement) {
+        return session.execute(boundStatement);
+    }
 }

@@ -1,21 +1,12 @@
 package org.apache.cassandra.cql.jdbc;
 
-import static org.apache.cassandra.cql.jdbc.Utils.WAS_CLOSED_CON;
-
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.net.URL;
-import java.sql.Date;
-import java.sql.ParameterMetaData;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.RowId;
-import java.sql.SQLException;
-import java.sql.SQLNonTransientConnectionException;
-import java.sql.SQLWarning;
-import java.sql.Time;
-import java.sql.Timestamp;
+import java.sql.*;
 import java.util.Calendar;
+
+import static org.apache.cassandra.cql.jdbc.Utils.WAS_CLOSED_CON;
 
 class ManagedPreparedStatement extends AbstractStatement implements PreparedStatement
 {
@@ -550,6 +541,11 @@ class ManagedPreparedStatement extends AbstractStatement implements PreparedStat
 	}
 
 	@Override
+	public void setBlob(int parameterIndex, Blob x) throws SQLException {
+		preparedStatement.setBlob(parameterIndex, x);
+	}
+
+	@Override
 	public void clearParameters() throws SQLException
 	{
 		checkNotClosed();
@@ -805,6 +801,23 @@ class ManagedPreparedStatement extends AbstractStatement implements PreparedStat
 	}
 
 	@Override
+	public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException {
+
+		checkNotClosed();
+
+		try
+		{
+			preparedStatement.setBlob(parameterIndex, new CassandraBlob(inputStream));
+		}
+		catch (SQLException sqlException)
+		{
+			pooledCassandraConnection.statementErrorOccurred(preparedStatement, sqlException);
+			throw sqlException;
+		}
+
+	}
+
+	@Override
 	public void setNull(int parameterIndex, int sqlType) throws SQLException
 	{
 		checkNotClosed();
@@ -877,6 +890,23 @@ class ManagedPreparedStatement extends AbstractStatement implements PreparedStat
 			pooledCassandraConnection.statementErrorOccurred(preparedStatement, sqlException);
 			throw sqlException;
 		}
+	}
+
+	@Override
+	public void setBlob(int parameterIndex, InputStream inputStream) throws SQLException {
+
+		checkNotClosed();
+
+		try
+		{
+			preparedStatement.setBlob(parameterIndex, new CassandraBlob(inputStream));
+		}
+		catch (SQLException sqlException)
+		{
+			pooledCassandraConnection.statementErrorOccurred(preparedStatement, sqlException);
+			throw sqlException;
+		}
+
 	}
 
 	@Override

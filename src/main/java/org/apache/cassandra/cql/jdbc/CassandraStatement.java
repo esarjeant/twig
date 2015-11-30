@@ -21,53 +21,20 @@
 package org.apache.cassandra.cql.jdbc;
 
 import org.apache.cassandra.thrift.ConsistencyLevel;
-import org.apache.cassandra.thrift.CqlResult;
-import org.apache.cassandra.thrift.InvalidRequestException;
-import org.apache.cassandra.thrift.SchemaDisagreementException;
-import org.apache.cassandra.thrift.TimedOutException;
-import org.apache.cassandra.thrift.UnavailableException;
-import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
-import java.sql.SQLNonTransientConnectionException;
-import java.sql.SQLNonTransientException;
-import java.sql.SQLRecoverableException;
-import java.sql.SQLSyntaxErrorException;
-import java.sql.SQLTransientConnectionException;
-import java.sql.SQLWarning;
-import java.sql.Statement;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.sql.*;
 
-import static org.apache.cassandra.cql.jdbc.Utils.BAD_AUTO_GEN;
-import static org.apache.cassandra.cql.jdbc.Utils.BAD_FETCH_DIR;
-import static org.apache.cassandra.cql.jdbc.Utils.BAD_FETCH_SIZE;
-import static org.apache.cassandra.cql.jdbc.Utils.BAD_HOLD_RSET;
-import static org.apache.cassandra.cql.jdbc.Utils.BAD_KEEP_RSET;
-import static org.apache.cassandra.cql.jdbc.Utils.BAD_TYPE_RSET;
-import static org.apache.cassandra.cql.jdbc.Utils.NO_BATCH;
-import static org.apache.cassandra.cql.jdbc.Utils.NO_GEN_KEYS;
-import static org.apache.cassandra.cql.jdbc.Utils.NO_INTERFACE;
-import static org.apache.cassandra.cql.jdbc.Utils.NO_MULTIPLE;
-import static org.apache.cassandra.cql.jdbc.Utils.NO_RESULTSET;
-import static org.apache.cassandra.cql.jdbc.Utils.NO_SERVER;
-import static org.apache.cassandra.cql.jdbc.Utils.NO_UPDATE_COUNT;
-import static org.apache.cassandra.cql.jdbc.Utils.SCHEMA_MISMATCH;
-import static org.apache.cassandra.cql.jdbc.Utils.WAS_CLOSED_STMT;
+import static org.apache.cassandra.cql.jdbc.Utils.*;
 
 /**
  * Cassandra statement: implementation class for {@link PreparedStatement}.
  */
-
 class CassandraStatement extends AbstractStatement implements CassandraStatementExtras, Comparable<Object>, Statement
 {
     private static final Logger logger = LoggerFactory.getLogger(CassandraStatement.class);
+
     /**
      * The connection.
      */
@@ -99,11 +66,6 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
     protected boolean escapeProcessing = true;
     
     protected ConsistencyLevel consistencyLevel;
-
-    /**
-     * regular expression to parse CQL
-     */
-    private static final Pattern CQL_STATEMENT = Pattern.compile("(select|insert|update|delete).*(into|from)\\s+(\\w+).*\\;?", Pattern.CASE_INSENSITIVE);
 
     CassandraStatement(CassandraConnection con) throws SQLException
     {
@@ -149,41 +111,58 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
         throw new SQLFeatureNotSupportedException(NO_BATCH);
     }
 
+//    /**
+//     * Take a look at the CQL and determine the name of the columngroup (table)
+//     * being queried. Cassandra does not support joins, so the FROM clause
+//     * will be the name of the table.
+//     * @return   Name of the table queried as part of this statement.
+//     */
+//    protected String getTableName() {
+//
+//        String tableName = "";
+//
+//        if (cql != null) {
+//
+//            StringTokenizer st = new StringTokenizer(cql, " ", false);
+//            String field = "";
+//            boolean nextFieldTable = false;
+//
+//            while ((field = st.nextToken()) != null) {
+//
+//                if (nextFieldTable) {
+//                    tableName = field;
+//                    break;
+//                }
+//
+//                nextFieldTable = "FROM".equalsIgnoreCase(field);
+//
+//            }
+//
+//        }
+//
+//        return tableName;
+//
+//    }
+
     /**
-     * Take a look at the CQL and determine the name of the columngroup (table)
-     * being queried. Cassandra does not support joins, so the FROM clause
-     * will be the name of the table.
-     * @return   Name of the table queried as part of this statement.
+     * Check the connection and return a fatal SQL Exception if it is no longer available.
+     * @throws SQLException  SQL exception if the connection has been closed.
      */
-    protected String getTableName() {
-
-        String tableName = "";
-
-        if (cql != null) {
-
-            Matcher matcher = CQL_STATEMENT.matcher(cql);
-
-            if (matcher.find()) {
-                tableName = matcher.group(3);
-            }
-
-        }
-
-        return tableName;
-
-    }
-
     protected final void checkNotClosed() throws SQLException
     {
-        if (isClosed()) throw new SQLRecoverableException(WAS_CLOSED_STMT);
+        if ((null == connection) || (connection.isClosed())) {
+            throw new SQLRecoverableException(WAS_CLOSED_STMT);
+        }
     }
 
+    @Override
     public void clearBatch() throws SQLException
     {
         checkNotClosed();
         throw new SQLFeatureNotSupportedException(NO_BATCH);
     }
 
+    @Override
     public void clearWarnings() throws SQLException
     {
         // This implementation does not support the collection of warnings so clearing is a no-op
@@ -191,71 +170,76 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
         checkNotClosed();
     }
 
+    @Override
     public void close() throws SQLException
     {
         connection.removeStatement(this);
         connection = null;
         cql = null;
     }
-        
 
-    private void doExecute(String cql) throws SQLException
-    {
-        try
-        {
-            if (logger.isTraceEnabled()) logger.trace("CQL: "+ cql);
-            
-            resetResults();
 
-            this.cql = cql;
-            CqlResult rSet = connection.execute(cql, consistencyLevel);
+//    private void doXExecute(String cql) throws SQLException
+//    {
+//        try
+//        {
+//            if (logger.isTraceEnabled()) logger.trace("CQL: "+ cql);
+//
+//            resetResults();
+//            connection.execute(cql, consistencyLevel);
+//
+////            switch (rSet.())
+////            {
+////                case ROWS:
+////                    currentResultSet = new CassandraResultSet(this, rSet);
+////                    break;
+////                case INT:
+////                    updateCount = rSet.getNum();
+////                    break;
+////                case VOID:
+////                    updateCount = 0;
+////                    break;
+////            }
+//        }
+//        catch (InvalidRequestException e)
+//        {
+//            throw new SQLSyntaxErrorException(e.getWhy()+"\n'"+cql+"'",e);
+//        }
+//        catch (UnavailableException e)
+//        {
+//            throw new SQLNonTransientConnectionException(NO_SERVER, e);
+//        }
+//        catch (TimedOutException e)
+//        {
+//            throw new SQLTransientConnectionException(e);
+//        }
+//        catch (SchemaDisagreementException e)
+//        {
+//            throw new SQLRecoverableException(SCHEMA_MISMATCH);
+//        }
+//        catch (TException e)
+//        {
+//        	try{
+//        		// Try to close the connection in order to force client to reconnect
+//        		connection.close();
+//        	}catch(Exception e1){
+//
+//        	}
+//            throw new SQLNonTransientConnectionException(e);
+//        }
+//
+//    }
 
-            switch (rSet.getType())
-            {
-                case ROWS:
-                    currentResultSet = new CassandraResultSet(this, rSet);
-                    break;
-                case INT:
-                    updateCount = rSet.getNum();
-                    break;
-                case VOID:
-                    updateCount = 0;
-                    break;
-            }
-        }
-        catch (InvalidRequestException e)
-        {
-            throw new SQLSyntaxErrorException(e.getWhy()+"\n'"+cql+"'",e);
-        }
-        catch (UnavailableException e)
-        {
-            throw new SQLNonTransientConnectionException(NO_SERVER, e);
-        }
-        catch (TimedOutException e)
-        {
-            throw new SQLTransientConnectionException(e);
-        }
-        catch (SchemaDisagreementException e)
-        {
-            throw new SQLRecoverableException(SCHEMA_MISMATCH);
-        }
-        catch (TException e)
-        {
-            throw new SQLNonTransientConnectionException(e);
-        }
-
-    }
-
+    @Override
     public boolean execute(String query) throws SQLException
     {
-        checkNotClosed();
-        doExecute(query);
-        return !(currentResultSet == null);
+        com.datastax.driver.core.ResultSet rst = connection.execute(query, consistencyLevel);
+        return ((rst != null) && (rst.wasApplied()));
     }
 
+    @Override
     public boolean execute(String sql, int autoGeneratedKeys) throws SQLException
     {
-        checkNotClosed();
 
         if (!(autoGeneratedKeys == RETURN_GENERATED_KEYS || autoGeneratedKeys == NO_GENERATED_KEYS))
             throw new SQLSyntaxErrorException(BAD_AUTO_GEN);
@@ -265,29 +249,42 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
         return execute(sql);
     }
 
+    @Override
     public int[] executeBatch() throws SQLException
     {
         throw new SQLFeatureNotSupportedException(NO_BATCH);
     }
 
+    @Override
     public ResultSet executeQuery(String query) throws SQLException
     {
-        checkNotClosed();
-        doExecute(query);
-        if (currentResultSet == null)
+        com.datastax.driver.core.ResultSet rst = connection.execute(query, consistencyLevel);
+
+        if (null == rst) {
             throw new SQLNonTransientException(NO_RESULTSET);
+        }
+
+        currentResultSet = new CassandraResultSet(new CassandraStatement(connection, query), rst);
         return currentResultSet;
+
     }
 
+    @Override
     public int executeUpdate(String query) throws SQLException
     {
         checkNotClosed();
-        doExecute(query);
-        if (currentResultSet != null)
+
+        com.datastax.driver.core.ResultSet rst = connection.execute(query, connection.defaultConsistencyLevel);
+
+        if ((null == rst) || !rst.wasApplied()) {
             throw new SQLNonTransientException(NO_UPDATE_COUNT);
-        return updateCount;
+        }
+
+        return rst.all().size();
+
     }
 
+    @Override
     public int executeUpdate(String sql, int autoGeneratedKeys) throws SQLException
     {
         checkNotClosed();
@@ -298,36 +295,42 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
         return executeUpdate(sql);
     }
 
+    @Override
     public Connection getConnection() throws SQLException
     {
         checkNotClosed();
-        return (Connection) connection;
+        return connection;
     }
 
+    @Override
     public int getFetchDirection() throws SQLException
     {
         checkNotClosed();
         return fetchDirection;
     }
 
+    @Override
     public int getFetchSize() throws SQLException
     {
         checkNotClosed();
         return fetchSize;
     }
 
+    @Override
     public int getMaxFieldSize() throws SQLException
     {
         checkNotClosed();
         return maxFieldSize;
     }
 
+    @Override
     public int getMaxRows() throws SQLException
     {
         checkNotClosed();
         return maxRows;
     }
 
+    @Override
     public boolean getMoreResults() throws SQLException
     {
         checkNotClosed();
@@ -336,6 +339,7 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
         return false;
     }
 
+    @Override
     public boolean getMoreResults(int current) throws SQLException
     {
         checkNotClosed();
@@ -357,24 +361,28 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
         return false;
     }
 
+    @Override
     public int getQueryTimeout() throws SQLException
     {
         // the Cassandra implementation does not support timeouts on queries
         return 0;
     }
 
+    @Override
     public ResultSet getResultSet() throws SQLException
     {
         checkNotClosed();
         return currentResultSet;
     }
 
+    @Override
     public int getResultSetConcurrency() throws SQLException
     {
         checkNotClosed();
         return ResultSet.CONCUR_READ_ONLY;
     }
 
+    @Override
     public int getResultSetHoldability() throws SQLException
     {
         checkNotClosed();
@@ -382,35 +390,41 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
         return ResultSet.HOLD_CURSORS_OVER_COMMIT;
     }
 
+    @Override
     public int getResultSetType() throws SQLException
     {
         checkNotClosed();
         return ResultSet.TYPE_FORWARD_ONLY;
     }
 
+    @Override
     public int getUpdateCount() throws SQLException
     {
         checkNotClosed();
         return updateCount;
     }
 
+    @Override
     public SQLWarning getWarnings() throws SQLException
     {
         checkNotClosed();
         return null;
     }
 
+    @Override
     public boolean isClosed()
     {
         return connection == null;
     }
 
+    @Override
     public boolean isPoolable() throws SQLException
     {
         checkNotClosed();
         return false;
     }
 
+    @Override
     public boolean isWrapperFor(Class<?> iface) throws SQLException
     {
         return false;
@@ -418,10 +432,10 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
 
     protected final void resetResults()
     {
-        currentResultSet = null;
         updateCount = -1;
     }
 
+    @Override
     public void setEscapeProcessing(boolean enable) throws SQLException
     {
         checkNotClosed();
@@ -429,6 +443,7 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
         escapeProcessing = enable;
     }
 
+    @Override
     public void setFetchDirection(int direction) throws SQLException
     {
         checkNotClosed();
@@ -442,7 +457,7 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
         else throw new SQLSyntaxErrorException(String.format(BAD_FETCH_DIR, direction));
     }
 
-
+    @Override
     public void setFetchSize(int size) throws SQLException
     {
         checkNotClosed();
@@ -450,47 +465,54 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
         fetchSize = size;
     }
 
+    @Override
     public void setMaxFieldSize(int arg0) throws SQLException
     {
         checkNotClosed();
         // silently ignore this setting. always use default 0 (unlimited)
     }
 
+    @Override
     public void setMaxRows(int arg0) throws SQLException
     {
         checkNotClosed();
         // silently ignore this setting. always use default 0 (unlimited)
     }
 
+    @Override
     public void setPoolable(boolean poolable) throws SQLException
     {
         checkNotClosed();
         // silently ignore any attempt to set this away from the current default (false)
     }
 
+    @Override
     public void setQueryTimeout(int arg0) throws SQLException
     {
         checkNotClosed();
         // silently ignore any attempt to set this away from the current default (0)
     }
 
+    @Override
     public <T> T unwrap(Class<T> iface) throws SQLException
     {
         if(iface.isInstance(this)) return iface.cast(this);
     	throw new SQLFeatureNotSupportedException(String.format(NO_INTERFACE, iface.getSimpleName()));
     }
-        
-    
+
+    @Override
     public ConsistencyLevel getConsistencyLevel()
     {
         return consistencyLevel;
     }
 
+    @Override
     public void setConsistencyLevel(ConsistencyLevel consistencyLevel)
     {
         this.consistencyLevel = consistencyLevel;
     }
 
+    @Override
     public int compareTo(Object target)
     {
         if (this.equals(target)) return 0;
