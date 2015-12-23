@@ -70,8 +70,8 @@ public class CassandraRow {
      */
     public String getColumnName(int column) throws SQLException {
 
-        if (((column - 1) >= 0) && ((column - 1) < columnList.size())) {
-            return columnList.get(column - 1).getName();
+        if ((column >= 0) && (column < columnList.size())) {
+            return columnList.get(column).getName();
         } else {
             throw new SQLException("Specified Column Not Found: " + column);
         }

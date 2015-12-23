@@ -20,6 +20,7 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
+import java.nio.charset.CharacterCodingException;
 import java.sql.*;
 
 import static org.apache.cassandra.cql.jdbc.Utils.NOT_SUPPORTED;
@@ -92,20 +93,45 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
         return new CassandraResultSet();
     }
 
+    /**
+     * Retrieves the <code>String</code> that this database uses as the
+     * separator between a catalog and table name.
+     *
+     * @return the separator string
+     * @exception SQLException if a database access error occurs
+     */
     public String getCatalogSeparator() throws SQLException
     {
         return "";
     }
 
+    /**
+     * Retrieves the database vendor's preferred term for "catalog".
+     *
+     * @return the vendor term for "catalog"
+     * @exception SQLException if a database access error occurs
+     */
     public String getCatalogTerm() throws SQLException
     {
         return "Cluster";
     }
 
+    /**
+     * Retrieves the catalog names available in this database.  The results
+     * are ordered by catalog name.
+     *
+     * <P>The catalog column is:
+     *  <OL>
+     *  <LI><B>TABLE_CAT</B> String {@code =>} catalog name
+     *  </OL>
+     *
+     * @return a <code>ResultSet</code> object in which each row has a
+     *         single <code>String</code> column that is a catalog name
+     * @exception SQLException if a database access error occurs
+     */
     public ResultSet getCatalogs() throws SQLException
     {
-        ResultSet rs = MetadataResultSets.makeCatalogs(statement);
-        return rs;
+        return MetadataResultSets.makeCatalogs(statement);
     }
 
     public ResultSet getClientInfoProperties() throws SQLException
@@ -118,15 +144,28 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
         return new CassandraResultSet();
     }
 
+    /**
+     * Retrieves a description of table columns available in
+     * the specified catalog.
+     *
+     * <P>Only column descriptions matching the catalog, schema, table
+     * and column name criteria are returned.  They are ordered by
+     * <code>TABLE_CAT</code>,<code>TABLE_SCHEM</code>,
+     * <code>TABLE_NAME</code>, and <code>ORDINAL_POSITION</code>.
+     */
     public ResultSet getColumns(String catalog,String schemaPattern, String tableNamePattern, String columnNamePattern) throws SQLException
     {
-    	if (catalog == null || connection.getCatalog().equals(catalog))
-    	{
-    		if (schemaPattern == null) schemaPattern = connection.getSchema(); //limit to current schema if set
-	        ResultSet rs = MetadataResultSets.makeColumns(statement, schemaPattern, tableNamePattern,columnNamePattern);
-	        return rs;
-    	}
+        try {
+            if (catalog == null || connection.getCatalog().equals(catalog)) {
+                if (schemaPattern == null) schemaPattern = connection.getSchema(); //limit to current schema if set
+                return MetadataResultSets.makeColumns(statement, schemaPattern, tableNamePattern, columnNamePattern);
+            }
+        } catch (CharacterCodingException ex) {
+            throw new SQLException("Failed to retrieve Cassandra database meta-data", ex);
+        }
+
         return new CassandraResultSet();
+
     }
 
     public Connection getConnection() throws SQLException
@@ -400,11 +439,12 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public ResultSet getSchemas(String catalog, String schemaPattern) throws SQLException
     {
+
         if (!(catalog == null || catalog.equals(statement.connection.getCatalog()) ))
             throw new SQLSyntaxErrorException("catalog name must exactly match or be null");
         
-        ResultSet rs = MetadataResultSets.makeSchemas(statement, schemaPattern);
-        return rs;
+        return MetadataResultSets.makeSchemas(statement, schemaPattern);
+
     }
 
     public String getSearchStringEscape() throws SQLException

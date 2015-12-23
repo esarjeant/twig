@@ -899,7 +899,7 @@ public class CassandraResultSet extends AbstractResultSet implements ResultSet
         @Override
         public int getColumnCount() throws SQLException
         {
-            return columnDefinitions.size();
+            return (null == columnDefinitions) ? 0 : columnDefinitions.size();
         }
 
         @Override

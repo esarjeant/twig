@@ -27,6 +27,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.net.URLEncoder;
+import java.nio.charset.CharacterCodingException;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -240,8 +241,8 @@ public class MetadataResultSetsTest
     }
 
     @Test
-    public void testColumns() throws SQLException
-    {
+    public void testColumns() throws SQLException, CharacterCodingException {
+
         CassandraStatement statement = (CassandraStatement) con.createStatement();
         ResultSet result = MetadataResultSets.makeColumns(statement, KEYSPACE1, "test1" ,null);
         
@@ -261,8 +262,8 @@ public class MetadataResultSetsTest
     }
 
     @Test
-    public void testClob() throws SQLException
-    {
+    public void testClob() throws SQLException, CharacterCodingException {
+
         CassandraStatement statement = (CassandraStatement) con.createStatement();
         ResultSet result = MetadataResultSets.makeColumns(statement, KEYSPACE1, "test3" ,null);
 

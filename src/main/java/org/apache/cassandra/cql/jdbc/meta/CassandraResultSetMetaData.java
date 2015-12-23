@@ -56,12 +56,12 @@ public class CassandraResultSetMetaData implements ResultSetMetaData {
 
     @Override
     public String getColumnLabel(int column) throws SQLException {
-        return metaResults.getName(column);
+        return metaResults.getName(column - 1);
     }
 
     @Override
     public String getColumnName(int column) throws SQLException {
-        return metaResults.getName(column);
+        return metaResults.getName(column - 1);
     }
 
     @Override
@@ -82,7 +82,7 @@ public class CassandraResultSetMetaData implements ResultSetMetaData {
 
     @Override
     public String getTableName(int column) throws SQLException {
-        return metaResults.getName(column);
+        return metaResults.getName(column - 1);
     }
 
     @Override

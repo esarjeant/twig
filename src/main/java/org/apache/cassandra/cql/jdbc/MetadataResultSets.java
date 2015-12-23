@@ -23,17 +23,15 @@ package org.apache.cassandra.cql.jdbc;
 import org.apache.cassandra.cql.jdbc.meta.CassandraColumn;
 import org.apache.cassandra.cql.jdbc.meta.CassandraResultSetMetaData;
 import org.apache.cassandra.cql.jdbc.meta.CassandraRow;
-import org.apache.cassandra.utils.ByteBufferUtil;
 
 import java.math.BigDecimal;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
-
-import static org.apache.cassandra.utils.ByteBufferUtil.bytes;
 
 public class MetadataResultSets extends AbstractResultSet implements ResultSet
 {
@@ -55,7 +53,7 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
      * Add a new row to the resultset.
      * @param row   Row to add to the resultset.
      */
-    private void addRow(CassandraRow row) {
+    void addRow(CassandraRow row) {
         this.rows.add(row);
     }
 
@@ -68,7 +66,7 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
     public static ResultSet makeTableTypes(CassandraStatement statement) throws SQLException
     {
         //final  Entry[][] tableTypes = { { new Entry("TABLE_TYPE",bytes(TABLE_CONSTANT),Entry.ASCII_TYPE)} };
-        
+
         // use tableTypes with the key in column number 1 (one based)
         // CassandraResultSet result =  makeCqlResult(tableTypes, 1);
 
@@ -79,39 +77,12 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
         metaResults.addRow(row);
 
-//        for (int rowcnt = 0; rowcnt < rowsOfcolsOfKvps.length; rowcnt++ )
-//        {
-//            colNamesList = new ArrayList<String>();
-//            columnlist = new LinkedList<CassandraColumn>();
-//            for (int colcnt = 0; colcnt < rowsOfcolsOfKvps[0].length; colcnt++ )
-//            {
-//                column = makeColumn(rowsOfcolsOfKvps[rowcnt][colcnt].name,rowsOfcolsOfKvps[rowcnt][colcnt].value);
-//                columnlist.add(column);
-//                colNamesList.add(rowsOfcolsOfKvps[rowcnt][colcnt].name);
-//            }
-//            row = makeRow(rowsOfcolsOfKvps[rowcnt][position-1].name, columnlist);
-//            rowlist.add(row);
-//        }
-//
-//        meta = makeMetadataAllString(colNamesList);
-//
-//        result.add
-//        result.setSchema(meta).setRows(rowlist);
-//        return result;
-
-        //CassandraResultSet result = new CassandraResultSet(statement, cqlresult);
         return metaResults;
 
     }
 
     public static ResultSet makeCatalogs(CassandraStatement statement) throws SQLException
     {
-        // final Entry[][] catalogs = { { new Entry("TABLE_CAT",bytes(statement.connection.getCatalog()),Entry.ASCII_TYPE)} };
-
-        // use catalogs with the key in column number 1 (one based)
-        // CassandraResultSet result = makeCqlResult(catalogs, 1);
-
-        //CassandraResultSet result = new CassandraResultSet(statement, cqlresult);
 
         CassandraColumn<String> tableCat = new CassandraColumn<String>("TABLE_CAT", statement.connection.getCatalog());
         CassandraRow row = new CassandraRow(tableCat);
@@ -122,20 +93,20 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
         return metaResults;
 
     }
-    
+
     public static ResultSet makeSchemas(CassandraStatement statement, String schemaPattern) throws SQLException
     {
         if ("%".equals(schemaPattern)) schemaPattern = null;
 
         // TABLE_SCHEM String => schema name
         // TABLE_CATALOG String => catalog name (may be null)
-        
+
         String query = "SELECT keyspace_name FROM system.schema_keyspaces";
         if (schemaPattern!=null) query = query + " where keyspace_name = '" + schemaPattern + "'";
-        
+
         String catalog = statement.connection.getCatalog();
         CassandraColumn<String> entryCatalog = new CassandraColumn<String>("TABLE_CATALOG", catalog);
-        
+
         // determine the schemas
         CassandraResultSet result = (CassandraResultSet)statement.executeQuery(query);
 
@@ -152,7 +123,7 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
         }
 
         return metaResult;
-        
+
     }
 
     /**
@@ -180,7 +151,7 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
         if ("%".equals(schemaPattern)) schemaPattern = null;
         if ("%".equals(tableNamePattern)) tableNamePattern = null;
-        
+
         // example query to retrieve tables
         // SELECT keyspace_name,columnfamily_name,comment from schema_columnfamilies WHERE columnfamily_name = 'Test2';
         StringBuilder query = new StringBuilder("SELECT keyspace_name,columnfamily_name,comment FROM system.schema_columnfamilies");
@@ -194,7 +165,7 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
         {
             String expr = "%s = '%s'";
             query.append(" WHERE ");
-            if (schemaPattern != null) 
+            if (schemaPattern != null)
             {
             	query.append(String.format(expr, "keyspace_name", schemaPattern));
                 filterCount--;
@@ -218,7 +189,7 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
         // create returned resultset
         MetadataResultSets metaResults = new MetadataResultSets();
-                
+
         while (result.next())
         {
             CassandraColumn<String> entrySchema = new CassandraColumn<String>("TABLE_SCHEM", result.getString(1));
@@ -255,8 +226,7 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
      * @return Results with column information.
      * @throws SQLException
      */
-    public static ResultSet makeColumns(CassandraStatement statement, String schemaPattern, String tableNamePattern, String columnNamePattern) throws SQLException
-    {
+    public static ResultSet makeColumns(CassandraStatement statement, String schemaPattern, String tableNamePattern, String columnNamePattern) throws SQLException, CharacterCodingException {
         // 1.TABLE_CAT String => table catalog (may be null)
         // 2.TABLE_SCHEM String => table schema (may be null)
         // 3.TABLE_NAME String => table name
@@ -312,13 +282,13 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
         {
             String expr = "%s = '%s'";
             query.append(" WHERE ");
-            if (schemaPattern != null) 
+            if (schemaPattern != null)
             {
             	query.append(String.format(expr, "keyspace_name", schemaPattern));
                 filterCount--;
                 if (filterCount > 0) query.append(" AND ");
             }
-            if (tableNamePattern != null) 
+            if (tableNamePattern != null)
             {
             	query.append(String.format(expr, "columnfamily_name", tableNamePattern));
                 filterCount--;
@@ -365,7 +335,7 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
             CassandraColumn<String> entryTypeName = new CassandraColumn<String>("TYPE_NAME", info.typeName);
 
             AbstractJdbcType jtype = TypesMap.getTypeForComparator(info.typeName);
-            int colLength = getJdbcTypeLength(jtype);
+            int colLength = getJdbcTypeWidth(jtype);
             CassandraColumn<Integer> entryColumnSize = new CassandraColumn<Integer>("COLUMN_SIZE", colLength);
 
             CassandraColumn<Integer> entryDecimalDigits = new CassandraColumn<Integer>("DECIMAL_DIGITS", 0x00);
@@ -374,9 +344,8 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
             if (jtype != null && (jtype.getJdbcType() == Types.DECIMAL || jtype.getJdbcType() == Types.NUMERIC)) npr = 10;
             CassandraColumn<Integer> entryNPR = new CassandraColumn<Integer>("NUM_PREC_RADIX", npr);
 
-            ByteBuffer charol = ByteBufferUtil.EMPTY_BYTE_BUFFER;
-            if (jtype instanceof JdbcAscii || jtype instanceof JdbcUTF8) charol = bytes(Integer.MAX_VALUE);
-            CassandraColumn<ByteBuffer> entryCharOctetLength = new CassandraColumn<ByteBuffer>("CHAR_OCTET_LENGTH", charol);
+            int charOctetLength = getJdbcTypeLength(jtype);
+            CassandraColumn<String> entryCharOctetLength = new CassandraColumn<String>("CHAR_OCTET_LENGTH", String.valueOf(charOctetLength));
 
             ordinalPosition++;
             CassandraColumn<Integer> entryOrdinalPosition = new CassandraColumn<Integer>("ORDINAL_POSITION", ordinalPosition);
@@ -412,7 +381,7 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
             metaResults.addRow(row);
 
 	    }
-        
+
         // define the columns
         CassandraResultSet result = (CassandraResultSet) statement.executeQuery(query.toString());
         while (result.next())
@@ -430,7 +399,7 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
             int idx = validator.lastIndexOf('.');
             CassandraColumn<String> entryTypeName = new CassandraColumn<String>("TYPE_NAME", validator.substring(idx + 1));
 
-            int colLength = getJdbcTypeLength(jtype);
+            int colLength = getJdbcTypeWidth(jtype);
             CassandraColumn<Integer> entryColumnSize = new CassandraColumn<Integer>("COLUMN_SIZE", colLength);
 
             // if (jtype instanceof JdbcDouble) dd = bytes(17);
@@ -485,16 +454,33 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
     }
 
-    private static int getJdbcTypeLength(AbstractJdbcType jtype) {
+    private static int getJdbcTypeWidth(AbstractJdbcType jtype) {
 
         if (jtype instanceof JdbcBytes) return Integer.MAX_VALUE / 2;
-        if (jtype instanceof JdbcAscii || jtype instanceof JdbcUTF8) return Integer.MAX_VALUE;
         if (jtype instanceof JdbcUUID) return 36;
         if (jtype instanceof JdbcInt32) return 4;
         if (jtype instanceof JdbcLong) return 8;
 
         // sensible default...
         return 20;
+
+    }
+
+    /**
+     * This is the maximum length in bytes for the designated type.
+     * @param jtype  JDBC type to check.
+     * @return Maximum length in bytes.
+     */
+    private static int getJdbcTypeLength(AbstractJdbcType jtype) {
+
+        if (jtype instanceof JdbcBytes) return Integer.MAX_VALUE / 2;
+        if (jtype instanceof JdbcAscii || jtype instanceof JdbcUTF8) return Integer.MAX_VALUE;
+        if (jtype instanceof JdbcUUID) return 36;
+        if (jtype instanceof JdbcInt32) return Integer.SIZE;
+        if (jtype instanceof JdbcLong) return Long.SIZE;
+
+        // sensible default...
+        return 1;
 
     }
 
@@ -510,36 +496,36 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
      */
     public static ResultSet makeIndexes(CassandraStatement statement, String schema, String table, boolean unique, boolean approximate) throws SQLException
 	{
-		//1.TABLE_CAT String => table catalog (may be null) 
-		//2.TABLE_SCHEM String => table schema (may be null) 
-		//3.TABLE_NAME String => table name 
-		//4.NON_UNIQUE boolean => Can index values be non-unique. false when TYPE is tableIndexStatistic 
-		//5.INDEX_QUALIFIER String => index catalog (may be null); null when TYPE is tableIndexStatistic 
-		//6.INDEX_NAME String => index name; null when TYPE is tableIndexStatistic 
-		//7.TYPE short => index type: - tableIndexStatistic - this identifies table statistics that are returned in conjuction with a table's index descriptions 
-		//- tableIndexClustered - this is a clustered index 
-		//- tableIndexHashed - this is a hashed index 
-		//- tableIndexOther - this is some other style of index 
+		//1.TABLE_CAT String => table catalog (may be null)
+		//2.TABLE_SCHEM String => table schema (may be null)
+		//3.TABLE_NAME String => table name
+		//4.NON_UNIQUE boolean => Can index values be non-unique. false when TYPE is tableIndexStatistic
+		//5.INDEX_QUALIFIER String => index catalog (may be null); null when TYPE is tableIndexStatistic
+		//6.INDEX_NAME String => index name; null when TYPE is tableIndexStatistic
+		//7.TYPE short => index type: - tableIndexStatistic - this identifies table statistics that are returned in conjuction with a table's index descriptions
+		//- tableIndexClustered - this is a clustered index
+		//- tableIndexHashed - this is a hashed index
+		//- tableIndexOther - this is some other style of index
 		//
-		//8.ORDINAL_POSITION short => column sequence number within index; zero when TYPE is tableIndexStatistic 
-		//9.COLUMN_NAME String => column name; null when TYPE is tableIndexStatistic 
-		//10.ASC_OR_DESC String => column sort sequence, "A" => ascending, "D" => descending, may be null if sort sequence is not supported; null when TYPE is tableIndexStatistic 
-		//11.CARDINALITY int => When TYPE is tableIndexStatistic, then this is the number of rows in the table; otherwise, it is the number of unique values in the index. 
-		//12.PAGES int => When TYPE is tableIndexStatisic then this is the number of pages used for the table, otherwise it is the number of pages used for the current index. 
-		//13.FILTER_CONDITION String => Filter condition, if any. (may be null) 
-	
+		//8.ORDINAL_POSITION short => column sequence number within index; zero when TYPE is tableIndexStatistic
+		//9.COLUMN_NAME String => column name; null when TYPE is tableIndexStatistic
+		//10.ASC_OR_DESC String => column sort sequence, "A" => ascending, "D" => descending, may be null if sort sequence is not supported; null when TYPE is tableIndexStatistic
+		//11.CARDINALITY int => When TYPE is tableIndexStatistic, then this is the number of rows in the table; otherwise, it is the number of unique values in the index.
+		//12.PAGES int => When TYPE is tableIndexStatisic then this is the number of pages used for the table, otherwise it is the number of pages used for the current index.
+		//13.FILTER_CONDITION String => Filter condition, if any. (may be null)
+
 	    StringBuilder query = new StringBuilder("SELECT keyspace_name, columnfamily_name, column_name, component_index, index_name, index_options, index_type FROM system.schema_columns");
-	
+
 	    int filterCount = 0;
 	    if (schema != null) filterCount++;
 	    if (table != null) filterCount++;
-	
+
 	    // check to see if it is qualified
 	    if (filterCount > 0)
 	    {
 	        String expr = "%s = '%s'";
 	        query.append(" WHERE ");
-	        if (schema != null) 
+	        if (schema != null)
 	        {
 	        	query.append(String.format(expr, "keyspace_name", schema));
                 filterCount--;
@@ -606,17 +592,17 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 	private static List<PKInfo> getPrimaryKeys(CassandraStatement statement, String schema, String table) throws SQLException
 	{
 		StringBuilder query = new StringBuilder("SELECT keyspace_name, columnfamily_name, key_aliases, key_validator, column_aliases, comparator FROM system.schema_columnfamilies");
-		
+
 	    int filterCount = 0;
 	    if (schema != null) filterCount++;
 	    if (table != null) filterCount++;
-	
+
 	    // check to see if it is qualified
 	    if (filterCount > 0)
 	    {
 	        String expr = "%s = '%s'";
 	        query.append(" WHERE ");
-	        if (schema != null) 
+	        if (schema != null)
 	        {
 	        	query.append(String.format(expr, "keyspace_name", schema));
                 filterCount--;
@@ -626,50 +612,28 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 	        query.append(" ALLOW FILTERING");
 	    }
 	    // System.out.println(query.toString());
-	
+
 	    List<PKInfo> retval = new ArrayList<PKInfo>();
 	    CassandraResultSet result = (CassandraResultSet) statement.executeQuery(query.toString());
 	    if (result.next()) // all is reported back in one json row
 	    {
+
 	    	String rschema = result.getString(1);
    	    	String rtable = result.getString(2);
-	        String validator = result.getString(4);
 	        String key_aliases = result.getString(3);
-	        buildPKInfo(retval,rschema,rtable,key_aliases,validator);
-	        
-	        String comparator = result.getString(6);
+            CassandraValidatorType validator = CassandraValidatorType.fromValidator(result.getString(4));
+            buildPKInfo(retval, rschema, rtable, key_aliases, validator);
+
+            CassandraValidatorType comparator = CassandraValidatorType.fromValidator(result.getString(6));
 	        String column_aliases = result.getString(5);
-	        buildPKInfo(retval,rschema,rtable,column_aliases,comparator);
+	        buildPKInfo(retval, rschema, rtable, column_aliases, comparator);
+
 	    }
 	    return retval;
 	}
-	
-	private static void buildPKInfo(List<PKInfo> retval,String schema, String table,String aliases,String validator)
+
+	private static void buildPKInfo(List<PKInfo> retval, String schema, String table, String aliases, CassandraValidatorType validator)
 	{
-		String[] typeNames = new String[0];
-    	int[] types = new int[0]; 
-        if (validator != null)
-        {
-        	String[] validatorArray = new String[]{validator};
-        	String check = "CompositeType";
-        	int idx = validator.indexOf(check);
-        	if (idx > 0)
-        	{
-        		validator = validator.substring(idx+check.length()+1,validator.length()-1);
-        		validatorArray = validator.split(",");
-        	}
-        	types = new int[validatorArray.length];
-        	typeNames = new String[validatorArray.length];
-        	for (int i = 0; i < validatorArray.length; i++) 
-        	{
-	        	AbstractJdbcType jtype = TypesMap.getTypeForComparator(validatorArray[i]);
-	        	types[i] = (jtype != null ? jtype.getJdbcType() : Types.OTHER);
-
-	            int dotidx = validatorArray[i].lastIndexOf('.');
-	            typeNames[i] = validatorArray[i].substring(dotidx + 1);
-        	}
-        }
-
         if (aliases != null)
         {
         	aliases = aliases.replace("[","");
@@ -678,20 +642,19 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
         	if (aliases.trim().length() != 0)
         	{
 	        	String[] kaArray = aliases.split(",");
-	        	for (int i = 0; i < kaArray.length; i++) 
+	        	for (int i = 0; i < kaArray.length; i++)
 	        	{
 	        		PKInfo pki = new PKInfo();
 	        		pki.name = kaArray[i];
 	        		pki.schema = schema;
 	        		pki.table = table;
-	        		pki.type = (i < types.length ? types[i] : Types.OTHER);
-	        		pki.typeName = (i < typeNames.length ? typeNames[i] : "unknown");
+	        		pki.type = validator.getSqlType();
+	        		pki.typeName = validator.getSqlName();
 	        		retval.add(pki);
 				}
         	}
         }
 	}
-
 
     @Override
     public boolean next() throws SQLException {
@@ -711,7 +674,21 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
     @Override
     public String getString(int columnIndex) throws SQLException {
-        return rows.get(getRow()).getColumnValue(columnIndex - 1);
+        Object value = rows.get(getRow()).getColumnValue(columnIndex - 1);
+
+        if (value instanceof Integer) {
+            return ((Integer)value).toString();
+        } else if (value instanceof Long) {
+            return ((Long)value).toString();
+        } else if (value instanceof Double) {
+            return ((Double)value).toString();
+        } else if (value instanceof Float) {
+            return ((Float)value).toString();
+        } else if (value instanceof String) {
+            return ((String)value).toString();
+        } else {
+            return value.getClass().getName();
+        }
     }
 
     @Override
@@ -857,12 +834,12 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
     @Override
     public Object getObject(int columnIndex) throws SQLException {
-        return null;
+        return rows.get(getRow()).getColumnValue(columnIndex - 1);
     }
 
     @Override
     public Object getObject(String columnLabel) throws SQLException {
-        return null;
+        return rows.get(getRow()).getColumnValue(findColumn(columnLabel));
     }
 
     @Override
@@ -1076,12 +1053,12 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
     @Override
     public <T> T getObject(int columnIndex, Class<T> type) throws SQLException {
-        return null;
+        return rows.get(getRow()).getColumnValue(columnIndex - 1);
     }
 
     @Override
     public <T> T getObject(String columnLabel, Class<T> type) throws SQLException {
-        return null;
+        return rows.get(getRow()).getColumnValue(findColumn(columnLabel));
     }
 
     @Override
@@ -1106,7 +1083,30 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
     }
 
     public String getName(int column) throws SQLException {
-        return this.rows.get(getRow()).getColumnName(column);
+
+        if (!this.rows.isEmpty()) {
+
+            Object columnName = this.rows.get(0).getColumnName(column);
+
+            if (columnName != null) {
+                if (columnName instanceof Integer) {
+                    return ((Integer) columnName).toString();
+                } else if (columnName instanceof Long) {
+                    return ((Long) columnName).toString();
+                } else if (columnName instanceof Boolean) {
+                    return ((Boolean) columnName).toString();
+                } else if (columnName instanceof Float) {
+                    return ((Float) columnName).toString();
+                } else if (columnName instanceof ByteBuffer) {
+                    return ((ByteBuffer) columnName).toString();
+                } else {
+                    return columnName.toString();
+                }
+            }
+        }
+
+        return null;
+
     }
 
     private static class PKInfo
@@ -1128,12 +1128,12 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
      */
 	public static final ResultSet makePrimaryKeys(CassandraStatement statement, String schema, String table) throws SQLException
 	{
-		//1.TABLE_CAT String => table catalog (may be null) 
-		//2.TABLE_SCHEM String => table schema (may be null) 
-		//3.TABLE_NAME String => table name 
-		//4.COLUMN_NAME String => column name 
-		//5.KEY_SEQ short => sequence number within primary key( a value of 1 represents the first column of the primary key, a value of 2 would represent the second column within the primary key). 
-		//6.PK_NAME String => primary key name (may be null) 
+		//1.TABLE_CAT String => table catalog (may be null)
+		//2.TABLE_SCHEM String => table schema (may be null)
+		//3.TABLE_NAME String => table name
+		//4.COLUMN_NAME String => column name
+		//5.KEY_SEQ short => sequence number within primary key( a value of 1 represents the first column of the primary key, a value of 2 would represent the second column within the primary key).
+		//6.PK_NAME String => primary key name (may be null)
 
 		List<PKInfo> pks = getPrimaryKeys(statement, schema, table);
 
@@ -1174,22 +1174,4 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
 	}
 
-//	private static class Entry
-//    {
-//    	static final String UTF8_TYPE = "UTF8Type";
-//        static final String ASCII_TYPE = "AsciiType";
-//        static final String INT32_TYPE = "Int32Type";
-//        static final String BOOLEAN_TYPE = "BooleanType";
-//
-//        String name = null;
-//        ByteBuffer value = null;
-//        String type = null;
-//
-//        private Entry(String name,ByteBuffer value,String type)
-//        {
-//            this.name = name;
-//            this.value = value;
-//            this.type = type;
-//        }
-//    }
 }
