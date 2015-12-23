@@ -21,7 +21,10 @@
 
 package org.apache.cassandra.cql.jdbc;
 
-import java.io.ByteArrayOutputStream;
+import com.datastax.driver.core.ConsistencyLevel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -36,15 +39,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.zip.Deflater;
-
-import org.apache.cassandra.thrift.Compression;
-import org.apache.cassandra.thrift.ConsistencyLevel;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.google.common.base.Charsets;
 
 /**
  * A set of static utility methods used by the JDBC Suite, and various default values and error message strings
@@ -64,7 +58,9 @@ class Utils
 
     public static final String KEY_VERSION = "version";
     public static final String KEY_CONSISTENCY = "consistency";
-    
+    public static final String KEY_PRIMARY_DC = "primarydc";
+    public static final String KEY_BACKUP_DC = "backupdc";
+    public static final String KEY_CONNECTION_RETRIES = "retries";
     
     public static final String TAG_DESCRIPTION = "description";
     public static final String TAG_USER = "user";
@@ -77,6 +73,13 @@ class Utils
     public static final String TAG_BUILD_VERSION = "buildVersion";
     public static final String TAG_THRIFT_VERSION = "thriftVersion";
     public static final String TAG_CONSISTENCY_LEVEL = "consistencyLevel";
+
+    public static final String TAG_TRUST_STORE = "truststore";
+    public static final String TAG_TRUST_PASSWORD = "trustpass";
+
+    public static final String TAG_PRIMARY_DC = "primaryDatacenter";
+    public static final String TAG_BACKUP_DC = "backupDatacenter";
+    public static final String TAG_CONNECTION_RETRIES = "retries";
 
     protected static final String WAS_CLOSED_CON = "method was called on a closed Connection";
     protected static final String WAS_CLOSED_STMT = "method was called on a closed Statement";
@@ -115,41 +118,6 @@ class Utils
     protected static final String FORWARD_ONLY = "Can not position cursor with a type of TYPE_FORWARD_ONLY";
 
     protected static final Logger logger = LoggerFactory.getLogger(Utils.class);
-
-    /**
-     * Use the Compression object method to deflate the query string
-     *
-     * @param queryStr An un-compressed CQL query string
-     * @param compression The compression object
-     * @return A compressed string
-     */
-    public static ByteBuffer compressQuery(String queryStr, Compression compression)
-    {
-        byte[] data = queryStr.getBytes(Charsets.UTF_8);
-        Deflater compressor = new Deflater();
-        compressor.setInput(data);
-        compressor.finish();
-
-        ByteArrayOutputStream byteArray = new ByteArrayOutputStream();
-        byte[] buffer = new byte[1024];
-
-        try
-        {
-            while (!compressor.finished())
-            {
-                int size = compressor.deflate(buffer);
-                byteArray.write(buffer, 0, size);
-            }
-        }
-        finally
-        {
-            compressor.end(); //clean up after the Deflater
-        }
-
-        logger.trace("Compressed query statement {} bytes in length to {} bytes", data.length, byteArray.size());
-
-        return ByteBuffer.wrap(byteArray.toByteArray());
-    }
 
     /**
      * Parse a URL for the Cassandra JDBC Driver
@@ -206,10 +174,29 @@ class Utils
                 if (params.containsKey(KEY_VERSION) )
                 {
                     props.setProperty(TAG_CQL_VERSION,params.get(KEY_VERSION));
-                }
+                }                
                 if (params.containsKey(KEY_CONSISTENCY) )
                 {
                     props.setProperty(TAG_CONSISTENCY_LEVEL,params.get(KEY_CONSISTENCY));
+                }
+                if (params.containsKey(KEY_PRIMARY_DC) )
+                {
+                    props.setProperty(TAG_PRIMARY_DC,params.get(KEY_PRIMARY_DC));
+                }
+                if (params.containsKey(KEY_BACKUP_DC) )
+                {
+                    props.setProperty(TAG_BACKUP_DC,params.get(KEY_BACKUP_DC));
+                }
+                if (params.containsKey(KEY_CONNECTION_RETRIES) )
+                {
+                    props.setProperty(TAG_CONNECTION_RETRIES,params.get(KEY_CONNECTION_RETRIES));
+                }
+                if (params.containsKey(TAG_TRUST_STORE)) {
+
+                    props.setProperty(TAG_TRUST_STORE, params.get(TAG_TRUST_STORE));
+                }
+                if (params.containsKey(TAG_TRUST_PASSWORD)) {
+                    props.setProperty(TAG_TRUST_PASSWORD, params.get(TAG_TRUST_PASSWORD));
                 }
 
 //               String[] items = query.split("&");
@@ -234,7 +221,7 @@ class Utils
      * @return A constructed "Subname" portion of a JDBC URL in the form of a CLI (ie: //myhost:9160/Test1?version=3.0.0 )
      * @throws SQLException
      */
-    public static final String createSubName(Properties props)throws SQLException
+    public static String createSubName(Properties props)throws SQLException
     {
         // make keyspace always start with a "/" for URI
         String keyspace = props.getProperty(TAG_DATABASE_NAME);

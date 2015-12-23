@@ -22,11 +22,13 @@
 package org.apache.cassandra.cql.jdbc;
 
 
+import java.net.URLEncoder;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 
 import org.apache.cassandra.cql.ConnectionDetails;
+import org.apache.commons.lang3.StringUtils;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -39,11 +41,23 @@ public class SpashScreenTest
     
     private static java.sql.Connection con = null;
 
+    // use these for encyrpted connections
+    private static final String TRUST_STORE = System.getProperty("trustStore");
+    private static final String TRUST_PASS = System.getProperty("trustPass", "cassandra");
+
+    private static String OPTIONS = "";
+
     @BeforeClass
     public static void setUpBeforeClass() throws Exception
     {
+        // configure OPTIONS
+        if (!StringUtils.isEmpty(TRUST_STORE)) {
+            OPTIONS = String.format("trustStore=%s&trustPass=%s",
+                    URLEncoder.encode(TRUST_STORE), TRUST_PASS);
+        }
+
         Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?version=3.0.0",HOST,PORT,"system"));
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?%s&version=3.0.0",HOST,PORT,"system",OPTIONS));
         Statement stmt = con.createStatement();
 
         // Drop Keyspace
@@ -70,7 +84,7 @@ public class SpashScreenTest
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?%s",HOST,PORT,KEYSPACE,OPTIONS));
     }
 
     @AfterClass

@@ -20,13 +20,13 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
-import java.sql.Statement;
+import com.datastax.driver.core.ConsistencyLevel;
 
-import org.apache.cassandra.thrift.ConsistencyLevel;
+import java.sql.Statement;
 
 public interface CassandraStatementExtras extends Statement
 {
-    public void setConsistencyLevel(ConsistencyLevel consistencyLevel);
+    void setConsistencyLevel(ConsistencyLevel consistencyLevel);
     
-    public ConsistencyLevel getConsistencyLevel();
+    ConsistencyLevel getConsistencyLevel();
 }

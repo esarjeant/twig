@@ -20,54 +20,25 @@
 
 package org.apache.cassandra.cql.jdbc;
 
-import org.apache.cassandra.cql.jdbc.TypedColumn.CollectionType;
-import org.apache.cassandra.thrift.Column;
-import org.apache.cassandra.thrift.CqlMetadata;
-import org.apache.cassandra.thrift.CqlResult;
-import org.apache.cassandra.thrift.CqlRow;
-import org.apache.cassandra.utils.ByteBufferUtil;
+import com.datastax.driver.core.ColumnDefinitions;
+import com.datastax.driver.core.DataType;
+import com.datastax.driver.core.Row;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.net.URL;
 import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.StandardCharsets;
-import java.sql.Date;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.RowId;
-import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
-import java.sql.SQLNonTransientException;
-import java.sql.SQLRecoverableException;
-import java.sql.SQLSyntaxErrorException;
-import java.sql.SQLWarning;
-import java.sql.Statement;
-import java.sql.Time;
-import java.sql.Timestamp;
-import java.util.ArrayList;
+import java.sql.*;
 import java.util.Calendar;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
 
 import static org.apache.cassandra.cql.jdbc.Utils.BAD_FETCH_DIR;
 import static org.apache.cassandra.cql.jdbc.Utils.BAD_FETCH_SIZE;
 import static org.apache.cassandra.cql.jdbc.Utils.FORWARD_ONLY;
-import static org.apache.cassandra.cql.jdbc.Utils.MUST_BE_POSITIVE;
-import static org.apache.cassandra.cql.jdbc.Utils.NOT_BOOLEAN;
-import static org.apache.cassandra.cql.jdbc.Utils.NOT_TRANSLATABLE;
 import static org.apache.cassandra.cql.jdbc.Utils.NO_INTERFACE;
-import static org.apache.cassandra.cql.jdbc.Utils.VALID_LABELS;
-import static org.apache.cassandra.cql.jdbc.Utils.WAS_CLOSED_RSLT;
-import static org.apache.cassandra.utils.ByteBufferUtil.string;
 
 /**
  * <p>
@@ -152,7 +123,7 @@ import static org.apache.cassandra.utils.ByteBufferUtil.string;
  * </table>
  * 
  */
-class CassandraResultSet extends AbstractResultSet implements CassandraResultSetExtras
+public class CassandraResultSet extends AbstractResultSet implements ResultSet
 {
     private static final Logger logger = LoggerFactory.getLogger(CassandraResultSet.class);
 
@@ -163,22 +134,14 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     /**
      * The rows iterator.
      */
-    private Iterator<CqlRow> rowsIterator;
+    private Iterator<Row> rowsIterator;
 
+    /**
+     * The current row or {@code null} if there is no row yet.
+     */
+    private Row row;
 
     int rowNumber = 0;
-    // the current row key when iterating through results.
-    private byte[] curRowKey = null;
-
-    /**
-     * The values.
-     */
-    private List<TypedColumn> values = new ArrayList<TypedColumn>();
-
-    /**
-     * The index map.
-     */
-    private Map<String, Integer> indexMap = new HashMap<String, Integer>();
 
     private final CResultSetMetaData meta;
 
@@ -192,7 +155,9 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
 
     private boolean wasNull;
 
-    private CqlMetadata schema;
+    private boolean closed;
+
+    private ColumnDefinitions columnDefinitions;
 
     /**
      * no argument constructor.
@@ -206,1007 +171,604 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     /**
      * Instantiates a new cassandra result set from a CqlResult.
      */
-    CassandraResultSet(CassandraStatement statement, CqlResult resultSet) throws SQLException
+    CassandraResultSet(CassandraStatement statement, com.datastax.driver.core.ResultSet resultSet) throws SQLException
     {
         this.statement = statement;
         this.resultSetType = statement.getResultSetType();
         this.fetchDirection = statement.getFetchDirection();
         this.fetchSize = statement.getFetchSize();
-        this.schema = resultSet.schema;
+        this.columnDefinitions = resultSet.getColumnDefinitions();
 
-        // Initialize meta-data from schema
-        populateMetaData();
+        // assign the first row for JDBC to read
+        List<Row> rowList = resultSet.all();
 
-        rowsIterator = resultSet.getRowsIterator();
-
-        // Initialize to column values from the first row
-        // re-Initialize meta-data to column values from the first row (if data exists)
-        // NOTE: that the first call to next() will HARMLESSLY re-write these values for the columns
-        // NOTE: the row cursor is not advanced and sits before the first row
-        if (hasMoreRows())
-        {
-            populateColumns();
-            // reset the iterator back to the beginning.
-            rowsIterator = resultSet.getRowsIterator();
+        if ((rowList != null) && !rowList.isEmpty()) {
+            row = rowList.get(0);
+            rowsIterator = rowList.iterator();
         }
 
-        meta = new CResultSetMetaData();
+        meta = new CResultSetMetaData(resultSet.getColumnDefinitions());
+
     }
 
-
-    private final boolean hasMoreRows()
-    {
-        return (rowsIterator != null && rowsIterator.hasNext());
-    }
-
-    private final void populateMetaData()
-    {
-        values.clear();
-        indexMap.clear();
-        for (ByteBuffer name : this.schema.name_types.keySet())
-        {
-            TypedColumn c = createColumn(new Column(name));
-            String columnName = c.getNameString();
-            values.add(c);
-            indexMap.put(columnName, values.size()); // one greater than 0 based index of a list
-        }
-    }
-
-    private final void populateColumns()
-    {
-        // clear column value tables
-        values.clear();
-        indexMap.clear();
-
-        CqlRow row = rowsIterator.next();
-        curRowKey = row.getKey();
-        List<Column> cols = row.getColumns();
-
-        // loop through the columns
-        for (Column col : cols)
-        {
-            TypedColumn c = createColumn(col);
-            String columnName = c.getNameString();
-            values.add(c);
-            indexMap.put(columnName, values.size()); // one greater than 0 based index of a list
-        }
-    }
-
+    /**
+     * Move to an absolute location in the resultset. This is not supported.
+     * @param arg0   Row to move to.
+     * @return Value is {@code true} for success.
+     * @throws SQLException  Operation is not supported; {@link SQLFeatureNotSupportedException} returns from here.
+     */
+    @Override
     public boolean absolute(int arg0) throws SQLException
     {
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
+    @Override
     public void afterLast() throws SQLException
     {
         if (resultSetType == TYPE_FORWARD_ONLY) throw new SQLNonTransientException(FORWARD_ONLY);
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
+    @Override
     public void beforeFirst() throws SQLException
     {
         if (resultSetType == TYPE_FORWARD_ONLY) throw new SQLNonTransientException(FORWARD_ONLY);
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
-    private final void checkIndex(int index) throws SQLException
-    {
-        // 1 <= index <= size()
-        if (index < 1 || index > values.size()) throw new SQLSyntaxErrorException(String.format(MUST_BE_POSITIVE, String.valueOf(index)) + " " + values.size());
+    /**
+     * Determine if a row has been selected from the resultset.
+     * @return Result is {@code true} if a row is currently selected in the result or {@code false} if it is not.
+     * @throws SQLException  Database error requesting the row.
+     */
+    private boolean hasRow() throws SQLException {
+        return (row != null);
     }
 
-    private final void checkName(String name) throws SQLException
-    {
-        if (indexMap.get(name) == null) throw new SQLSyntaxErrorException(String.format(VALID_LABELS, name));
-    }
-
-    private final void checkNotClosed() throws SQLException
-    {
-        if (isClosed()) throw new SQLRecoverableException(WAS_CLOSED_RSLT);
-    }
-
+    @Override
     public void clearWarnings() throws SQLException
     {
-        // This implementation does not support the collection of warnings so clearing is a no-op
-        // but it is still an exception to call this on a closed connection.
-        checkNotClosed();
+        // not implemented
     }
 
+    @Override
     public void close() throws SQLException
     {
-        indexMap = null;
-        values = null;
+        // not implemented
     }
 
+    @Override
     public int findColumn(String name) throws SQLException
     {
-        checkNotClosed();
-        checkName(name);
-        return indexMap.get(name).intValue();
+        return columnDefinitions.getIndexOf(name) + 1;
     }
 
+    @Override
     public boolean first() throws SQLException
     {
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
-
+    @Override
     public BigDecimal getBigDecimal(int index) throws SQLException
     {
-        checkIndex(index);
-        return getBigDecimal(values.get(index - 1));
+        if (hasRow()) {
+            BigDecimal val = row.getDecimal(index - 1);
+            wasNull = row.isNull(index - 1);
+
+            return wasNull ? null : val;
+
+        } else {
+            throw new SQLDataException("Record Not Found At Index: " + index);
+        }
     }
 
     /** @deprecated */
+    @Override
     public BigDecimal getBigDecimal(int index, int scale) throws SQLException
     {
-        checkIndex(index);
-        return (getBigDecimal(values.get(index - 1))).setScale(scale);
+        return getBigDecimal(index);
     }
 
+    @Override
     public BigDecimal getBigDecimal(String name) throws SQLException
     {
-        checkName(name);
-        return getBigDecimal(indexMap.get(name).intValue());
+        return getBigDecimal(findColumn(name));
     }
 
     /** @deprecated */
+    @Override
     public BigDecimal getBigDecimal(String name, int scale) throws SQLException
     {
-        checkName(name);
-        return (getBigDecimal(indexMap.get(name).intValue())).setScale(scale);
+        return getBigDecimal(name);
     }
 
-    private BigDecimal getBigDecimal(TypedColumn column) throws SQLException
-    {
-        checkNotClosed();
-        Object value = column.getValue();
-        wasNull = value == null;
-
-        if (wasNull) return BigDecimal.ZERO;
-
-        if (value instanceof BigDecimal) return (BigDecimal) value;
-
-        if (value instanceof Long) return BigDecimal.valueOf((Long) value);
-
-        if (value instanceof Double) return BigDecimal.valueOf((Double) value);
-
-        if (value instanceof BigInteger) return new BigDecimal((BigInteger) value);
-
-        try
-        {
-            if (value instanceof String) return (new BigDecimal((String) value));
-        }
-        catch (NumberFormatException e)
-        {
-            throw new SQLSyntaxErrorException(e);
-        }
-
-        throw new SQLSyntaxErrorException(String.format(NOT_TRANSLATABLE, value.getClass().getSimpleName(), "BigDecimal"));
-    }
-
-    public BigInteger getBigInteger(int index) throws SQLException
-    {
-        checkIndex(index);
-        return getBigInteger(values.get(index - 1));
-    }
-
-    public BigInteger getBigInteger(String name) throws SQLException
-    {
-        checkName(name);
-        return getBigInteger(indexMap.get(name).intValue());
-    }
-
-    private BigInteger getBigInteger(TypedColumn column) throws SQLException
-    {
-        checkNotClosed();
-        Object value = column.getValue();
-        wasNull = value == null;
-
-        if (wasNull) return BigInteger.ZERO;
-
-        if (value instanceof BigInteger) return (BigInteger) value;
-
-        if (value instanceof Integer) return BigInteger.valueOf((Integer) value);
-
-        if (value instanceof Long) return BigInteger.valueOf((Long) value);
-
-        try
-        {
-            if (value instanceof String) return (new BigInteger((String) value));
-        }
-        catch (NumberFormatException e)
-        {
-            throw new SQLSyntaxErrorException(e);
-        }
-
-        throw new SQLSyntaxErrorException(String.format(NOT_TRANSLATABLE, value.getClass().getSimpleName(), "BigInteger"));
-    }
-
+    @Override
     public boolean getBoolean(int index) throws SQLException
     {
-        checkIndex(index);
-        return getBoolean(values.get(index - 1));
+
+        if (hasRow()) {
+            Boolean val = row.getBool(index - 1);
+            wasNull = row.isNull(index - 1);
+
+            return !wasNull && val;
+
+        } else {
+            throw new SQLDataException("Record Not Found At Index: " + index);
+        }
     }
 
+    @Override
     public boolean getBoolean(String name) throws SQLException
     {
-        checkName(name);
-        return getBoolean(indexMap.get(name).intValue());
+        return getBoolean(findColumn(name));
     }
 
-    private final Boolean getBoolean(TypedColumn column) throws SQLException
-    {
-        checkNotClosed();
-        Object value = column.getValue();
-        wasNull = value == null;
-
-        if (wasNull) return false;
-
-        if (value instanceof Boolean) return (Boolean) value;
-
-        if (value instanceof Integer) return Boolean.valueOf(((Integer) value) == 0 ? false : true);
-
-        if (value instanceof Long) return Boolean.valueOf(((Long) value) == 0 ? false : true);
-
-        if (value instanceof BigInteger) return Boolean.valueOf(((BigInteger) value).intValue() == 0 ? false : true);
-
-        if (value instanceof String)
-        {
-            String str = (String) value;
-            if (str.equalsIgnoreCase("true")) return true;
-            if (str.equalsIgnoreCase("false")) return false;
-
-            throw new SQLSyntaxErrorException(String.format(NOT_BOOLEAN, str));
-        }
-
-        throw new SQLSyntaxErrorException(String.format(NOT_TRANSLATABLE, value.getClass().getSimpleName(), "Boolean"));
-    }
-
+    @Override
     public byte getByte(int index) throws SQLException
     {
-        checkIndex(index);
-        return getByte(values.get(index - 1));
+        if (hasRow()) {
+
+            ByteBuffer val = row.getBytes(index - 1);
+            wasNull = row.isNull(index - 1);
+
+            if (val != null) {
+                byte[] bytes = val.array();
+                return !wasNull && (bytes.length > 0) ? 0x00 : val.get(0);
+            } else {
+                return 0x00;
+            }
+
+        } else {
+            throw new SQLDataException("Record Not Found At Index: " + index);
+        }
     }
 
+    @Override
     public byte getByte(String name) throws SQLException
     {
-        checkName(name);
-        return getByte(indexMap.get(name).intValue());
+        return getByte(findColumn(name));
     }
 
-    private final Byte getByte(TypedColumn column) throws SQLException
-    {
-        checkNotClosed();
-        Object value = column.getValue();
-        wasNull = value == null;
-
-        if (wasNull) return 0;
-
-        if (value instanceof Integer) return ((Integer) value).byteValue();
-
-        if (value instanceof Long) return ((Long) value).byteValue();
-
-        if (value instanceof BigInteger) return ((BigInteger) value).byteValue();
-
-        try
-        {
-            if (value instanceof String) return (new Byte((String) value));
-        }
-        catch (NumberFormatException e)
-        {
-            throw new SQLSyntaxErrorException(e);
-        }
-
-        throw new SQLSyntaxErrorException(String.format(NOT_TRANSLATABLE, value.getClass().getSimpleName(), "Byte"));
-    }
-
+    @Override
     public byte[] getBytes(int index) throws SQLException
     {
-        return getBytes(values.get(index - 1));
+        if (hasRow()) {
+            ByteBuffer val = row.getBytes(index - 1);
+            wasNull = row.isNull(index - 1) || (null == val);
+
+            return wasNull ? null : val.array();
+
+        } else {
+            throw new SQLDataException("Record Not Found At Index: " + index);
+        }
     }
 
+    @Override
     public byte[] getBytes(String name) throws SQLException
     {
-        return getBytes(indexMap.get(name).intValue());
+        return getBytes(findColumn(name));
     }
 
-    private byte[] getBytes(TypedColumn column) throws SQLException
-    {
-        checkNotClosed();
-        ByteBuffer value = (ByteBuffer) column.getRawColumn().value;
-        wasNull = value == null;
-        return value == null ? null : ByteBufferUtil.clone(value).array();
-    }
-
-    public TypedColumn getColumn(int index) throws SQLException
-    {
-        checkIndex(index);
-        checkNotClosed();
-        return values.get(index - 1);
-    }
-
-    public TypedColumn getColumn(String name) throws SQLException
-    {
-        checkName(name);
-        checkNotClosed();
-        return values.get(indexMap.get(name).intValue());
-    }
-
+    @Override
     public int getConcurrency() throws SQLException
     {
-        checkNotClosed();
         return statement.getResultSetConcurrency();
     }
 
+    @Override
     public Date getDate(int index) throws SQLException
     {
-        checkIndex(index);
-        return getDate(values.get(index - 1));
+        if (hasRow()) {
+            java.util.Date val = row.getDate(index - 1);
+            wasNull = row.isNull(index - 1) || (null == val);
+
+            return wasNull ? null : new java.sql.Date(val.getTime());
+
+        } else {
+            throw new SQLDataException("Record Not Found At Index: " + index);
+        }
     }
 
+    @Override
     public Date getDate(int index, Calendar calendar) throws SQLException
     {
-        checkIndex(index);
-        // silently ignore the Calendar argument; its a hint we do not need
         return getDate(index);
     }
 
+    @Override
     public Date getDate(String name) throws SQLException
     {
-        checkName(name);
-        return getDate(indexMap.get(name).intValue());
+        return getDate(findColumn(name));
     }
 
+    @Override
     public Date getDate(String name, Calendar calendar) throws SQLException
     {
-        checkName(name);
-        // silently ignore the Calendar argument; its a hint we do not need
         return getDate(name);
     }
 
-    private Date getDate(TypedColumn column) throws SQLException
-    {
-        checkNotClosed();
-        Object value = column.getValue();
-        wasNull = value == null;
-
-        if (wasNull) return null;
-
-        if (value instanceof Long) return new Date((Long) value);
-
-        if (value instanceof java.util.Date) return new Date(((java.util.Date) value).getTime());
-
-        try
-        {
-            if (value instanceof String) return Date.valueOf((String) value);
-        }
-        catch (IllegalArgumentException e)
-        {
-            throw new SQLSyntaxErrorException(e);
-        }
-
-        throw new SQLSyntaxErrorException(String.format(NOT_TRANSLATABLE, value.getClass().getSimpleName(), "SQL Date"));
-    }
-
+    @Override
     public double getDouble(int index) throws SQLException
     {
-        checkIndex(index);
-        return getDouble(values.get(index - 1));
+        if (hasRow()) {
+            double val = row.getDouble(index - 1);
+            wasNull = row.isNull(index - 1);
+
+            return wasNull ? 0x0d : val;
+
+        } else {
+            throw new SQLDataException("Record Not Found At Index: " + index);
+        }
     }
 
+    @Override
     public double getDouble(String name) throws SQLException
     {
-        checkName(name);
-        return getDouble(indexMap.get(name).intValue());
+        return getDouble(findColumn(name));
     }
 
-    private final Double getDouble(TypedColumn column) throws SQLException
-    {
-        checkNotClosed();
-        Object value = column.getValue();
-        wasNull = value == null;
-
-        if (wasNull) return 0.0;
-
-        if (value instanceof Double) return ((Double) value);
-
-        if (value instanceof Float) return ((Float) value).doubleValue();
-
-        if (value instanceof Integer) return new Double((Integer) value);
-
-        if (value instanceof Long) return new Double((Long) value);
-
-        if (value instanceof BigInteger) return new Double(((BigInteger) value).doubleValue());
-
-        try
-        {
-            if (value instanceof String) return new Double((String) value);
-        }
-        catch (NumberFormatException e)
-        {
-            throw new SQLSyntaxErrorException(e);
-        }
-
-        throw new SQLSyntaxErrorException(String.format(NOT_TRANSLATABLE, value.getClass().getSimpleName(), "Double"));
-    }
-
+    @Override
     public int getFetchDirection() throws SQLException
     {
-        checkNotClosed();
         return fetchDirection;
     }
 
+    @Override
     public int getFetchSize() throws SQLException
     {
-        checkNotClosed();
         return fetchSize;
     }
 
+    @Override
     public float getFloat(int index) throws SQLException
     {
-        checkIndex(index);
-        return getFloat(values.get(index - 1));
+        if (hasRow()) {
+            float val = row.getFloat(index - 1);
+            wasNull = row.isNull(index - 1);
+
+            return wasNull ? 0x0f : val;
+
+        } else {
+            throw new SQLDataException("Record Not Found At Index: " + index);
+        }
     }
 
+    @Override
     public float getFloat(String name) throws SQLException
     {
-        checkName(name);
-        return getFloat(indexMap.get(name).intValue());
+        return getFloat(findColumn(name));
     }
 
-    private final Float getFloat(TypedColumn column) throws SQLException
-    {
-        checkNotClosed();
-        Object value = column.getValue();
-        wasNull = value == null;
-
-        if (wasNull) return (float) 0.0;
-
-        if (value instanceof Float) return ((Float) value);
-
-        if (value instanceof Double) return ((Double) value).floatValue();
-
-        if (value instanceof Integer) return new Float((Integer) value);
-
-        if (value instanceof Long) return new Float((Long) value);
-
-        if (value instanceof BigInteger) return new Float(((BigInteger) value).floatValue());
-
-        try
-        {
-            if (value instanceof String) return new Float((String) value);
-        }
-        catch (NumberFormatException e)
-        {
-            throw new SQLException(e);
-        }
-
-        throw new SQLSyntaxErrorException(String.format(NOT_TRANSLATABLE, value.getClass().getSimpleName(), "Float"));
-    }
-
+    @Override
     public int getHoldability() throws SQLException
     {
-        checkNotClosed();
         return statement.getResultSetHoldability();
     }
 
+    @Override
     public int getInt(int index) throws SQLException
     {
-        checkIndex(index);
-        return getInt(values.get(index - 1));
+        if (hasRow()) {
+            wasNull = row.isNull(index - 1);
+            return row.getInt(index - 1);
+        } else {
+            throw new SQLDataException("Record Not Found At Index: " + index);
+        }
     }
 
+    @Override
     public int getInt(String name) throws SQLException
     {
-        checkName(name);
-        return getInt(indexMap.get(name).intValue());
+        return getInt(findColumn(name));
     }
 
-    private int getInt(TypedColumn column) throws SQLException
-    {
-        checkNotClosed();
-        Object value = column.getValue();
-        wasNull = value == null;
-
-        if (wasNull) return 0;
-
-        if (value instanceof Integer) return ((Integer) value);
-
-        if (value instanceof Long) return ((Long) value).intValue();
-
-        if (value instanceof BigInteger) return ((BigInteger) value).intValue();
-
-        try
-        {
-            if (value instanceof String) return (Integer.parseInt((String) value));
-        }
-        catch (NumberFormatException e)
-        {
-            throw new SQLSyntaxErrorException(e);
-        }
-
-        throw new SQLSyntaxErrorException(String.format(NOT_TRANSLATABLE, value.getClass().getSimpleName(), "int"));
-    }
-
-    public byte[] getKey() throws SQLException
-    {
-        return curRowKey;
-    }
-
-    public List<?> getList(int index) throws SQLException
-    {
-        checkIndex(index);
-        return getList(values.get(index - 1));
-    }
-
-    public List<?> getList(String name) throws SQLException
-    {
-        checkName(name);
-        return getList(indexMap.get(name).intValue());
-    }
-
-    private List<?> getList(TypedColumn column) throws SQLException
-    {
-        checkNotClosed();
-        Object value = column.getValue();
-        wasNull = value == null;
-        if (column.getCollectionType() != CollectionType.LIST) throw new SQLSyntaxErrorException(String.format(NOT_TRANSLATABLE,
-            value.getClass().getSimpleName(),
-            "List"));
-
-        List<Object> listIn = (List) value;
-        List<Object> listOut = new ArrayList<Object>();
-        for (Object obj : listIn) {
-
-            if (isHeapByteBuffer(obj)) {
-                Object conv = convertHeapByteBuffer(obj);
-                listOut.add(conv);
-            } else {
-                listOut.add(obj);
-            }
-        }
-
-        return listOut;
-
-    }
-
+    @Override
     public long getLong(int index) throws SQLException
     {
-        checkIndex(index);
-        return getLong(values.get(index - 1));
+        if (hasRow()) {
+            wasNull = row.isNull(index - 1);
+            return wasNull ? 0 : row.getLong(index - 1);
+        } else {
+            throw new SQLDataException("Record Not Found At Index: " + index);
+        }
     }
 
+    @Override
     public long getLong(String name) throws SQLException
     {
-        checkName(name);
-        return getLong(indexMap.get(name).intValue());
+        return getLong(findColumn(name));
     }
 
-    private Long getLong(TypedColumn column) throws SQLException
-    {
-        checkNotClosed();
-        Object value = column.getValue();
-        wasNull = value == null;
-
-        if (wasNull) return 0L;
-
-        if (value instanceof Long) return (Long) value;
-
-        if (value instanceof Integer) return Long.valueOf((Integer) value);
-
-        if (value instanceof BigInteger) return getBigInteger(column).longValue();
-
-        if (value instanceof Long) return (Long) value;
-
-        try
-        {
-            if (value instanceof String) return (Long.parseLong((String) value));
-        }
-        catch (NumberFormatException e)
-        {
-            throw new SQLSyntaxErrorException(e);
-        }
-
-        throw new SQLSyntaxErrorException(String.format(NOT_TRANSLATABLE, value.getClass().getSimpleName(), "Long"));
-    }
-
-    public Map<?, ?> getMap(int index) throws SQLException
-    {
-        checkIndex(index);
-        return getMap(values.get(index - 1));
-    }
-
-    public Map<?, ?> getMap(String name) throws SQLException
-    {
-        checkName(name);
-        return getMap(indexMap.get(name).intValue());
-    }
-
-    private Map<?, ?> getMap(TypedColumn column) throws SQLException
-    {
-        checkNotClosed();
-        Object value = column.getValue();
-        wasNull = value == null;
-        if (column.getCollectionType() != CollectionType.MAP) throw new SQLSyntaxErrorException(String.format(NOT_TRANSLATABLE,
-            value.getClass().getSimpleName(),
-            "Map"));
-
-        Map<Object, Object> mapIn = (Map) value;
-        HashMap<Object, Object> mapOut = new HashMap<Object, Object>();
-        for (Object key : mapIn.keySet()) {
-            Object mapEntryObj = mapIn.get(key);
-
-            if (isHeapByteBuffer(mapEntryObj)) {
-                Object mapEntryConv = convertHeapByteBuffer(mapEntryObj);
-                mapOut.put(key, mapEntryConv);
-            } else {
-                mapOut.put(key, mapEntryObj);
-            }
-        }
-
-        return mapOut;
-    }
-
+    @Override
     public ResultSetMetaData getMetaData() throws SQLException
     {
-        checkNotClosed();
         return meta;
     }
 
+    @Override
     public Object getObject(int index) throws SQLException
     {
-        checkIndex(index);
-        return getObject(values.get(index - 1));
+        if (hasRow()) {
+            wasNull = row.isNull(index - 1);
+            return row.getObject(index - 1);
+        } else {
+            throw new SQLDataException("Record Not Found At Index: " + index);
+        }
     }
 
+    @Override
     public Object getObject(String name) throws SQLException
     {
-        checkName(name);
-        return getObject(indexMap.get(name).intValue());
+        return getObject(findColumn(name));
     }
 
+    @Override
+    public <T> T getObject(int columnIndex, Class<T> type) throws SQLException {
 
-    private Object getObject(TypedColumn column) throws SQLException
-    {
-        checkNotClosed();
-        Object value = column.getValue();
-        
-        // handle date properly for expectations of a JDBC caller
-        if (value != null) {
-
-            switch (column.getCollectionType()) {
-
-                case MAP:
-                    // map...
-                    value = getMap(column.getNameString());
-                    break;
-
-                case SET:
-                    // set...
-                    value = getSet(column.getNameString());
-                    break;
-
-                case LIST:
-                    // list..
-                    value = getList(column.getNameString());
-                    break;
-
-                case NOT_COLLECTION:
-                default:
-
-                    if (column.getValueType() == JdbcDate.instance && value instanceof java.util.Date) {
-                        value = new java.sql.Timestamp(((java.util.Date) value).getTime());
-                    }
-
-                    if (column.getValueType() == JdbcBytes.instance) {
-                        value = convertHeapByteBuffer(value);
-                    }
-                    break;
-
-            }
-
+        if (type == String.class) {
+            return (T)getString(columnIndex);
+        } else if (type == Integer.class) {
+            return (T)Integer.valueOf(getInt(columnIndex));
+        } else if (type == Long.class) {
+            return (T)Long.valueOf(getLong(columnIndex));
+        } else if (type == Double.class) {
+            return (T)Double.valueOf(getDouble(columnIndex));
+        } else if (type == Float.class) {
+            return (T)Float.valueOf(getFloat(columnIndex));
+        } else if (type == java.sql.Date.class) {
+            Date date = getDate(columnIndex);
+            long millis = date.getTime();
+            return (T)(new java.sql.Date(millis));
+        } else if (type == java.sql.Time.class) {
+            Date date = getDate(columnIndex);
+            long millis = date.getTime();
+            return (T)(new java.sql.Time(millis));
+        } else if (type == java.sql.Timestamp.class) {
+            Date date = getDate(columnIndex);
+            long millis = date.getTime();
+            return (T)(new java.sql.Timestamp(millis));
+        } else {
+            return (T)getObject(columnIndex);
         }
-
-        wasNull = value == null;
-        return (wasNull) ? null : value;
-    }
-
-    private String convertObject(Object key) {
-
-        if (key instanceof String) {
-            return (String)key;
-        }
-
-        if (key instanceof Long) {
-            return ((Long)key).toString();
-        }
-
-        if (key instanceof ByteBuffer) {
-            ByteBuffer bb = (ByteBuffer) key;
-            CharBuffer charBuffer = StandardCharsets.UTF_8.decode(bb);
-            return charBuffer.toString();
-        }
-
-        return key.toString();
 
     }
 
-    /**
-     * Is this object an instance of an NIO buffer. These must be converted
-     * prior to being returned. If this is {@code true}, use
-     * {@link #convertHeapByteBuffer(Object)} to create a copy in memory.
-     * @param value   The object to check.
-     * @return Result is {@code true} if the specified object is an NIO backed buffer.
-     */
-    private boolean isHeapByteBuffer(Object value) {
-        return (value != null) && (value instanceof java.nio.ByteBuffer);
+    @Override
+    public <T> T getObject(String columnLabel, Class<T> type) throws SQLException {
+        return getObject(findColumn(columnLabel), type);
     }
 
-    /**
-     * Convert an NIO byte buffer into a byte array.
-     * @param value  Byte buffer to convert.
-     * @return Converted buffer or an empty array if it cannot be converted.
-     */
-    private String convertHeapByteBuffer(Object value) {
-
-        String result = "";
-
-        if (value != null) {
-            if (value instanceof java.nio.ByteBuffer) {
-                ByteBuffer bb = (ByteBuffer) value;
-                CharBuffer charBuffer = StandardCharsets.UTF_8.decode(bb);
-
-                result = charBuffer.toString();
-
-            } else {
-                result = String.format("[%s]", value.getClass().getName());
-            }
-        }
-
-        return result;
-
-    }
-
+    @Override
     public int getRow() throws SQLException
     {
-        checkNotClosed();
         return rowNumber;
     }
 
+    @Override
     public RowId getRowId(int index) throws SQLException
     {
-        checkIndex(index);
-        return getRowId(values.get(index - 1));
+        if (hasRow()) {
+            wasNull = row.isNull(index - 1);
+
+            if (!wasNull) {
+                ByteBuffer byteBuffer = row.getBytes(index - 1);
+                return new CassandraRowId(byteBuffer);
+            } else {
+                return null;
+            }
+        } else {
+            throw new SQLException("ResultSet Not Advanced");
+        }
     }
 
+    @Override
     public RowId getRowId(String name) throws SQLException
     {
-        checkName(name);
-        return getRowId(indexMap.get(name).intValue());
+        return getRowId(findColumn(name));
     }
 
-    private final RowId getRowId(TypedColumn column) throws SQLException
-    {
-        checkNotClosed();
-        ByteBuffer value = column.getRawColumn().value;
-        wasNull = value == null;
-        return value == null ? null : new CassandraRowId(value);
-    }
-
+    /**
+     * Cassandra does not natively support short; it is possible this may result in loss of data.
+     * @param index  Column identifier to retrieve.
+     * @return Column as a short or {@code 0} if it cannot be converted.
+     * @throws SQLException  Error requesting this from the database.
+     */
+    @Override
     public short getShort(int index) throws SQLException
     {
-        checkIndex(index);
-        return getShort(values.get(index - 1));
-    }
+        if (hasRow()) {
+            int val = row.getInt(index - 1);
+            wasNull = row.isNull(index - 1);
 
-    public Set<?> getSet(int index) throws SQLException
-    {
-        checkIndex(index);
-        return getSet(values.get(index - 1));
-    }
+            return wasNull ? 0 : (short)val;
 
-    public Set<?> getSet(String name) throws SQLException
-    {
-        checkName(name);
-        return getSet(indexMap.get(name).intValue());
-    }
-
-    private Set<?> getSet(TypedColumn column) throws SQLException
-    {
-        checkNotClosed();
-        Object value = column.getValue();
-        wasNull = value == null;
-        if (column.getCollectionType() != CollectionType.SET) throw new SQLSyntaxErrorException(String.format(NOT_TRANSLATABLE,
-            value.getClass().getSimpleName(),
-            "Set"));
-
-        Set<Object> setIn = (Set) value;
-        Set<Object> setOut = new TreeSet<Object>();
-        for (Object obj : setIn) {
-
-            if (isHeapByteBuffer(obj)) {
-                Object conv = convertHeapByteBuffer(obj);
-                setOut.add(conv);
-            } else {
-                setOut.add(obj);
-            }
+        } else {
+            throw new SQLDataException("Record Not Found At Index: " + index);
         }
-
-        return setOut;
-
     }
 
+    @Override
     public short getShort(String name) throws SQLException
     {
-        checkName(name);
-        return getShort(indexMap.get(name).intValue());
+        return getShort(findColumn(name));
     }
 
-    private final Short getShort(TypedColumn column) throws SQLException
-    {
-        checkNotClosed();
-        Object value = column.getValue();
-        wasNull = value == null;
-
-        if (wasNull) return 0;
-
-        if (value instanceof Integer) return ((Integer) value).shortValue();
-
-        if (value instanceof Long) return ((Long) value).shortValue();
-
-        if (value instanceof BigInteger) return ((BigInteger) value).shortValue();
-
-        try
-        {
-            if (value instanceof String) return (new Short((String) value));
-        }
-        catch (NumberFormatException e)
-        {
-            throw new SQLSyntaxErrorException(e);
-        }
-
-        throw new SQLSyntaxErrorException(String.format(NOT_TRANSLATABLE, value.getClass().getSimpleName(), "Short"));
-    }
-
+    @Override
     public Statement getStatement() throws SQLException
     {
-        checkNotClosed();
         return statement;
     }
 
+    @Override
     public String getString(int index) throws SQLException
     {
-        checkIndex(index);
-        return getString(values.get(index - 1));
+        if (hasRow()) {
+            wasNull = row.isNull(index - 1);
+
+            if (wasNull) {
+                return null;
+            } else {
+
+                DataType dataType = row.getColumnDefinitions().getType(index - 1);
+
+                // TODO: should this go elsewhere?
+                if ("UUID".equalsIgnoreCase(dataType.getName().toString())) {
+                    return row.getUUID(index - 1).toString();
+                } else if ("TIMESTAMP".equalsIgnoreCase(dataType.getName().toString())) {
+                    return row.getDate(index - 1).toString();
+                } else if ("BOOLEAN".equalsIgnoreCase(dataType.getName().toString())) {
+                    return Boolean.toString(row.getBool(index - 1));
+                } else if ("LONG".equalsIgnoreCase(dataType.getName().toString())) {
+                    return Long.toString(row.getLong(index - 1));
+                } else if ("INT32".equalsIgnoreCase(dataType.getName().toString())) {
+                    return Long.toString(row.getLong(index - 1));
+                } else if ("DECIMAL".equalsIgnoreCase(dataType.getName().toString())) {
+                    return row.getDecimal(index - 1).toString();
+                } else if ("DOUBLE".equalsIgnoreCase(dataType.getName().toString())) {
+                    return Double.toString(row.getDouble(index - 1));
+                } else if ("INETADDRESS".equalsIgnoreCase(dataType.getName().toString())) {
+                    return row.getInet(index - 1).toString();
+                } else if ("TIMEUUID".equalsIgnoreCase(dataType.getName().toString())) {
+                    return row.getUUID(index - 1).toString();
+                } else if ("MAP".equalsIgnoreCase(dataType.getName().toString())) {
+                    Map<Object,Object> map = row.getMap(index - 1, Object.class, Object.class);
+                    StringBuilder sbout = new StringBuilder();
+
+                    for (Map.Entry<Object,Object> mapEntry : map.entrySet()) {
+                        sbout.append(mapEntry.getKey() + "=" + mapEntry.getValue() + ",");
+                    }
+                    return sbout.toString();
+                } else {
+                    return row.getString(index - 1);
+                }
+            }
+
+        } else {
+            throw new SQLDataException("Record Not Found At Index: " + index);
+        }
     }
 
+    @Override
     public String getString(String name) throws SQLException
     {
-        checkName(name);
-        return getString(indexMap.get(name).intValue());
+        return getString(findColumn(name));
     }
 
-    private String getString(TypedColumn column) throws SQLException
-    {
-        checkNotClosed();
-        Object value = column.getValue();
-        wasNull = value == null;
-        return (wasNull) ? null : value.toString();
-    }
-
+    @Override
     public Time getTime(int index) throws SQLException
     {
-        checkIndex(index);
-        return getTime(values.get(index - 1));
+        if (hasRow()) {
+
+            wasNull = row.isNull(index - 1);
+
+            if (wasNull) {
+                return null;
+            } else {
+                java.util.Date dt = row.getDate(index - 1);
+                return new Time(dt.getTime());
+            }
+        } else {
+            throw new SQLDataException("Record Not Found At Index: " + index);
+        }
     }
 
+    @Override
     public Time getTime(int index, Calendar calendar) throws SQLException
     {
-        checkIndex(index);
         // silently ignore the Calendar argument; its a hint we do not need
         return getTime(index);
     }
 
+    @Override
     public Time getTime(String name) throws SQLException
     {
-        checkName(name);
-        return getTime(indexMap.get(name).intValue());
+        return getTime(findColumn(name));
     }
 
+    @Override
     public Time getTime(String name, Calendar calendar) throws SQLException
     {
-        checkName(name);
         // silently ignore the Calendar argument; its a hint we do not need
-        return getTime(name);
+        return getTime(findColumn(name));
     }
 
-    private Time getTime(TypedColumn column) throws SQLException
-    {
-        checkNotClosed();
-        Object value = column.getValue();
-        wasNull = value == null;
-
-        if (wasNull) return null;
-
-        if (value instanceof Long) return new Time((Long) value);
-
-        if (value instanceof java.util.Date) return new Time(((java.util.Date) value).getTime());
-
-        try
-        {
-            if (value instanceof String) return Time.valueOf((String) value);
-        }
-        catch (IllegalArgumentException e)
-        {
-            throw new SQLSyntaxErrorException(e);
-        }
-
-        throw new SQLSyntaxErrorException(String.format(NOT_TRANSLATABLE, value.getClass().getSimpleName(), "SQL Time"));
-    }
-
+    @Override
     public Timestamp getTimestamp(int index) throws SQLException
     {
-        checkIndex(index);
-        return getTimestamp(values.get(index - 1));
+        if (hasRow()) {
+            wasNull = row.isNull(index - 1);
+
+            if (wasNull) {
+                return null;
+            } else {
+                java.util.Date dt = row.getDate(index - 1);
+                return new Timestamp(dt.getTime());
+            }
+        } else {
+            throw new SQLDataException("Record Not Found At Index: " + index);
+        }
     }
 
+    @Override
     public Timestamp getTimestamp(int index, Calendar calendar) throws SQLException
     {
-        checkIndex(index);
         // silently ignore the Calendar argument; its a hint we do not need
         return getTimestamp(index);
     }
 
+    @Override
     public Timestamp getTimestamp(String name) throws SQLException
     {
-        checkName(name);
-        return getTimestamp(indexMap.get(name).intValue());
+        return getTimestamp(findColumn(name));
     }
 
+    @Override
     public Timestamp getTimestamp(String name, Calendar calendar) throws SQLException
     {
-        checkName(name);
         // silently ignore the Calendar argument; its a hint we do not need
         return getTimestamp(name);
     }
 
-    private Timestamp getTimestamp(TypedColumn column) throws SQLException
+    @Override
+    public Blob getBlob(int index) throws SQLException
     {
-        checkNotClosed();
-        Object value = column.getValue();
-        wasNull = value == null;
+        if (hasRow()) {
 
-        if (wasNull) return null;
+            wasNull = row.isNull(index - 1);
 
-        if (value instanceof Long) return new Timestamp((Long) value);
-
-        if (value instanceof java.util.Date) return new Timestamp(((java.util.Date) value).getTime());
-
-        try
-        {
-            if (value instanceof String) return Timestamp.valueOf((String) value);
+            if (wasNull) {
+                return null;
+            } else {
+                ByteBuffer bb = row.getBytes(index - 1);
+                return new CassandraBlob(bb);
+            }
+        } else {
+            throw new SQLDataException("Record Not Found At Index: " + index);
         }
-        catch (IllegalArgumentException e)
-        {
-            throw new SQLSyntaxErrorException(e);
-        }
-
-        throw new SQLSyntaxErrorException(String.format(NOT_TRANSLATABLE, value.getClass().getSimpleName(), "SQL Timestamp"));
     }
 
+    @Override
+    public Blob getBlob(String name) throws SQLException
+    {
+        return getBlob(findColumn(name));
+    }
+
+    @Override
     public int getType() throws SQLException
     {
-        checkNotClosed();
         return resultSetType;
     }
 
     // URL (awaiting some clarifications as to how it is stored in C* ... just a validated Sting in URL format?
+    @Override
     public URL getURL(int arg0) throws SQLException
     {
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
+    @Override
     public URL getURL(String arg0) throws SQLException
     {
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
@@ -1216,64 +778,70 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
     // Each set of methods has a more detailed set of issues that should be considered fully...
 
 
+    @Override
     public SQLWarning getWarnings() throws SQLException
     {
-        checkNotClosed();
         // the rationale is there are no warnings to return in this implementation...
         return null;
     }
 
-
+    @Override
     public boolean isAfterLast() throws SQLException
     {
-        checkNotClosed();
         return rowNumber == Integer.MAX_VALUE;
     }
 
+    @Override
     public boolean isBeforeFirst() throws SQLException
     {
-        checkNotClosed();
         return rowNumber == 0;
     }
 
+    @Override
     public boolean isClosed() throws SQLException
     {
-        return values == null;
+        return closed;
     }
 
+    @Override
     public boolean isFirst() throws SQLException
     {
-        checkNotClosed();
         return rowNumber == 1;
     }
 
+    @Override
     public boolean isLast() throws SQLException
     {
-        checkNotClosed();
         return !rowsIterator.hasNext();
     }
 
+    @Override
     public boolean isWrapperFor(Class<?> iface) throws SQLException
     {
-        return CassandraResultSetExtras.class.isAssignableFrom(iface);
+        // TODO: should this be implemented?
+        return false;
     }
 
     // Navigation between rows within the returned set of rows
     // Need to use a list iterator so next() needs completely re-thought
-
+    @Override
     public boolean last() throws SQLException
     {
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
+    /**
+     * Move to the next row in the ResultSet. This navigates the internal resultset iterator and returns
+     * {@code true} if the next record can be read or {@code false} if there are no more rows.
+     * @return {@code true} if the next row can be read or {@code false} if it cannot.
+     * @throws SQLException  Fatal error communicating with the resultset.
+     */
+    @Override
     public synchronized boolean next() throws SQLException
     {
-        if (hasMoreRows())
+        if ((rowsIterator != null) && rowsIterator.hasNext())
         {
-            // populateColumns is called upon init to set up the metadata fields; so skip first call
-            if (rowNumber != 0) populateColumns();
-            else rowsIterator.next();
-// populateColumns();
+            this.row = rowsIterator.next();
             rowNumber++;
             return true;
         }
@@ -1284,81 +852,21 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
         }
     }
 
-    private String bbToString(ByteBuffer buffer)
-    {
-        try
-        {
-            return string(buffer);
-        }
-        catch (CharacterCodingException e)
-        {
-            throw new RuntimeException(e);
-        }
-
-    }
-
-    private TypedColumn createColumn(Column column)
-    {
-        assert column != null;
-        assert column.name != null;
-
-        AbstractJdbcType<?> keyType = null;
-        CollectionType type = CollectionType.NOT_COLLECTION;
-        String nameType = schema.name_types.get(column.name);
-        if (nameType == null) nameType = "AsciiType";
-        AbstractJdbcType<?> comparator = TypesMap.getTypeForComparator(nameType == null ? schema.default_name_type : nameType);
-        String valueType = schema.value_types.get(column.name);
-        AbstractJdbcType<?> validator = TypesMap.getTypeForComparator(valueType == null ? schema.default_value_type : valueType);
-
-        // some new types are not directly supported
-        if (validator == null) {
-            if (valueType.endsWith("TimestampType")) {
-                validator = TypesMap.getTypeForComparator("DateType");
-            }
-        }
-
-        // look for lists/collections types
-        if (validator == null)
-        {
-            int index = valueType.indexOf("(");
-            assert index > 0;
-
-            String collectionClass = valueType.substring(0, index);
-            if (collectionClass.endsWith("ListType")) type = CollectionType.LIST;
-            else if (collectionClass.endsWith("SetType")) type = CollectionType.SET;
-            else if (collectionClass.endsWith("MapType")) type = CollectionType.MAP;
-
-            String[] split = valueType.substring(index + 1, valueType.length() - 1).split(",");
-            if (split.length > 1)
-            {
-                keyType = TypesMap.getTypeForComparator(split[0]);
-                validator = TypesMap.getTypeForComparator(split[1]);
-            }
-            else validator = TypesMap.getTypeForComparator(split[0]);
-
-        }
-
-        TypedColumn tc = new TypedColumn(column, comparator, validator, keyType, type);
-
-        if (logger.isTraceEnabled()) logger.trace("tc = " + tc);
-
-        return tc;
-    }
-
+    @Override
     public boolean previous() throws SQLException
     {
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
+    @Override
     public boolean relative(int arg0) throws SQLException
     {
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
+    @Override
     public void setFetchDirection(int direction) throws SQLException
     {
-        checkNotClosed();
-
         if (direction == FETCH_FORWARD || direction == FETCH_REVERSE || direction == FETCH_UNKNOWN)
         {
             if ((getType() == TYPE_FORWARD_ONLY) && (direction != FETCH_FORWARD)) throw new SQLSyntaxErrorException("attempt to set an illegal direction : " + direction);
@@ -1367,20 +875,21 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
         throw new SQLSyntaxErrorException(String.format(BAD_FETCH_DIR, direction));
     }
 
+    @Override
     public void setFetchSize(int size) throws SQLException
     {
-        checkNotClosed();
         if (size < 0) throw new SQLException(String.format(BAD_FETCH_SIZE, size));
         fetchSize = size;
     }
 
+    @Override
     public <T> T unwrap(Class<T> iface) throws SQLException
     {
-        if (iface.equals(CassandraResultSetExtras.class)) return (T) this;
-
+        // TODO: should this be implemented?
         throw new SQLFeatureNotSupportedException(String.format(NO_INTERFACE, iface.getSimpleName()));
     }
 
+    @Override
     public boolean wasNull() throws SQLException
     {
         return wasNull;
@@ -1392,179 +901,226 @@ class CassandraResultSet extends AbstractResultSet implements CassandraResultSet
      */
     class CResultSetMetaData implements ResultSetMetaData
     {
+
+        private ColumnDefinitions columnDefinitions;
+
+        public CResultSetMetaData() {
+            // now what????
+        }
+
+        public CResultSetMetaData(ColumnDefinitions columnDefinitions) {
+            this.columnDefinitions = columnDefinitions;
+        }
+
         /**
-         * return the Cassandra Cluster Name as the Catalog
+         * Return the Cassandra Cluster Name as the Catalog
          */
+        @Override
         public String getCatalogName(int column) throws SQLException
         {
-            checkIndex(column);
-            return statement.connection.getCatalog();
+            return columnDefinitions.getKeyspace(column - 1);
         }
 
+        /**
+         * Get the JDBC class for this column.
+         * @param column   Column identifier.
+         * @return JDBC class for the column.
+         * @throws SQLException Database error.
+         */
+        @Override
         public String getColumnClassName(int column) throws SQLException
         {
-            checkIndex(column);
-            return values.get(column - 1).getValueType().getType().getName();
+            return columnDefinitions.getType(column - 1).getName().toString();
         }
 
+        @Override
         public int getColumnCount() throws SQLException
         {
-            return values.size();
+            return (null == columnDefinitions) ? 0 : columnDefinitions.size();
         }
 
+        @Override
         public int getColumnDisplaySize(int column) throws SQLException
         {
-            checkIndex(column);
-            String stringValue = values.get(column - 1).getValueString();
-            return (stringValue == null ? -1 : stringValue.length());
+
+            Class colClass  = columnDefinitions.getType(column - 1).asJavaClass();
+
+            if (colClass == String.class) {
+                return 50;
+            } else if (colClass == ByteBuffer.class) {
+                return 75;
+            } else if (colClass == Boolean.class) {
+                return 4;
+            } else {
+                return 10;
+            }
+
         }
 
         public String getColumnLabel(int column) throws SQLException
         {
-            checkIndex(column);
-            return getColumnName(column);
+            return columnDefinitions.getName(column - 1);
         }
 
         public String getColumnName(int column) throws SQLException
         {
-            checkIndex(column);
-            return values.get(column - 1).getNameString();
+            return columnDefinitions.getName(column - 1);
         }
 
         public int getColumnType(int column) throws SQLException
         {
-            checkIndex(column);
-            return values.get(column - 1).getValueType().getJdbcType();
+
+            DataType dataType = columnDefinitions.getType(column - 1);
+            Class clazz = dataType.asJavaClass();
+
+            if (clazz == String.class) {
+                return Types.NVARCHAR;
+            }
+
+            if ((clazz == Integer.class) || (clazz == Long.class)) {
+                return Types.INTEGER;
+            }
+
+            if (clazz == Boolean.class) {
+                return Types.BOOLEAN;
+            }
+
+            if (clazz == ByteBuffer.class) {
+                return Types.BLOB;
+            }
+
+            if (dataType.isCollection()) {
+                return Types.ARRAY;
+            }
+
+            // TODO: JDBC Types missing -- additional needed here
+
+            // default type is Object
+            return Types.JAVA_OBJECT;
+
         }
 
         /**
          * Spec says "database specific type name"; for Cassandra this means the AbstractType.
          */
+        @Override
         public String getColumnTypeName(int column) throws SQLException
         {
-            checkIndex(column);
-            return values.get(column - 1).getValueType().getClass().getSimpleName();
+            return columnDefinitions.getType(column - 1).asJavaClass().toString();
         }
 
+        @Override
         public int getPrecision(int column) throws SQLException
         {
-            checkIndex(column);
-            TypedColumn col = values.get(column - 1);
-            if (col.getValueType() == JdbcBytes.instance) {
-                String value = convertHeapByteBuffer(col.getValue());
-                return value.length();
-            } else if (col.getValue() instanceof List) {
-                return ((List)col.getValue()).size();
-            } else if (col.getValue() instanceof Set) {
-                return ((Set)col.getValue()).size();
-            } else if (col.getValue() instanceof Map) {
-                return ((Map)col.getValue()).size();
-            } else {
-                return (null == col.getValue()) ? 0 : col.getValueType().getPrecision(col.getValue());
-            }
+            // TODO: column size should vary depending on the type
+            return 50;
         }
 
+        @Override
         public int getScale(int column) throws SQLException
         {
-            checkIndex(column);
-            TypedColumn tc = values.get(column - 1);
-            if (tc.getValueType() == JdbcBytes.instance) {
-                String value = convertHeapByteBuffer(tc.getValue());
-                return value.length();
-            } else if (tc.getValue() instanceof List) {
-                return ((List)tc.getValue()).size();
-            } else if (tc.getValue() instanceof Set) {
-                return ((Set)tc.getValue()).size();
-            } else if (tc.getValue() instanceof Map) {
-                return ((Map)tc.getValue()).size();
+            int colType = getColumnType(column);
+
+            if ((colType == Types.FLOAT) || (colType == Types.DOUBLE)) {
+                return 4;
             } else {
-                return (null == tc.getValue()) ? 0 : tc.getValueType().getScale(tc.getValue());
+                return 0;
             }
         }
 
         /**
          * return the DEFAULT current Keyspace as the Schema Name
          */
+        @Override
         public String getSchemaName(int column) throws SQLException
         {
-            checkIndex(column);
-            return statement.connection.getSchema();
+            return columnDefinitions.getKeyspace(column - 1);
         }
 
+        @Override
         public String getTableName(int column) throws SQLException
         {
-            checkIndex(column);
-            return statement.getTableName();
+            return columnDefinitions.getTable(column - 1);
         }
 
+        @Override
         public boolean isAutoIncrement(int column) throws SQLException
         {
-            checkIndex(column);
-            return values.get(column - 1).getValueType() instanceof JdbcCounterColumn; // todo: check Value is correct.
+            // TODO: how should this be implemented?
+            return false;
         }
 
+
+        @Override
         public boolean isCaseSensitive(int column) throws SQLException
         {
-            checkIndex(column);
-            TypedColumn tc = values.get(column - 1);
-            return tc.getValueType().isCaseSensitive();
+            // TODO: why wouldn't this be case sensitive?
+            return true;
         }
 
+        @Override
         public boolean isCurrency(int column) throws SQLException
         {
-            checkIndex(column);
-            TypedColumn tc = values.get(column - 1);
-            return tc.getValueType().isCurrency();
+            // TODO: how should this support currency type?
+            return false;
         }
 
+        @Override
         public boolean isDefinitelyWritable(int column) throws SQLException
         {
-            checkIndex(column);
             return isWritable(column);
         }
 
         /**
          * absence is the equivalent of null in Cassandra
          */
+        @Override
         public int isNullable(int column) throws SQLException
         {
-            checkIndex(column);
             return ResultSetMetaData.columnNullable;
         }
 
+        @Override
         public boolean isReadOnly(int column) throws SQLException
         {
-            checkIndex(column);
             return column == 0;
         }
 
+        @Override
         public boolean isSearchable(int column) throws SQLException
         {
-            checkIndex(column);
             return false;
         }
 
+        @Override
         public boolean isSigned(int column) throws SQLException
         {
-            checkIndex(column);
-            TypedColumn tc = values.get(column - 1);
-            return tc.getValueType().isSigned();
+            // TODO: determine if this is signed
+            return false;
         }
 
+        @Override
         public boolean isWrapperFor(Class<?> iface) throws SQLException
         {
             return false;
         }
 
+        @Override
         public boolean isWritable(int column) throws SQLException
         {
-            checkIndex(column);
-            return column > 0;
+            if (columnDefinitions.getType(column - 1) != null) {
+                return column > 0;
+            } else {
+                return false;
+            }
         }
 
+        @Override
         public <T> T unwrap(Class<T> iface) throws SQLException
         {
             throw new SQLFeatureNotSupportedException(String.format(NO_INTERFACE, iface.getSimpleName()));
         }
+        
+        
     }
 }

@@ -23,8 +23,6 @@ package org.apache.cassandra.cql.jdbc;
 import java.nio.ByteBuffer;
 import java.sql.RowId;
 
-import org.apache.cassandra.utils.ByteBufferUtil;
-
 class CassandraRowId implements RowId
 {
     private final ByteBuffer bytes;
@@ -36,12 +34,12 @@ class CassandraRowId implements RowId
 
     public byte[] getBytes()
     {
-        return ByteBufferUtil.getArray(bytes);
+        return bytes.array();
     }
     
     public String toString()
     {
-        return ByteBufferUtil.bytesToHex(bytes);
+        return new String(bytes.array());
     }
 
     public int hashCode()

@@ -30,7 +30,7 @@ under the License.
 
   <groupId>org.apache-extras.cassandra-twig-jdbc</groupId>
   <artifactId>cassandra-twig-jdbc</artifactId>
-  <version>1.0.1-SNAPSHOT</version>
+  <version>2.0.0-SNAPSHOT</version>
 
   <name>Twig JDBC driver for Cassandra/CQL</name>
   <description>Driver for Cassandra that works in common JDBC clients (DbVisualizer, IntelliJ, etc.)</description>
@@ -45,6 +45,13 @@ under the License.
   </licenses>
 
   <developers>
+    <developer>
+      <id>esarjeant</id>
+      <name>Eric Sarjeant</name>
+      <roles>
+        <role>developer</role>
+      </roles>
+    </developer>
     <developer>
       <id>stephenc</id>
       <name>Stephen Connolly</name>
@@ -97,22 +104,28 @@ under the License.
       <artifactId>cassandra-clientutil</artifactId>
       <version>1.2.5</version>
     </dependency>
-    <dependency>
-      <groupId>org.apache.cassandra</groupId>
-      <artifactId>cassandra-thrift</artifactId>
-      <version>2.1.2</version>
-      <exclusions>
-        <exclusion>
-          <groupId>javax.servlet</groupId>
-          <artifactId>servlet-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.httpcomponents</groupId>
-          <artifactId>httpclient</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
+      <dependency>
+          <groupId>org.apache.commons</groupId>
+          <artifactId>commons-lang3</artifactId>
+          <version>3.0</version>
+      </dependency>
+      <dependency>
+          <groupId>com.datastax.cassandra</groupId>
+          <artifactId>cassandra-driver-core</artifactId>
+          <version>2.1.7</version>
+      </dependency>
+      <dependency>
+          <groupId>com.datastax.cassandra</groupId>
+          <artifactId>cassandra-driver-mapping</artifactId>
+          <version>2.1.7</version>
+      </dependency>
+      <dependency>
+          <groupId>com.google.guava</groupId>
+          <artifactId>guava</artifactId>
+          <version>18.0</version>
+      </dependency>
+
+      <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>4.10</version>
@@ -231,6 +244,39 @@ under the License.
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>cassandra-maven-plugin</artifactId>
                     <version>1.2.1-1</version>
+                </plugin>
+                <!--This plugin's configuration is used to store Eclipse m2e settings only. It has no influence on the Maven build itself.-->
+                <plugin>
+                	<groupId>org.eclipse.m2e</groupId>
+                	<artifactId>lifecycle-mapping</artifactId>
+                	<version>1.0.0</version>
+                	<configuration>
+                		<lifecycleMappingMetadata>
+                			<pluginExecutions>
+                				<pluginExecution>
+                					<pluginExecutionFilter>
+                						<groupId>
+                							org.codehaus.mojo
+                						</groupId>
+                						<artifactId>
+                							build-helper-maven-plugin
+                						</artifactId>
+                						<versionRange>
+                							[1.7,)
+                						</versionRange>
+                						<goals>
+                							<goal>
+                								reserve-network-port
+                							</goal>
+                						</goals>
+                					</pluginExecutionFilter>
+                					<action>
+                						<ignore></ignore>
+                					</action>
+                				</pluginExecution>
+                			</pluginExecutions>
+                		</lifecycleMappingMetadata>
+                	</configuration>
                 </plugin>
             </plugins>
         </pluginManagement>

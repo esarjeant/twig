@@ -20,34 +20,29 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.sql.*;
+import java.util.Properties;
+
+import static org.apache.cassandra.cql.jdbc.Utils.NOT_SUPPORTED;
 import static org.apache.cassandra.cql.jdbc.Utils.PROTOCOL;
 import static org.apache.cassandra.cql.jdbc.Utils.TAG_PASSWORD;
 import static org.apache.cassandra.cql.jdbc.Utils.TAG_USER;
-import static org.apache.cassandra.cql.jdbc.Utils.NOT_SUPPORTED;
-
-import java.sql.Connection;
-import java.sql.Driver;
-import java.sql.DriverManager;
-import java.sql.DriverPropertyInfo;
-import java.sql.SQLException;
-import java.sql.SQLFeatureNotSupportedException;
-import java.util.Properties;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * The Class CassandraDriver.
  */
 public class CassandraDriver implements Driver
 {
-    public static final int DVR_MAJOR_VERSION = 1;
+    public static final int DVR_MAJOR_VERSION = 2;
 
     public static final int DVR_MINOR_VERSION = 2;
 
-    public static final int DVR_PATCH_VERSION = 4;
+    public static final int DVR_PATCH_VERSION = 3;
 
-    public static final String DVR_NAME = "Cassandra JDBC Driver";
+    public static final String DVR_NAME = "Cassandra Twig JDBC Driver";
 
     private static final Logger logger = LoggerFactory.getLogger(CassandraDriver.class);
 

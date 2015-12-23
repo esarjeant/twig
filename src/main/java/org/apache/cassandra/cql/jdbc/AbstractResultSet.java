@@ -70,16 +70,6 @@ abstract class AbstractResultSet
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
-    public Blob getBlob(int arg0) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
-    public Blob getBlob(String arg0) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
     public Reader getCharacterStream(int arg0) throws SQLException
     {
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
@@ -145,16 +135,6 @@ abstract class AbstractResultSet
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
     
-    public <T> T getObject(String columnLabel, Class<T> type) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-    
-    public <T> T getObject(int columnIndex, Class<T> type) throws SQLException
-    {
-        throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
-    }
-
     public Ref getRef(int arg0) throws SQLException
     {
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
