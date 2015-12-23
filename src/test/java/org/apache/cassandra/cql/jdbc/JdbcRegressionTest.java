@@ -20,8 +20,8 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
+import com.datastax.driver.core.ConsistencyLevel;
 import org.apache.cassandra.cql.ConnectionDetails;
-import org.apache.cassandra.thrift.ConsistencyLevel;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.AfterClass;

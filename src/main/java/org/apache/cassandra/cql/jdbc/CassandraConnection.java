@@ -21,10 +21,7 @@
 package org.apache.cassandra.cql.jdbc;
 
 import com.datastax.driver.core.*;
-import org.apache.cassandra.thrift.*;
-import org.apache.cassandra.thrift.ConsistencyLevel;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,10 +31,14 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.security.*;
 import java.security.cert.CertificateException;
+import java.sql.Connection;
 import java.sql.*;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
-import java.util.*;
+import java.util.Properties;
+import java.util.Random;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 import static org.apache.cassandra.cql.jdbc.CassandraResultSet.DEFAULT_CONCURRENCY;
@@ -61,8 +62,6 @@ class CassandraConnection extends AbstractConnection implements Connection
     public static final int DB_MINOR_VERSION = 2;
     public static final String DB_PRODUCT_NAME = "Cassandra";
     public static final String DEFAULT_CQL_VERSION = "3.0.0";
-
-    public static Compression defaultCompression = Compression.GZIP;
 
     private final boolean autoCommit = true;
 
@@ -546,61 +545,15 @@ class CassandraConnection extends AbstractConnection implements Connection
      * Execute a CQL query.
      *
      * @param queryStr    a CQL query string
-     * @param compression query compression to use
-     * @param consistencyLevel    the CQL query consistency level
-     * @return the query results encoded as a CqlResult structure
-     * @throws InvalidRequestException     on poorly constructed or illegal requests
-     * @throws UnavailableException        when not all required replicas could be created/read
-     * @throws TimedOutException           when a cluster operation timed out
-     * @throws SchemaDisagreementException when the client side and server side are at different versions of schema (Thrift)
-     * @throws TException                  when there is a error in Thrift processing
-     */
-    protected com.datastax.driver.core.ResultSet execute(String queryStr, Compression compression, ConsistencyLevel consistencyLevel)
-    {
-        //currentKeyspace = determineCurrentKeyspace(queryStr, currentKeyspace);
-        return session.execute(queryStr);
-    }
-
-    /**
-     * Execute a CQL query using the default compression methodology.
-     *
-     * @param queryStr a CQL query string
-     * @param consistencyLevel	the CQL query consistency level
-     * @return the query results encoded as a CqlResult structure
-     * @throws InvalidRequestException     on poorly constructed or illegal requests
-     * @throws UnavailableException        when not all required replicas could be created/read
-     * @throws TimedOutException           when a cluster operation timed out
-     * @throws SchemaDisagreementException when the client side and server side are at different versions of schema (Thrift)
-     * @throws TException                  when there is a error in Thrift processing
      */
     protected com.datastax.driver.core.ResultSet execute(String queryStr, ConsistencyLevel consistencyLevel)
     {
-        return execute(queryStr, defaultCompression, consistencyLevel);
+        return session.execute(queryStr);
     }
 
-//    protected com.datastax.driver.core.ResultSet execute(int itemId, List<ByteBuffer> values, ConsistencyLevel consistencyLevel)
-//    {
-//        try
-//        {
-//            if (majorCqlVersion==3) return client.execute_prepared_cql3_query(itemId, values, consistencyLevel);
-//            else                    return client.execute_prepared_cql_query(itemId, values);
-//        }
-//        catch (TException error)
-//        {
-//            numFailures++;
-//            timeOfLastFailure = System.currentTimeMillis();
-//            throw error;
-//        }
-//    }
-    
-    protected com.datastax.driver.core.PreparedStatement prepare(String queryStr, Compression compression)
-    {
-        return session.prepare(queryStr);
-    }
-    
     protected com.datastax.driver.core.PreparedStatement prepare(String queryStr)
     {
-        return prepare(queryStr, defaultCompression);
+        return session.prepare(queryStr);
     }
     
     /**

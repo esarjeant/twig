@@ -46,6 +46,13 @@ under the License.
 
   <developers>
     <developer>
+      <id>esarjeant</id>
+      <name>Eric Sarjeant</name>
+      <roles>
+        <role>developer</role>
+      </roles>
+    </developer>
+    <developer>
       <id>stephenc</id>
       <name>Stephen Connolly</name>
       <roles>
@@ -97,21 +104,11 @@ under the License.
       <artifactId>cassandra-clientutil</artifactId>
       <version>1.2.5</version>
     </dependency>
-    <dependency>
-      <groupId>org.apache.cassandra</groupId>
-      <artifactId>cassandra-thrift</artifactId>
-      <version>2.1.2</version>
-      <exclusions>
-        <exclusion>
-          <groupId>javax.servlet</groupId>
-          <artifactId>servlet-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.httpcomponents</groupId>
-          <artifactId>httpclient</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
+      <dependency>
+          <groupId>org.apache.commons</groupId>
+          <artifactId>commons-lang3</artifactId>
+          <version>3.0</version>
+      </dependency>
       <dependency>
           <groupId>com.datastax.cassandra</groupId>
           <artifactId>cassandra-driver-core</artifactId>

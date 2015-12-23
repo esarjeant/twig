@@ -20,7 +20,7 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
-import org.apache.cassandra.thrift.ConsistencyLevel;
+import com.datastax.driver.core.ConsistencyLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -233,8 +233,8 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
     @Override
     public boolean execute(String query) throws SQLException
     {
-        com.datastax.driver.core.ResultSet rst = connection.execute(query, consistencyLevel);
-        return ((rst != null) && (rst.wasApplied()));
+        currentResultSet = executeQuery(query);
+        return true;
     }
 
     @Override

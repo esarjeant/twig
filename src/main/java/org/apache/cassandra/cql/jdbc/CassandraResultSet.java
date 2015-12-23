@@ -33,6 +33,7 @@ import java.sql.*;
 import java.util.Calendar;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import static org.apache.cassandra.cql.jdbc.Utils.BAD_FETCH_DIR;
 import static org.apache.cassandra.cql.jdbc.Utils.BAD_FETCH_SIZE;
@@ -606,7 +607,43 @@ public class CassandraResultSet extends AbstractResultSet implements ResultSet
         if (hasRow()) {
             wasNull = row.isNull(index - 1);
 
-            return wasNull ? null : row.getString(index - 1);
+            if (wasNull) {
+                return null;
+            } else {
+
+                DataType dataType = row.getColumnDefinitions().getType(index - 1);
+
+                // TODO: should this go elsewhere?
+                if ("UUID".equalsIgnoreCase(dataType.getName().toString())) {
+                    return row.getUUID(index - 1).toString();
+                } else if ("TIMESTAMP".equalsIgnoreCase(dataType.getName().toString())) {
+                    return row.getDate(index - 1).toString();
+                } else if ("BOOLEAN".equalsIgnoreCase(dataType.getName().toString())) {
+                    return Boolean.toString(row.getBool(index - 1));
+                } else if ("LONG".equalsIgnoreCase(dataType.getName().toString())) {
+                    return Long.toString(row.getLong(index - 1));
+                } else if ("INT32".equalsIgnoreCase(dataType.getName().toString())) {
+                    return Long.toString(row.getLong(index - 1));
+                } else if ("DECIMAL".equalsIgnoreCase(dataType.getName().toString())) {
+                    return row.getDecimal(index - 1).toString();
+                } else if ("DOUBLE".equalsIgnoreCase(dataType.getName().toString())) {
+                    return Double.toString(row.getDouble(index - 1));
+                } else if ("INETADDRESS".equalsIgnoreCase(dataType.getName().toString())) {
+                    return row.getInet(index - 1).toString();
+                } else if ("TIMEUUID".equalsIgnoreCase(dataType.getName().toString())) {
+                    return row.getUUID(index - 1).toString();
+                } else if ("MAP".equalsIgnoreCase(dataType.getName().toString())) {
+                    Map<Object,Object> map = row.getMap(index - 1, Object.class, Object.class);
+                    StringBuilder sbout = new StringBuilder();
+
+                    for (Map.Entry<Object,Object> mapEntry : map.entrySet()) {
+                        sbout.append(mapEntry.getKey() + "=" + mapEntry.getValue() + ",");
+                    }
+                    return sbout.toString();
+                } else {
+                    return row.getString(index - 1);
+                }
+            }
 
         } else {
             throw new SQLDataException("Record Not Found At Index: " + index);
