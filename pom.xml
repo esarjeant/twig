@@ -30,7 +30,7 @@ under the License.
 
   <groupId>com.micromux</groupId>
   <artifactId>cassandra-twig-jdbc</artifactId>
-  <version>2.0.0</version>
+  <version>2.1.0</version>
 
   <name>Twig JDBC driver for Cassandra/CQL</name>
   <description>Driver for Cassandra that works in common JDBC clients (DbVisualizer, IntelliJ, etc.)</description>
@@ -61,6 +61,7 @@ under the License.
     <sourceReleaseAssemblyDescriptor>source-release</sourceReleaseAssemblyDescriptor>
     <gpg.useagent>true</gpg.useagent>
     <cassandra.host>localhost</cassandra.host>
+    <cassandra.version>2.1.9</cassandra.version>
   </properties>
 
   <dependencies>
@@ -77,13 +78,13 @@ under the License.
       <dependency>
           <groupId>com.datastax.cassandra</groupId>
           <artifactId>cassandra-driver-core</artifactId>
-          <version>2.1.7</version>
+          <version>${cassandra.version}</version>
       </dependency>
-      <dependency>
-          <groupId>com.datastax.cassandra</groupId>
-          <artifactId>cassandra-driver-mapping</artifactId>
-          <version>2.1.7</version>
-      </dependency>
+      <!--<dependency>-->
+          <!--<groupId>com.datastax.cassandra</groupId>-->
+          <!--<artifactId>cassandra-driver-mapping</artifactId>-->
+          <!--<version>${cassandra.version}</version>-->
+      <!--</dependency>-->
       <dependency>
           <groupId>com.google.guava</groupId>
           <artifactId>guava</artifactId>
@@ -142,15 +143,6 @@ under the License.
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-failsafe-plugin</artifactId>
                     <version>2.14</version>
-                </plugin>
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-gpg-plugin</artifactId>
-                    <version>1.4</version>
-                    <configuration>
-                        <passphrase>${gpg.passphrase}</passphrase>
-                        <useAgent>${gpg.useagent}</useAgent>
-                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
