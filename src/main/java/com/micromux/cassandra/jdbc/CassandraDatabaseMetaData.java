@@ -431,6 +431,22 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
         return "Column Family";
     }
 
+    /**
+     * Retrieves the schema names available in this database.  The results
+     * are ordered by <code>TABLE_CATALOG</code> and
+     * <code>TABLE_SCHEM</code>.
+     *
+     * <P>The schema columns are:
+     *  <OL>
+     *  <LI><B>TABLE_SCHEM</B> String {@code =>} schema name
+     *  <LI><B>TABLE_CATALOG</B> String {@code =>} catalog name (may be <code>null</code>)
+     *  </OL>
+     *
+     * @return a <code>ResultSet</code> object in which each row is a
+     *         schema description
+     * @exception SQLException if a database access error occurs
+     *
+     */
     public ResultSet getSchemas() throws SQLException
     {
         ResultSet rs = MetadataResultSets.makeSchemas(statement, null);

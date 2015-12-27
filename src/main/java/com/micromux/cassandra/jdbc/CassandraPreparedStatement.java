@@ -120,7 +120,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         currentResultSet = connection.execute(boundStatement);
 
         if ((currentResultSet != null) && (currentResultSet.wasApplied())) {
-            updateCount = currentResultSet.all().size() + 1;  // TODO: can INSERT/UPDATE be supported?
+            updateCount = currentResultSet.getAvailableWithoutFetching();  // TODO: can INSERT/UPDATE be supported?
         }
 
         return (currentResultSet != null);

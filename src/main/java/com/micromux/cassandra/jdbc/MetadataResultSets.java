@@ -95,6 +95,22 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
     }
 
+    /**
+     * Retrieves the schema names available in this database.  The results
+     * are ordered by <code>TABLE_CATALOG</code> and
+     * <code>TABLE_SCHEM</code>.
+     *
+     * <P>The schema columns are:
+     *  <OL>
+     *  <LI><B>TABLE_SCHEM</B> String {@code =>} schema name
+     *  <LI><B>TABLE_CATALOG</B> String {@code =>} catalog name (may be <code>null</code>)
+     *  </OL>
+     *
+     * @return a <code>ResultSet</code> object in which each row is a
+     *         schema description
+     * @exception SQLException if a database access error occurs
+     *
+     */
     public static ResultSet makeSchemas(CassandraStatement statement, String schemaPattern) throws SQLException
     {
         if ("%".equals(schemaPattern)) schemaPattern = null;
@@ -592,7 +608,7 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
 	private static List<PKInfo> getPrimaryKeys(CassandraStatement statement, String schema, String table) throws SQLException
 	{
-		StringBuilder query = new StringBuilder("SELECT keyspace_name, columnfamily_name, column_name, validator, component_index FROM system.schema_columns");
+		StringBuilder query = new StringBuilder("SELECT keyspace_name, columnfamily_name, column_name, validator, type FROM system.schema_columns");
 
 	    int filterCount = 0;
 	    if (schema != null) filterCount++;
@@ -623,9 +639,9 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
    	    	String rtable = result.getString(2);
 	        String columnName = result.getString(3);
             String validator = result.getString(4);
-            int componentIndex = result.getInt(5);
+            String type = result.getString(5);
 
-            if (componentIndex < 2) {
+            if (!"regular".equalsIgnoreCase(type)) {
 
                 CassandraValidatorType validatorType = CassandraValidatorType.fromValidator(validator);
 

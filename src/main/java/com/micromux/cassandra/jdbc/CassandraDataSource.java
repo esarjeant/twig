@@ -40,7 +40,7 @@ public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
     {
         try
         {
-            Class.forName("CassandraDriver");
+            Class.forName("com.micromux.cassandra.jdbc.CassandraDriver");
         }
         catch (ClassNotFoundException e)
         {

@@ -26,6 +26,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.net.URLEncoder;
@@ -603,13 +604,7 @@ public class JdbcRegressionTest
     @Test
     public void isValid() throws Exception
     {
-//    	assert con.isValid(3);
-    }
-    
-    @Test(expected=SQLException.class)
-    public void isValidSubZero() throws Exception
-    {
-    	con.isValid(-42);
+    	assert con.isValid(3);
     }
     
     @Test
@@ -656,7 +651,7 @@ public class JdbcRegressionTest
     
     private CassandraStatementExtras statementExtras(Statement statement) throws Exception
     {
-        Class cse = Class.forName("CassandraStatementExtras");
+        Class cse = Class.forName("com.micromux.cassandra.jdbc.CassandraStatementExtras");
         return (CassandraStatementExtras) statement.unwrap(cse);
     }
 

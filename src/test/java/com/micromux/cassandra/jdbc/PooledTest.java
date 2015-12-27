@@ -137,7 +137,7 @@ public class PooledTest
 
 		Connection connection = pooledCassandraDataSource.getConnection();
 
-		PreparedStatement statement = connection.prepareStatement("SELECT someInt FROM pooled_test WHERE somekey = ?");
+		PreparedStatement statement = connection.prepareStatement("SELECT someint FROM pooled_test WHERE somekey = ?");
 		statement.setString(1, "world");
 
 		ResultSet resultSet = statement.executeQuery();

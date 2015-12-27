@@ -207,11 +207,11 @@ public class MetadataResultSetsTest
     public void testTableName() throws SQLException
     {
         CassandraPreparedStatement statement = (CassandraPreparedStatement) con.prepareStatement("select * from " + KEYSPACE1 + ".test1");
-        ResultSet result = MetadataResultSets.makeSchemas(statement, null);
+        ResultSet result = statement.executeQuery();
 
         System.out.println("--- testTableName() ---");
         ResultSetMetaData meta = result.getMetaData();
-        assertEquals(KEYSPACE1 + ".test1", meta.getTableName(1));
+        assertEquals("test1", meta.getTableName(1));
 
     }
 

@@ -82,7 +82,7 @@ public class CassandraResultSetMetaData implements ResultSetMetaData {
 
     @Override
     public String getTableName(int column) throws SQLException {
-        return metaResults.getName(column - 1);
+        return metaResults.getString(column);
     }
 
     @Override

@@ -7,7 +7,7 @@ public enum CassandraValidatorType {
     CompositeType("org.apache.cassandra.db.marshal.CompositeType", Types.STRUCT),
     SetType("org.apache.cassandra.db.marshal.SetType", Types.ARRAY),
     MapType("org.apache.cassandra.db.marshal.MapType", Types.JAVA_OBJECT),
-    UTF8Type("org.apache.cassandra.db.marshal.UTF8Type", Types.LONGNVARCHAR),
+    UTF8Type("org.apache.cassandra.db.marshal.UTF8Type", Types.VARCHAR),
     BooleanType("org.apache.cassandra.db.marshal.BooleanType", Types.BOOLEAN),
     Int32Type("org.apache.cassandra.db.marshal.Int32Type", Types.INTEGER),
     LongType("org.apache.cassandra.db.marshal.LongType", Types.BIGINT),
