@@ -84,7 +84,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         try{
         	connection.removeStatement(this);
         }catch(Exception e){
-        	
+        	LOG.warn("Failed to close() prepared statment", e);
         }
 
         connection = null;
