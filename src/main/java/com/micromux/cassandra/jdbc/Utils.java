@@ -255,59 +255,7 @@ class Utils
         
         return uri.toString();
     }
-    
-    /**
-     * Determine the current keyspace by inspecting the CQL string to see if a USE statement is provided; which would change the keyspace.
-     *
-     * @param cql     A CQL query string
-     * @param current The current keyspace stored as state in the connection
-     * @return the provided keyspace name or the keyspace from the contents of the CQL string
-     */
-    public static String determineCurrentKeyspace(String cql, String current)
-    {
-        String ks = current;
-        Matcher isKeyspace = KEYSPACE_PATTERN.matcher(cql);
-        if (isKeyspace.matches()) ks = isKeyspace.group(1);
-        return ks;
-    }
 
-    /**
-     * Determine the current column family by inspecting the CQL to find a CF reference.
-     *
-     * @param cql A CQL query string
-     * @return The column family name from the contents of the CQL string or null in none was found
-     */
-    public static String determineCurrentColumnFamily(String cql)
-    {
-        String cf = null;
-        Matcher isSelect = SELECT_PATTERN.matcher(cql);
-        if (isSelect.matches()) cf = isSelect.group(1);
-        Matcher isUpdate = UPDATE_PATTERN.matcher(cql);
-        if (isUpdate.matches()) cf = isUpdate.group(1);
-        return cf;
-    }
-    
-    // Utility method
-    /**
-     * Utility method to pack bytes into a byte buffer from a list of ByteBuffers 
-     * 
-     * @param buffers A list of ByteBuffers representing the elements to pack
-     * @param elements The count of the elements
-     * @param size The size in bytes of the result buffer
-     * @return The packed ByteBuffer
-     */
-    protected static ByteBuffer pack(List<ByteBuffer> buffers, int elements, int size)
-    {
-        ByteBuffer result = ByteBuffer.allocate(2 + size);
-        result.putShort((short)elements);
-        for (ByteBuffer bb : buffers)
-        {
-            result.putShort((short)bb.remaining());
-            result.put(bb.duplicate());
-        }
-        return (ByteBuffer)result.flip();
-    }
-    
     protected static String makeQueryString(Properties props)
     {
         StringBuilder sb = new StringBuilder();

@@ -59,6 +59,15 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
     }
 
     /**
+     * Add a new row to the resultset as one of the first records. This is used
+     * for primary key columns.
+     * @param row   Row to add first to the resultset.
+     */
+    void addFirst(CassandraRow row) {
+        this.rows.add(0, row);
+    }
+
+    /**
      * The table types available in this database.
      * @param statement  Statement that needs meta-data.
      * @return The resultset containing the available table types.
@@ -337,68 +346,6 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
         // create the resultsets that will return...
         MetadataResultSets metaResults = new MetadataResultSets();
 
-        for (PKInfo info : pks)
-        {
-
-            CassandraColumn<String> entrySchema = new CassandraColumn<String>("TABLE_SCHEM", info.schema);
-            CassandraColumn<String> entryTableName = new CassandraColumn<String>("TABLE_NAME", info.table);
-	        if (columnNamePattern != null && !info.name.contains(columnNamePattern))
-	        {
-	        	continue;
-	        }
-
-            CassandraColumn<String> entryColumnName = new CassandraColumn<String>("COLUMN_NAME", info.name);
-            CassandraColumn<Integer> entryDataType = new CassandraColumn<Integer>("DATA_TYPE", info.type);
-            CassandraColumn<String> entryTypeName = new CassandraColumn<String>("TYPE_NAME", info.typeName);
-
-            AbstractJdbcType jtype = TypesMap.getTypeForComparator(info.typeName);
-            int colLength = getJdbcTypeWidth(jtype);
-            CassandraColumn<Integer> entryColumnSize = new CassandraColumn<Integer>("COLUMN_SIZE", colLength);
-
-            CassandraColumn<Integer> entryDecimalDigits = new CassandraColumn<Integer>("DECIMAL_DIGITS", 0x00);
-
-            int npr = 2;
-            if (jtype != null && (jtype.getJdbcType() == Types.DECIMAL || jtype.getJdbcType() == Types.NUMERIC)) npr = 10;
-            CassandraColumn<Integer> entryNPR = new CassandraColumn<Integer>("NUM_PREC_RADIX", npr);
-
-            int charOctetLength = getJdbcTypeLength(jtype);
-            CassandraColumn<String> entryCharOctetLength = new CassandraColumn<String>("CHAR_OCTET_LENGTH", String.valueOf(charOctetLength));
-
-            ordinalPosition++;
-            CassandraColumn<Integer> entryOrdinalPosition = new CassandraColumn<Integer>("ORDINAL_POSITION", ordinalPosition);
-            CassandraColumn<Integer> entryNullable = new CassandraColumn<Integer>("NULLABLE", DatabaseMetaData.columnNoNulls);
-            CassandraColumn<String> entryISNullable = new CassandraColumn<String>("IS_NULLABLE", "NO");
-
-            CassandraRow row = new CassandraRow(entryCatalog,
-                    entrySchema,
-                    entryTableName,
-                    entryColumnName,
-                    entryDataType,
-                    entryTypeName,
-                    entryColumnSize,
-                    entryBufferLength,
-                    entryDecimalDigits,
-                    entryNPR,
-                    entryNullable,
-                    entryRemarks,
-                    entryColumnDef,
-                    entrySQLDataType,
-                    entrySQLDateTimeSub,
-                    entryCharOctetLength,
-                    entryOrdinalPosition,
-                    entryISNullable,
-                    entryScopeCatalog,
-                    entryScopeSchema,
-                    entryScopeTable,
-                    entrySOURCEDT,
-                    entryISAutoIncrement,
-                    entryISGeneratedColumn
-            );
-
-            metaResults.addRow(row);
-
-	    }
-
         // define the columns
         CassandraResultSet result = (CassandraResultSet) statement.executeQuery(query.toString());
         while (result.next())
@@ -410,26 +357,15 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
                 (result.getString(3) == null) ? "" : result.getString(3));
 
             String validator = result.getString(4);
-            AbstractJdbcType jtype = TypesMap.getTypeForComparator(validator);
-            CassandraColumn<Integer> entryDataType = new CassandraColumn<Integer>("DATA_TYPE", (jtype == null ? Types.OTHER : jtype.getJdbcType()));
+            CassandraValidatorType validatorType = CassandraValidatorType.fromValidator(validator);
 
-            int idx = validator.lastIndexOf('.');
-            CassandraColumn<String> entryTypeName = new CassandraColumn<String>("TYPE_NAME", validator.substring(idx + 1));
+            CassandraColumn<Integer> entryDataType = new CassandraColumn<Integer>("DATA_TYPE", validatorType.getSqlType());
+            CassandraColumn<String> entryTypeName = new CassandraColumn<String>("TYPE_NAME", validatorType.getSqlDisplayName());
 
-            int colLength = getJdbcTypeWidth(jtype);
-            CassandraColumn<Integer> entryColumnSize = new CassandraColumn<Integer>("COLUMN_SIZE", colLength);
-
-            // if (jtype instanceof JdbcDouble) dd = bytes(17);
-            // if (jtype instanceof JdbcFloat) dd = bytes(11);
+            CassandraColumn<Integer> entryColumnSize = new CassandraColumn<Integer>("COLUMN_SIZE", validatorType.getSqlWidth());
             CassandraColumn<Integer> entryDecimalDigits = new CassandraColumn<Integer>("DECIMAL_DIGITS", 0x00);
-
-            int npr = 2;
-            if (jtype != null && (jtype.getJdbcType() == Types.DECIMAL || jtype.getJdbcType() == Types.NUMERIC)) npr = 10;
-            CassandraColumn<Integer> entryNPR = new CassandraColumn<Integer>("NUM_PREC_RADIX", npr);
-
-            int charol = 0;
-            if (jtype instanceof JdbcAscii || jtype instanceof JdbcUTF8) charol = Integer.MAX_VALUE;
-            CassandraColumn<Integer> entryCharOctetLength = new CassandraColumn<Integer>("CHAR_OCTET_LENGTH", charol);
+            CassandraColumn<Integer> entryNPR = new CassandraColumn<Integer>("NUM_PREC_RADIX", validatorType.getSqlRadix());
+            CassandraColumn<Integer> entryCharOctetLength = new CassandraColumn<Integer>("CHAR_OCTET_LENGTH", validatorType.getSqlLength());
 
             ordinalPosition++;
             CassandraColumn<Integer> entryOrdinalPosition = new CassandraColumn<Integer>("ORDINAL_POSITION", ordinalPosition);
@@ -463,7 +399,12 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
                     entryISGeneratedColumn
             );
 
-            metaResults.addRow(row);
+            // determine if this is a pkey
+            if (isPrimaryKeyColumn(pks, entryColumnName)) {
+                metaResults.addFirst(row);
+            } else {
+                metaResults.addRow(row);
+            }
 
         }
 
@@ -471,33 +412,15 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
     }
 
-    private static int getJdbcTypeWidth(AbstractJdbcType jtype) {
+    private static boolean isPrimaryKeyColumn(List<PKInfo> pks, CassandraColumn<String> entryColumnName) {
 
-        if (jtype instanceof JdbcBytes) return Integer.MAX_VALUE / 2;
-        if (jtype instanceof JdbcUUID) return 36;
-        if (jtype instanceof JdbcInt32) return 4;
-        if (jtype instanceof JdbcLong) return 8;
+        for (PKInfo i : pks) {
+            if (entryColumnName.getValue().equalsIgnoreCase(i.name)) {
+                return true;
+            }
+        }
 
-        // sensible default...
-        return 20;
-
-    }
-
-    /**
-     * This is the maximum length in bytes for the designated type.
-     * @param jtype  JDBC type to check.
-     * @return Maximum length in bytes.
-     */
-    private static int getJdbcTypeLength(AbstractJdbcType jtype) {
-
-        if (jtype instanceof JdbcBytes) return Integer.MAX_VALUE / 2;
-        if (jtype instanceof JdbcAscii || jtype instanceof JdbcUTF8) return Integer.MAX_VALUE;
-        if (jtype instanceof JdbcUUID) return 36;
-        if (jtype instanceof JdbcInt32) return Integer.SIZE;
-        if (jtype instanceof JdbcLong) return Long.SIZE;
-
-        // sensible default...
-        return 1;
+        return false;
 
     }
 
