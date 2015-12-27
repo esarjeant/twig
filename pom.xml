@@ -28,7 +28,7 @@ under the License.
     <version>7</version>
   </parent>
 
-  <groupId>org.apache-extras.cassandra-twig-jdbc</groupId>
+  <groupId>com.micromux</groupId>
   <artifactId>cassandra-twig-jdbc</artifactId>
   <version>2.0.0</version>
 
@@ -48,41 +48,6 @@ under the License.
     <developer>
       <id>esarjeant</id>
       <name>Eric Sarjeant</name>
-      <roles>
-        <role>developer</role>
-      </roles>
-    </developer>
-    <developer>
-      <id>stephenc</id>
-      <name>Stephen Connolly</name>
-      <roles>
-        <role>packager</role>
-      </roles>
-    </developer>
-    <developer>
-      <id>eevans</id>
-      <name>Eric Evans</name>
-      <roles>
-        <role>developer</role>
-      </roles>
-    </developer>
-    <developer>
-      <id>gdusbabek</id>
-      <name>Gary Dusbabek</name>
-      <roles>
-        <role>developer</role>
-      </roles>
-    </developer>
-    <developer>
-      <id>jbellis</id>
-      <name>Jonathan Ellis</name>
-      <roles>
-        <role>developer</role>
-      </roles>
-    </developer>
-    <developer>
-      <id>rickshaw</id>
-      <name>Rick Shaw</name>
       <roles>
         <role>developer</role>
       </roles>
