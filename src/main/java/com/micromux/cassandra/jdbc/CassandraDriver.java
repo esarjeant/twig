@@ -38,9 +38,9 @@ public class CassandraDriver implements Driver
 {
     public static final int DVR_MAJOR_VERSION = 2;
 
-    public static final int DVR_MINOR_VERSION = 2;
+    public static final int DVR_MINOR_VERSION = 1;
 
-    public static final int DVR_PATCH_VERSION = 3;
+    public static final int DVR_PATCH_VERSION = 0;
 
     public static final String DVR_NAME = "Cassandra Twig JDBC Driver";
 
