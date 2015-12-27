@@ -592,7 +592,7 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
 	private static List<PKInfo> getPrimaryKeys(CassandraStatement statement, String schema, String table) throws SQLException
 	{
-		StringBuilder query = new StringBuilder("SELECT keyspace_name, columnfamily_name, key_aliases, key_validator, column_aliases, comparator FROM system.schema_columnfamilies");
+		StringBuilder query = new StringBuilder("SELECT keyspace_name, columnfamily_name, column_name, validator, component_index FROM system.schema_columns");
 
 	    int filterCount = 0;
 	    if (schema != null) filterCount++;
@@ -612,49 +612,45 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 	        if (table != null) query.append(String.format(expr, "columnfamily_name", table));
 	        query.append(" ALLOW FILTERING");
 	    }
-	    // System.out.println(query.toString());
 
-	    List<PKInfo> retval = new ArrayList<PKInfo>();
+        // interrogate the results forp primary keys
+	    List<PKInfo> primaryKeys = new ArrayList<PKInfo>();
 	    CassandraResultSet result = (CassandraResultSet) statement.executeQuery(query.toString());
-	    if (result.next()) // all is reported back in one json row
+	    while (result.next())
 	    {
 
 	    	String rschema = result.getString(1);
    	    	String rtable = result.getString(2);
-	        String key_aliases = result.getString(3);
-            CassandraValidatorType validator = CassandraValidatorType.fromValidator(result.getString(4));
-            buildPKInfo(retval, rschema, rtable, key_aliases, validator);
+	        String columnName = result.getString(3);
+            String validator = result.getString(4);
+            int componentIndex = result.getInt(5);
 
-            CassandraValidatorType comparator = CassandraValidatorType.fromValidator(result.getString(6));
-	        String column_aliases = result.getString(5);
-	        buildPKInfo(retval, rschema, rtable, column_aliases, comparator);
+            if (componentIndex < 2) {
+
+                CassandraValidatorType validatorType = CassandraValidatorType.fromValidator(validator);
+
+                PKInfo pk = createPKInfo(primaryKeys, rschema, rtable, columnName, validatorType);
+                primaryKeys.add(pk);
+
+            }
 
 	    }
-	    return retval;
+
+	    return primaryKeys;
+
 	}
 
-	private static void buildPKInfo(List<PKInfo> retval, String schema, String table, String aliases, CassandraValidatorType validator)
+	private static PKInfo createPKInfo(List<PKInfo> retval, String schema, String table, String columnName, CassandraValidatorType validator)
 	{
-        if (aliases != null)
-        {
-        	aliases = aliases.replace("[","");
-        	aliases = aliases.replace("]","");
-        	aliases = aliases.replace("\"","");
-        	if (aliases.trim().length() != 0)
-        	{
-	        	String[] kaArray = aliases.split(",");
-	        	for (int i = 0; i < kaArray.length; i++)
-	        	{
-	        		PKInfo pki = new PKInfo();
-	        		pki.name = kaArray[i];
-	        		pki.schema = schema;
-	        		pki.table = table;
-	        		pki.type = validator.getSqlType();
-	        		pki.typeName = validator.getSqlName();
-	        		retval.add(pki);
-				}
-        	}
-        }
+        PKInfo pki = new PKInfo();
+        pki.name = columnName;
+        pki.schema = schema;
+        pki.table = table;
+        pki.type = validator.getSqlType();
+        pki.typeName = validator.getSqlName();
+
+        return pki;
+
 	}
 
     @Override

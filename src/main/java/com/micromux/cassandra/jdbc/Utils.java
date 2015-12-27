@@ -52,7 +52,7 @@ class Utils
 
     public static final String PROTOCOL = "jdbc:cassandra:";
     public static final String DEFAULT_HOST = "localhost";
-    public static final int DEFAULT_PORT = 9160;
+    public static final int DEFAULT_PORT = 9042;
     public static final ConsistencyLevel DEFAULT_CONSISTENCY = ConsistencyLevel.ONE;
     
 
@@ -124,7 +124,7 @@ class Utils
      * <p/>
      * The URL must start with the Protocol: "jdbc:cassandra:"
      * The URI part(the "Subname") must contain a host and an optional port and optional keyspace name
-     * ie. "//localhost:9160/Test1"
+     * ie. "//localhost:9042/Test1"
      *
      * @param url The full JDBC URL to be parsed
      * @return A list of properties that were parsed from the Subname
@@ -218,7 +218,7 @@ class Utils
      * Create a "Subname" portion of a JDBC URL from properties.
      * 
      * @param props A Properties file containing all the properties to be considered.
-     * @return A constructed "Subname" portion of a JDBC URL in the form of a CLI (ie: //myhost:9160/Test1?version=3.0.0 )
+     * @return A constructed "Subname" portion of a JDBC URL in the form of a CLI (ie: //myhost:9042/Test1?version=3.0.0 )
      * @throws SQLException
      */
     public static String createSubName(Properties props)throws SQLException

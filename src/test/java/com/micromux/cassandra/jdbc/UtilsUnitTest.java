@@ -51,7 +51,7 @@ public class UtilsUnitTest
         String consistencyonly = "jdbc:cassandra://localhost/Keyspace1?consistency=QUORUM";
         props = Utils.parseURL(consistencyonly);
         assertEquals("localhost", props.getProperty(Utils.TAG_SERVER_NAME));
-        assertEquals("9160", props.getProperty(Utils.TAG_PORT_NUMBER));
+        assertEquals("9042", props.getProperty(Utils.TAG_PORT_NUMBER));
         assertEquals("Keyspace1", props.getProperty(Utils.TAG_DATABASE_NAME));
         assertEquals("QUORUM", props.getProperty(Utils.TAG_CONSISTENCY_LEVEL));
         assertNull(props.getProperty(Utils.TAG_CQL_VERSION));
@@ -59,14 +59,14 @@ public class UtilsUnitTest
         String noport = "jdbc:cassandra://localhost/Keyspace1?version=2.0.0";
         props = Utils.parseURL(noport);
         assertEquals("localhost", props.getProperty(Utils.TAG_SERVER_NAME));
-        assertEquals("9160", props.getProperty(Utils.TAG_PORT_NUMBER));
+        assertEquals("9042", props.getProperty(Utils.TAG_PORT_NUMBER));
         assertEquals("Keyspace1", props.getProperty(Utils.TAG_DATABASE_NAME));
         assertEquals("2.0.0", props.getProperty(Utils.TAG_CQL_VERSION));
         
-        String noversion = "jdbc:cassandra://localhost:9170/Keyspace1";
+        String noversion = "jdbc:cassandra://localhost:9042/Keyspace1";
         props = Utils.parseURL(noversion);
         assertEquals("localhost", props.getProperty(Utils.TAG_SERVER_NAME));
-        assertEquals("9170", props.getProperty(Utils.TAG_PORT_NUMBER));
+        assertEquals("9042", props.getProperty(Utils.TAG_PORT_NUMBER));
         assertEquals("Keyspace1", props.getProperty(Utils.TAG_DATABASE_NAME));
         assertNull(props.getProperty(Utils.TAG_CQL_VERSION));
         
@@ -88,7 +88,7 @@ public class UtilsUnitTest
     @Test
     public void testCreateSubName() throws Exception
     {
-        String happypath = "jdbc:cassandra://localhost:9170/Keyspace1?consistency=QUORUM&version=3.0.0";
+        String happypath = "jdbc:cassandra://localhost:9042/Keyspace1?consistency=QUORUM&version=3.0.0";
         Properties props = Utils.parseURL(happypath);
         
         if (LOG.isDebugEnabled()) LOG.debug("happypath    = '{}'", happypath);
