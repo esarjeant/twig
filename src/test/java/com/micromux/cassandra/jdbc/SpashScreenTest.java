@@ -55,7 +55,7 @@ public class SpashScreenTest
                     URLEncoder.encode(TRUST_STORE), TRUST_PASS);
         }
 
-        Class.forName("CassandraDriver");
+        Class.forName("com.micromux.cassandra.jdbc.CassandraDriver");
         con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?%s&version=3.0.0",HOST,PORT,"system",OPTIONS));
         Statement stmt = con.createStatement();
 

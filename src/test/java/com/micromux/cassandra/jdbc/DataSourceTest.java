@@ -66,7 +66,7 @@ public class DataSourceTest
                     URLEncoder.encode(TRUST_STORE), TRUST_PASS);
         }
 
-        Class.forName("CassandraDriver");
+        Class.forName("com.micromux.cassandra.jdbc.CassandraDriver");
         con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?%s",HOST,PORT,"system",OPTIONS));
         Statement stmt = con.createStatement();
         

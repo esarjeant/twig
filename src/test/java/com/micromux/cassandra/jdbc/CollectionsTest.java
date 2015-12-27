@@ -75,7 +75,7 @@ public class CollectionsTest
                     URLEncoder.encode(TRUST_STORE), TRUST_PASS);
         }
 
-        Class.forName("CassandraDriver");
+        Class.forName("com.micromux.cassandra.jdbc.CassandraDriver");
         String URL = String.format("jdbc:cassandra://%s:%d/%s?%s&version=%s", HOST, PORT, SYSTEM, OPTIONS, CQLV3);
 
         con = DriverManager.getConnection(URL);

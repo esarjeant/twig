@@ -65,7 +65,7 @@ public class MetadataResultSetsTest
                     URLEncoder.encode(TRUST_STORE), TRUST_PASS);
         }
 
-        Class.forName("CassandraDriver");
+        Class.forName("com.micromux.cassandra.jdbc.CassandraDriver");
         String URL = String.format("jdbc:cassandra://%s:%d/%s?version=3.0.0&%s",HOST,PORT,"system",OPTIONS);
         System.out.println("Connection URL = '"+URL +"'");
         

@@ -54,12 +54,9 @@ class CassandraConnection extends AbstractConnection implements Connection
 {
 
     private static final Logger logger = LoggerFactory.getLogger(CassandraConnection.class);
-    public static Integer roundRobinIndex;
-    static final String IS_VALID_CQLQUERY_2_0_0 = "SELECT COUNT(1) FROM system.Versions WHERE component = 'cql';";
-    static final String IS_VALID_CQLQUERY_3_0_0 = "SELECT COUNT(1) FROM system.\"Versions\" WHERE component = 'cql';";
-    
-    public static final int DB_MAJOR_VERSION = 1;
-    public static final int DB_MINOR_VERSION = 2;
+
+    public static final int DB_MAJOR_VERSION = 2;
+    public static final int DB_MINOR_VERSION = 1;
     public static final String DB_PRODUCT_NAME = "Cassandra";
     public static final String DEFAULT_CQL_VERSION = "3.0.0";
 
@@ -87,22 +84,13 @@ class CassandraConnection extends AbstractConnection implements Connection
      */
     private Session session;
 
-    // TODO: DEPRECATE
-    //private Cassandra.Client client;
-    //private TTransport transport;
-
-    protected long timeOfLastFailure = 0;
-    protected int numFailures = 0;
     protected String username = null;
     protected String url = null;
-    protected String cluster;//current catalog
     protected String currentKeyspace;//current schema
     protected TreeSet<String> hostListPrimary;
     protected TreeSet<String> hostListBackup;
     int majorCqlVersion;
 
-    //private TSocket socket;
-    
     PreparedStatement isAlive = null;
     
     private String currentCqlVersion;
@@ -132,8 +120,10 @@ class CassandraConnection extends AbstractConnection implements Connection
         String version = props.getProperty(TAG_CQL_VERSION,DEFAULT_CQL_VERSION);
 
         connectionProps.setProperty(TAG_ACTIVE_CQL_VERSION, version);
-        majorCqlVersion = getMajor(version);
         defaultConsistencyLevel = ConsistencyLevel.valueOf(props.getProperty(TAG_CONSISTENCY_LEVEL, ConsistencyLevel.ONE.name()));
+
+        // take a stab at the CQL version based on what was requested
+        majorCqlVersion = getMajor(version);
 
         // dealing with multiple hosts passed as seeds in the JDBC URL : jdbc:cassandra://lyn4e900.tlt--lyn4e901.tlt--lyn4e902.tlt:9160/fluks
         // in this phase we get the list of all the nodes of the cluster
@@ -181,6 +171,17 @@ class CassandraConnection extends AbstractConnection implements Connection
             // if keyspace was specified - use it
             if (!session.isClosed() && !StringUtils.isEmpty(currentKeyspace)) {
                 session.execute(String.format("USE %s;", currentKeyspace));
+            }
+
+            // request version from session
+            Configuration configuration = session.getCluster().getConfiguration();
+            if ((configuration != null) && (configuration.getProtocolOptions() != null) && (configuration.getProtocolOptions().getProtocolVersionEnum() != null)){
+                ProtocolVersion pv = configuration.getProtocolOptions().getProtocolVersionEnum();
+                this.currentCqlVersion = pv.name();
+
+                // recompute the CQL major version from the actual...
+                this.majorCqlVersion = pv.toInt();
+
             }
 
         } catch (Exception e){

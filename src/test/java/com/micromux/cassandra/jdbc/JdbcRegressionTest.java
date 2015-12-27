@@ -70,7 +70,7 @@ public class JdbcRegressionTest
                     URLEncoder.encode(TRUST_STORE), TRUST_PASS);
         }
 
-        Class.forName("CassandraDriver");
+        Class.forName("com.micromux.cassandra.jdbc.CassandraDriver");
         String URL = String.format("jdbc:cassandra://%s:%d/%s?%s", HOST, PORT, "system", OPTIONS);
         System.out.println("Connection URL = '"+URL +"'");
         
