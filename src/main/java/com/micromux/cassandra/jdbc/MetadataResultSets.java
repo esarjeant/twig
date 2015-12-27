@@ -21,13 +21,11 @@
 package com.micromux.cassandra.jdbc;
 
 import com.micromux.cassandra.jdbc.meta.CassandraColumn;
-import org.apache.cassandra.cql.jdbc.*;
 import com.micromux.cassandra.jdbc.meta.CassandraResultSetMetaData;
 import com.micromux.cassandra.jdbc.meta.CassandraRow;
 
 import java.math.BigDecimal;
 import java.net.URL;
-import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.sql.*;
 import java.util.ArrayList;
@@ -429,12 +427,10 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
      * @param statement     Statement from which the Connection should be derived.
      * @param schema        Schema to query (keyspace).
      * @param table         Table to query (column group).
-     * @param unique
-     * @param approximate
-     * @return
-     * @throws SQLException
+     * @return Set of unique indexes for the specified table (column group)
+     * @throws SQLException Database error during index query.
      */
-    public static ResultSet makeIndexes(CassandraStatement statement, String schema, String table, boolean unique, boolean approximate) throws SQLException
+    public static ResultSet makeIndexes(CassandraStatement statement, String schema, String table) throws SQLException
 	{
 		//1.TABLE_CAT String => table catalog (may be null)
 		//2.TABLE_SCHEM String => table schema (may be null)
@@ -621,7 +617,7 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
         } else if (value instanceof Float) {
             return ((Float)value).toString();
         } else if (value instanceof String) {
-            return ((String)value).toString();
+            return ((String)value);
         } else {
             return value.getClass().getName();
         }
@@ -1021,27 +1017,10 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
     public String getName(int column) throws SQLException {
 
         if (!this.rows.isEmpty()) {
-
-            Object columnName = this.rows.get(0).getColumnName(column);
-
-            if (columnName != null) {
-                if (columnName instanceof Integer) {
-                    return ((Integer) columnName).toString();
-                } else if (columnName instanceof Long) {
-                    return ((Long) columnName).toString();
-                } else if (columnName instanceof Boolean) {
-                    return ((Boolean) columnName).toString();
-                } else if (columnName instanceof Float) {
-                    return ((Float) columnName).toString();
-                } else if (columnName instanceof ByteBuffer) {
-                    return ((ByteBuffer) columnName).toString();
-                } else {
-                    return columnName.toString();
-                }
-            }
+            return this.rows.get(0).getColumnName(column);
+        } else {
+            return null;
         }
-
-        return null;
 
     }
 
@@ -1062,7 +1041,7 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
      * @return Set of primary keys in standard format.
      * @throws SQLException  Database error.
      */
-	public static final ResultSet makePrimaryKeys(CassandraStatement statement, String schema, String table) throws SQLException
+	public static ResultSet makePrimaryKeys(CassandraStatement statement, String schema, String table) throws SQLException
 	{
 		//1.TABLE_CAT String => table catalog (may be null)
 		//2.TABLE_SCHEM String => table schema (may be null)

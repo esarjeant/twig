@@ -30,6 +30,10 @@ import javax.sql.DataSource;
 import java.net.URLEncoder;
 import java.sql.*;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
 public class PooledTest
 {
 	private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
@@ -141,9 +145,9 @@ public class PooledTest
 		statement.setString(1, "world");
 
 		ResultSet resultSet = statement.executeQuery();
-		assert resultSet.next();
-		assert resultSet.getInt(1) == 1;
-		assert resultSet.next() == false;
+		assertTrue(resultSet.next());
+		assertEquals(1, resultSet.getInt(1));
+		assertFalse(resultSet.next());
 		resultSet.close();
 
 		statement.close();
@@ -163,9 +167,9 @@ public class PooledTest
 		statement.setString(1, "world");
 
 		ResultSet resultSet = statement.executeQuery();
-		assert resultSet.next();
-		assert resultSet.getInt(1) == 1;
-		assert resultSet.next() == false;
+		assertTrue(resultSet.next());
+		assertEquals(1, resultSet.getInt(1));
+		assertFalse(resultSet.next());
 		resultSet.close();
 
 		connection.close();
@@ -185,9 +189,9 @@ public class PooledTest
 		Statement statement = connection.createStatement();
 
 		ResultSet resultSet = statement.executeQuery("SELECT someInt FROM pooled_test WHERE somekey = 'world'");
-		assert resultSet.next();
-		assert resultSet.getInt(1) == 1;
-		assert resultSet.next() == false;
+		assertTrue(resultSet.next());
+		assertEquals(1, resultSet.getInt(1));
+		assertFalse(resultSet.next());
 		resultSet.close();
 
 		statement.close();
@@ -206,9 +210,9 @@ public class PooledTest
 		Statement statement = connection.createStatement();
 
 		ResultSet resultSet = statement.executeQuery("SELECT someInt FROM pooled_test WHERE somekey = 'world'");
-		assert resultSet.next();
-		assert resultSet.getInt(1) == 1;
-		assert resultSet.next() == false;
+		assertTrue(resultSet.next());
+		assertEquals(1, resultSet.getInt(1));
+		assertFalse(resultSet.next());
 		resultSet.close();
 
 		connection.close();

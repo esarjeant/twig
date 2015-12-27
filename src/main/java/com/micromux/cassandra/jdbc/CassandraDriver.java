@@ -136,6 +136,6 @@ public class CassandraDriver implements Driver
     
     public java.util.logging.Logger getParentLogger() throws SQLFeatureNotSupportedException
     {
-    	throw new SQLFeatureNotSupportedException(String.format(NOT_SUPPORTED));
+    	throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 }

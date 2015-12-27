@@ -258,8 +258,7 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
     	if (catalog == null || connection.getCatalog().equals(catalog))
     	{
     		if (schema == null) schema = connection.getSchema(); //limit to current schema if set
-	        ResultSet rs = MetadataResultSets.makeIndexes(statement, schema, table,unique,approximate);
-	        return rs;
+	        return MetadataResultSets.makeIndexes(statement, schema, table);
     	}
         return new CassandraResultSet();
     }
@@ -385,8 +384,7 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
     	if (catalog == null || connection.getCatalog().equals(catalog))
     	{
     		if (schema == null) schema = connection.getSchema(); //limit to current schema if set
-	        ResultSet rs = MetadataResultSets.makePrimaryKeys(statement, schema, table);
-	        return rs;
+	        return MetadataResultSets.makePrimaryKeys(statement, schema, table);
     	}
         return new CassandraResultSet();
     }
@@ -449,8 +447,7 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
      */
     public ResultSet getSchemas() throws SQLException
     {
-        ResultSet rs = MetadataResultSets.makeSchemas(statement, null);
-        return rs;
+        return MetadataResultSets.makeSchemas(statement, null);
     }
 
     public ResultSet getSchemas(String catalog, String schemaPattern) throws SQLException
@@ -531,8 +528,7 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
     	if ((catalog == null || connection.getCatalog().equals(catalog)) && askingForTable)
     	{
     		if (schemaPattern == null) schemaPattern = connection.getSchema(); //limit to current schema if set
-	        ResultSet rs = MetadataResultSets.makeTables(statement, schemaPattern, tableNamePattern);
-	        return rs;
+	        return MetadataResultSets.makeTables(statement, schemaPattern, tableNamePattern);
     	}
         return new CassandraResultSet();
     }
@@ -1030,11 +1026,11 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
     
     public boolean generatedKeyAlwaysReturned() throws SQLException
     {
-    	throw new SQLFeatureNotSupportedException(String.format(NOT_SUPPORTED));
+    	throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
     
     public ResultSet getPseudoColumns(String catalog, String schemaPattern, String tableNamePattern, String columnNamePattern) throws SQLException
     {
-    	throw new SQLFeatureNotSupportedException(String.format(NOT_SUPPORTED));
+    	throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 }

@@ -125,7 +125,7 @@ public class MetadataResultSetsTest
         if (con!=null) con.close();
     }
 
-    private final String showColumn(int index, ResultSet result) throws SQLException
+    private String showColumn(int index, ResultSet result) throws SQLException
     {
         StringBuilder sb = new StringBuilder();
         sb.append("[").append(index).append("]");
@@ -133,7 +133,7 @@ public class MetadataResultSetsTest
         return sb.toString();
     }
 
-    private final String toString(ResultSet result) throws SQLException
+    private String toString(ResultSet result) throws SQLException
     {
        StringBuilder sb = new StringBuilder();
 
@@ -151,7 +151,7 @@ public class MetadataResultSetsTest
        return sb.toString();
     }
 
-	private final String getColumnNames(ResultSetMetaData metaData) throws SQLException
+	private String getColumnNames(ResultSetMetaData metaData) throws SQLException
 	{
        StringBuilder sb = new StringBuilder();
         int count = metaData.getColumnCount();

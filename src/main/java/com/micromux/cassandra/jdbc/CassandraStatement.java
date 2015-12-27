@@ -36,41 +36,41 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
     /**
      * The connection.
      */
-    protected CassandraConnection connection;
+    CassandraConnection connection;
 
     /**
      * The cql.
      */
     protected String cql;
 
-    protected int fetchDirection = ResultSet.FETCH_FORWARD;
+    private int fetchDirection = ResultSet.FETCH_FORWARD;
 
-    protected int fetchSize = 0;
+    private int fetchSize = 0;
 
-    protected int maxFieldSize = 0;
+    private int maxFieldSize = 0;
 
-    protected int maxRows = 0;
+    private int maxRows = 0;
 
-    protected int resultSetType = CassandraResultSet.DEFAULT_TYPE;
+    private int resultSetType = CassandraResultSet.DEFAULT_TYPE;
 
-    protected int resultSetConcurrency = CassandraResultSet.DEFAULT_CONCURRENCY;
+    private int resultSetConcurrency = CassandraResultSet.DEFAULT_CONCURRENCY;
 
-    protected int resultSetHoldability = CassandraResultSet.DEFAULT_HOLDABILITY;
+    private int resultSetHoldability = CassandraResultSet.DEFAULT_HOLDABILITY;
 
-    protected ResultSet currentResultSet = null;
+    private ResultSet currentResultSet = null;
 
-    protected int updateCount = -1;
+    int updateCount = -1;
 
-    protected boolean escapeProcessing = true;
-    
-    protected ConsistencyLevel consistencyLevel;
+    private boolean escapeProcessing = true;
+
+    private ConsistencyLevel consistencyLevel;
 
     CassandraStatement(CassandraConnection con) throws SQLException
     {
         this(con, null, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.HOLD_CURSORS_OVER_COMMIT);
     }
 
-    CassandraStatement(CassandraConnection con, String cql) throws SQLException
+    private CassandraStatement(CassandraConnection con, String cql) throws SQLException
     {
         this(con, cql, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.HOLD_CURSORS_OVER_COMMIT);
     }
@@ -146,7 +146,7 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
      * Check the connection and return a fatal SQL Exception if it is no longer available.
      * @throws SQLException  SQL exception if the connection has been closed.
      */
-    protected final void checkNotClosed() throws SQLException
+    final void checkNotClosed() throws SQLException
     {
         if ((null == connection) || (connection.isClosed())) {
             throw new SQLRecoverableException(Utils.WAS_CLOSED_STMT);
@@ -428,7 +428,7 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
         return false;
     }
 
-    protected final void resetResults()
+    final void resetResults()
     {
         updateCount = -1;
     }

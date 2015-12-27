@@ -123,7 +123,7 @@ import static com.micromux.cassandra.jdbc.Utils.NO_INTERFACE;
  * </table>
  * 
  */
-public class CassandraResultSet extends AbstractResultSet implements ResultSet
+class CassandraResultSet extends AbstractResultSet implements ResultSet
 {
     private static final Logger logger = LoggerFactory.getLogger(CassandraResultSet.class);
 
@@ -141,7 +141,7 @@ public class CassandraResultSet extends AbstractResultSet implements ResultSet
      */
     private Row row;
 
-    int rowNumber = 0;
+    private int rowNumber = 0;
 
     private final CResultSetMetaData meta;
 
@@ -504,6 +504,17 @@ public class CassandraResultSet extends AbstractResultSet implements ResultSet
         return getObject(findColumn(name));
     }
 
+    /**
+     * This is some unusual logic; support the Object conversion for JDBC which allows the client to request the
+     * type of entity based on a column index lookup. For many of the common types (String, Integer, etc.) the
+     * native implementation is used here.
+     *
+     * @param columnIndex   Column entry to request.
+     * @param type          Type of object expected.
+     * @param <T>           Class of object expected.
+     * @return Instance of the object or an exception if this fails.
+     * @throws SQLException Exception occurs if the request object does not match the data definition.
+     */
     @Override
     public <T> T getObject(int columnIndex, Class<T> type) throws SQLException {
 
@@ -637,7 +648,7 @@ public class CassandraResultSet extends AbstractResultSet implements ResultSet
                     StringBuilder sbout = new StringBuilder();
 
                     for (Map.Entry<Object,Object> mapEntry : map.entrySet()) {
-                        sbout.append(mapEntry.getKey() + "=" + mapEntry.getValue() + ",");
+                        sbout.append(mapEntry.getKey()).append("=").append(mapEntry.getValue()).append(",");
                     }
                     return sbout.toString();
                 } else {

@@ -280,7 +280,7 @@ class CassandraConnection extends AbstractConnection implements Connection
         return major;
     }
     
-    private final void checkNotClosed() throws SQLException
+    private void checkNotClosed() throws SQLException
     {
         if (isClosed()) throw new SQLNonTransientConnectionException(WAS_CLOSED_CON);
     }

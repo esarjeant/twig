@@ -33,7 +33,7 @@ import java.util.logging.Logger;
 
 import static com.micromux.cassandra.jdbc.Utils.*;
 
-public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
+class CassandraDataSource implements ConnectionPoolDataSource, DataSource
 {
 
     static
@@ -48,21 +48,20 @@ public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
         }
     }
 
-    protected static final String description = "Cassandra Data Source";
+    private static final String description = "Cassandra Data Source";
 
-    protected String serverName;
+    private String serverName;
 
-    protected int portNumber = 9042;
+    private int portNumber = 9042;
 
-    protected String databaseName;
+    private String databaseName;
 
-    protected String user;
+    private String user;
+    private String password;
 
-    protected String password;
+    private String version = null;
 
-    protected String version = null;
-    
-    protected String consistency = null;
+    private String consistency = null;
 
     private final String trustStore;
     private final String trustPass;
@@ -91,7 +90,7 @@ public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
         return serverName;
     }
 
-    public void setServerName(String serverName)
+    private void setServerName(String serverName)
     {
         this.serverName = serverName;
     }
@@ -101,7 +100,7 @@ public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
         return version;
     }
 
-    public void setVersion(String version)
+    private void setVersion(String version)
     {
         this.version = version;
     }
@@ -111,7 +110,7 @@ public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
         return consistency;
     }
 
-    public void setConsistency(String consistency)
+    private void setConsistency(String consistency)
     {
         this.consistency = consistency;
     }
@@ -121,7 +120,7 @@ public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
         return portNumber;
     }
 
-    public void setPortNumber(int portNumber)
+    private void setPortNumber(int portNumber)
     {
         this.portNumber = portNumber;
     }
@@ -131,7 +130,7 @@ public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
         return databaseName;
     }
 
-    public void setDatabaseName(String databaseName)
+    private void setDatabaseName(String databaseName)
     {
         this.databaseName = databaseName;
     }
@@ -141,7 +140,7 @@ public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
         return user;
     }
 
-    public void setUser(String user)
+    private void setUser(String user)
     {
         this.user = user;
     }
@@ -151,7 +150,7 @@ public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
         return password;
     }
 
-    public void setPassword(String password)
+    private void setPassword(String password)
     {
         this.password = password;
     }
@@ -216,7 +215,7 @@ public class CassandraDataSource implements ConnectionPoolDataSource, DataSource
     
     public Logger getParentLogger() throws SQLFeatureNotSupportedException
     {
-    	throw new SQLFeatureNotSupportedException(String.format(NOT_SUPPORTED));
+    	throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
 	@Override

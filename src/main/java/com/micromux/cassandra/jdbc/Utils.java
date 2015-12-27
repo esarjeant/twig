@@ -29,15 +29,12 @@ import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
-import java.nio.ByteBuffer;
 import java.sql.SQLException;
 import java.sql.SQLNonTransientConnectionException;
 import java.sql.SQLSyntaxErrorException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -130,7 +127,7 @@ class Utils
      * @return A list of properties that were parsed from the Subname
      * @throws SQLException
      */
-    public static final Properties parseURL(String url) throws SQLException
+    public static Properties parseURL(String url) throws SQLException
     {
         Properties props = new Properties();
 
@@ -138,7 +135,7 @@ class Utils
         {
             props.setProperty(TAG_PORT_NUMBER, "" + DEFAULT_PORT);
             String rawUri = url.substring(PROTOCOL.length());
-            URI uri = null;
+            URI uri;
             try
             {
                 uri = new URI(rawUri);

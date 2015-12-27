@@ -65,8 +65,8 @@ public class CassandraRow {
 
     /**
      * Name of the specified column.
-     * @param column
-     * @return
+     * @param column   Identifier for the column.
+     * @return  Name for the requested column.
      */
     public String getColumnName(int column) throws SQLException {
 
