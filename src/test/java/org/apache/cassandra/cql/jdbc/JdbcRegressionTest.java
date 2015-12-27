@@ -20,9 +20,14 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
+import org.apache.cassandra.cql.ConnectionDetails;
+import org.apache.cassandra.thrift.ConsistencyLevel;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
+import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -30,16 +35,19 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Types;
 import java.sql.Timestamp;
+import java.sql.Types;
+import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
-import org.apache.cassandra.cql.ConnectionDetails;
-import org.apache.cassandra.thrift.ConsistencyLevel;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 public class JdbcRegressionTest
 {
@@ -47,20 +55,18 @@ public class JdbcRegressionTest
     private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort()+""));
     private static final String KEYSPACE = "testks";
     private static final String TABLE = "regressiontest";
+    private static final String TYPETABLE = "datatypetest";
 //    private static final String CQLV3 = "3.0.0";
     private static final String CONSISTENCY_QUORUM = "QUORUM";
       
     private static java.sql.Connection con = null;
     
-
     @BeforeClass
     public static void setUpBeforeClass() throws Exception
     {
         Class.forName("org.apache.cassandra.cql.jdbc.CassandraDriver");
-        String URL = String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,"system");
-        System.out.println("Connection URL = '"+URL +"'");
         
-        con = DriverManager.getConnection(URL);
+        con = createNewConnection("system");
         Statement stmt = con.createStatement();
         
         // Drop Keyspace
@@ -86,18 +92,37 @@ public class JdbcRegressionTest
                         + " iValue int"
                         + ");";
         stmt.execute(createCF);
-        
+
         //create an index
         stmt.execute("CREATE INDEX ON "+TABLE+" (iValue)");
+
+        String createCF2 = "CREATE COLUMNFAMILY " + TYPETABLE + " ( "
+                + " id uuid PRIMARY KEY, "
+                + " blobValue blob,"
+                + " blobSetValue set<blob>,"
+                + " dataMapValue map<text,blob>,"
+                + " uuidList list<uuid>,"
+                + " stringMap map<text,text> "
+                + ") WITH comment = 'datatype TABLE in the Keyspace'"
+                + ";";
+        stmt.execute(createCF2);
+
         stmt.close();
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+        con = createNewConnection(KEYSPACE);
         System.out.println(con);
 
     }
-    
+
+	private static Connection createNewConnection(String ks) throws SQLException 
+	{
+		String URL = String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,ks);
+        System.out.println("Connection URL = '"+URL +"'");
+		return DriverManager.getConnection(URL);
+	}
+
     @AfterClass
     public static void tearDownAfterClass() throws Exception
     {
@@ -113,7 +138,7 @@ public class JdbcRegressionTest
 
         statement.executeUpdate(insert);
         statement.close();
-        
+
         statement = con.createStatement();
         ResultSet result = statement.executeQuery("SELECT bValue,iValue FROM regressiontest WHERE keyname='key0';");
         result.next();
@@ -202,7 +227,7 @@ public class JdbcRegressionTest
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+        con = createNewConnection(KEYSPACE);
         
         // paraphrase of the snippet from the ISSUE #33 provided test
         PreparedStatement statement = con.prepareStatement("update t33 set c=? where k=123");
@@ -328,7 +353,7 @@ public class JdbcRegressionTest
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+        con = createNewConnection(KEYSPACE);
  
         PreparedStatement statement = con.prepareStatement("update t59 set c=? where k=123", ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
         statement.setString(1, "hello");
@@ -357,16 +382,19 @@ public class JdbcRegressionTest
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+        con = createNewConnection(KEYSPACE);
         
         Statement statement = con.createStatement();
         String insert = "INSERT INTO t65 (key, int1,int2,intset) VALUES ('key1',1,100,{10,20,30,40});";
         statement.executeUpdate(insert);
         
-        ResultSet result = statement.executeQuery("SELECT * FROM t65;");
+        ResultSet result = statement.executeQuery("SELECT int1, int2, intset, key FROM t65;");
 
         System.out.println(resultToDisplay(result,65, "with set = {10,20,30,40}"));
-       
+
+        ResultSetMetaData md = result.getMetaData();
+        assertEquals("t65", md.getTableName(1));
+
         String update = "UPDATE t65 SET intset=? WHERE key=?;";
  
         PreparedStatement pstatement = con.prepareStatement(update);
@@ -431,7 +459,7 @@ public class JdbcRegressionTest
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s",HOST,PORT,KEYSPACE));
+        con = createNewConnection(KEYSPACE);
         
         Statement statement = con.createStatement();
         
@@ -454,6 +482,53 @@ public class JdbcRegressionTest
 
         System.out.println(resultToDisplay(result,74, "current date"));
        
+    }
+
+    @Test
+    public void testColumnTypes() throws Exception
+    {
+        Statement stmt = con.createStatement();
+
+        // Create the target Column family
+        String createCF = "CREATE table ttypes (id BIGINT PRIMARY KEY, col_f float,col_d double,col_n int,col_t timestamp)";        
+        
+        stmt.execute(createCF);
+        stmt.close();
+        con.close();
+
+        // open it up again to see the new CF
+        con = createNewConnection(KEYSPACE);
+        
+        Statement statement = con.createStatement();
+        
+        String insert = "INSERT INTO ttypes (id, col_f,col_d,col_n,col_t) VALUES (?, ?, ?, ?,?);";
+        
+        PreparedStatement pstatement = con.prepareStatement(insert);
+        pstatement.setLong(1, 1L); 
+        pstatement.setFloat(2, 1f); 
+        pstatement.setDouble(3, 1d); 
+        pstatement.setInt(4, 1); 
+        pstatement.setDate(5, new java.sql.Date(System.currentTimeMillis())); 
+        pstatement.execute();
+
+        pstatement.setObject(1, new Long(2l)); 
+        pstatement.setObject(2, new Float(1f)); 
+        pstatement.setObject(3, new Double(1d)); 
+        pstatement.setObject(4, new Integer(1)); 
+        pstatement.setObject(5, new Date()); 
+        pstatement.execute();
+
+        pstatement.setObject(1, new Long(3l),Types.BIGINT); 
+        pstatement.setObject(2, new Float(1f),Types.FLOAT);
+        pstatement.setObject(3, new Double(1d),Types.DOUBLE); 
+        pstatement.setObject(4, new Integer(1),Types.INTEGER);
+        pstatement.setObject(5, new Date(),Types.TIMESTAMP); 
+        pstatement.execute();
+
+        ResultSet result = statement.executeQuery("SELECT * FROM ttypes;");
+        assertTrue(result.next());
+        assertTrue(result.next());
+        assertTrue(result.next());
     }
 
     @Test
@@ -524,7 +599,105 @@ public class JdbcRegressionTest
         ResultSet result = md.getColumns(null, "%", TABLE, "ivalue");
         assertTrue("Make sure we have found an column", result.next());
     }
+
+    @Test
+    public void testBlob() throws Exception
+    {
+        UUID blobId = UUID.randomUUID();
+        String blobValue = RandomStringUtils.random(10);
+        String insert = "INSERT INTO " + TYPETABLE + " (id,blobValue,dataMapValue) " +
+                        " VALUES(" + blobId.toString() + ", ?, {'12345': bigintAsBlob(12345)});";
+
+        PreparedStatement statement = con.prepareStatement(insert);
+        statement.setObject(1, blobValue);
+
+        statement.executeUpdate();
+        statement.close();
+
+        Statement select1 = con.createStatement();
+        String query = "SELECT blobValue FROM "+TYPETABLE+" WHERE id=" + blobId.toString() + ";";
+        ResultSet result = select1.executeQuery(query);
+        result.next();
+
+        Object blobResult = result.getObject(1);
+        assertEquals(blobValue, blobResult);
+
+        Statement select2 = con.createStatement();
+        String query2 = "SELECT dataMapValue FROM "+TYPETABLE+" WHERE id=" + blobId.toString() + ";";
+        ResultSet result2 = select2.executeQuery(query2);
+        result2.next();
+
+        Object mapObj = result2.getObject(1);
+        assertTrue(mapObj instanceof Map);
+
+        Map mapResult = (Map)mapObj;
+        assertEquals(1, mapResult.size());
+
+
+
+    }
     
+    @Test
+    public void testListUuid() throws Exception
+    {
+        UUID id = UUID.randomUUID();
+        UUID uuid1 = UUID.randomUUID();
+
+        String insert = "INSERT INTO " + TYPETABLE + " (id,uuidList) " +
+                        " VALUES(" + id.toString() + ", [" + uuid1.toString() + "]);";
+
+        PreparedStatement statement = con.prepareStatement(insert);
+        statement.executeUpdate();
+        statement.close();
+
+        Statement select1 = con.createStatement();
+        String query = "SELECT uuidList FROM "+TYPETABLE+" WHERE id=" + id.toString() + ";";
+        ResultSet result = select1.executeQuery(query);
+        result.next();
+
+        Object objList = result.getObject(1);
+
+        assertTrue("Expecting a List of UUID", objList instanceof List);
+
+        List uuidList = (List)objList;
+        assertEquals("List should have (1) element", 1, uuidList.size());
+        assertEquals("Element should be equal at (0)", uuid1, uuidList.get(0));
+
+    }
+
+    @Test
+    public void testMapString() throws Exception
+    {
+        UUID id = UUID.randomUUID();
+
+        String key1 = RandomStringUtils.randomAlphanumeric(5);
+        String value1 = RandomStringUtils.randomAlphanumeric(99);
+
+        String insert = String.format("INSERT INTO %s (id, stringMap) " +
+                        " VALUES(%s, {'%s' : '%s'});",
+                            TYPETABLE, id.toString(),
+                            key1, value1);
+
+        PreparedStatement statement = con.prepareStatement(insert);
+        statement.executeUpdate();
+        statement.close();
+
+        Statement select1 = con.createStatement();
+        String query = String.format("SELECT stringMap FROM %s WHERE id=%s;", TYPETABLE, id.toString());
+        ResultSet result = select1.executeQuery(query);
+        result.next();
+
+        Object objMap = result.getObject(1);
+
+        assertTrue("Expecting a Map", objMap instanceof Map);
+
+        Map strMap = (Map)objMap;
+        assertEquals("Map should have (1) element", 1, strMap.size());
+        assertTrue("Key1 should be in the map", strMap.containsKey(key1));
+//        assertTrue("Key1:Value should match expected", value1, (String)(strMap.get(key1)));
+
+    }
+
 
     @Test
     public void isValid() throws Exception

@@ -20,10 +20,16 @@
 
 package org.apache.cassandra.cql.jdbc;
 
-import static org.apache.cassandra.cql.jdbc.Utils.NO_RESULTSET;
-import static org.apache.cassandra.cql.jdbc.Utils.NO_SERVER;
-import static org.apache.cassandra.cql.jdbc.Utils.NO_UPDATE_COUNT;
-import static org.apache.cassandra.cql.jdbc.Utils.SCHEMA_MISMATCH;
+import org.apache.cassandra.thrift.CqlPreparedResult;
+import org.apache.cassandra.thrift.CqlResult;
+import org.apache.cassandra.thrift.InvalidRequestException;
+import org.apache.cassandra.thrift.SchemaDisagreementException;
+import org.apache.cassandra.thrift.TimedOutException;
+import org.apache.cassandra.thrift.UnavailableException;
+import org.apache.cassandra.utils.ByteBufferUtil;
+import org.apache.thrift.TException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -51,16 +57,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.cassandra.thrift.CqlPreparedResult;
-import org.apache.cassandra.thrift.CqlResult;
-import org.apache.cassandra.thrift.InvalidRequestException;
-import org.apache.cassandra.thrift.SchemaDisagreementException;
-import org.apache.cassandra.thrift.TimedOutException;
-import org.apache.cassandra.thrift.UnavailableException;
-import org.apache.cassandra.utils.ByteBufferUtil;
-import org.apache.thrift.TException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_RESULTSET;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_SERVER;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_UPDATE_COUNT;
+import static org.apache.cassandra.cql.jdbc.Utils.SCHEMA_MISMATCH;
 
 class CassandraPreparedStatement extends CassandraStatement implements PreparedStatement
 {
@@ -93,10 +93,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
        if (LOG.isTraceEnabled()) LOG.trace("CQL: " + this.cql);
        try
        {
-           CqlPreparedResult result = con.prepare(cql);
-
-           itemId = result.itemId;
-           count = result.count;
+    	   createPreparedResult();
        }
        catch (InvalidRequestException e)
        {
@@ -108,6 +105,19 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
        }
     }
     
+    void createPreparedResult() throws InvalidRequestException, TException
+    {
+	    CqlPreparedResult result = connection.prepare(cql);
+	
+	    itemId = result.itemId;
+	    count = result.count;
+	}
+
+    int getItemId() 
+	{
+		return itemId;
+	}
+
     String getCql()
     {
         return cql;
@@ -156,7 +166,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         try
         {
             resetResults();
-            CqlResult result = connection.execute(itemId, getBindValues(), consistencyLevel);
+            CqlResult result = connection.execute(this, getBindValues(), consistencyLevel);
 
             switch (result.getType())
             {
@@ -359,8 +369,32 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
 
     public void setObject(int parameterIndex, Object object) throws SQLException
     {
-        // For now all objects are forced to String type
-        setObject(parameterIndex, object, Types.VARCHAR, 0);
+    	int targetSqlType = Types.VARCHAR; // For now all objects are default to String type
+    	if (object instanceof Float)
+    	{
+    		targetSqlType = Types.FLOAT;
+    	}
+    	else if (object instanceof Double)
+    	{
+    		targetSqlType = Types.DOUBLE;
+    	}
+    	else if (object instanceof Integer)
+    	{
+    		targetSqlType = Types.INTEGER;
+    	}
+    	else if (object instanceof Long || object instanceof BigInteger)
+    	{
+    		targetSqlType = Types.BIGINT;
+    	}
+    	else if (object instanceof Boolean)
+    	{
+    		targetSqlType = Types.BOOLEAN;
+    	}
+    	else if (object instanceof Date || object instanceof java.util.Date)
+    	{
+    		targetSqlType = Types.TIMESTAMP;
+    	}
+        setObject(parameterIndex, object, targetSqlType);
     }
 
     public void setObject(int parameterIndex, Object object, int targetSqlType) throws SQLException
@@ -375,7 +409,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
 
         ByteBuffer variable = HandleObjects.makeBytes(object, targetSqlType, scaleOrLength);
 
-        if (variable == null) throw new SQLNonTransientException("Problem mapping object to JDBC Type");
+        if (variable == null) throw new SQLNonTransientException("Problem mapping object:"+(object != null ? object.getClass() : null)+" to JDBC Type:"+targetSqlType);
 
         bindValues.put(parameterIndex, variable);
     }

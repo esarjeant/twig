@@ -20,7 +20,15 @@
  */
 package org.apache.cassandra.cql.jdbc;
 
-import static org.apache.cassandra.cql.jdbc.Utils.*;
+import org.apache.cassandra.thrift.ConsistencyLevel;
+import org.apache.cassandra.thrift.CqlResult;
+import org.apache.cassandra.thrift.InvalidRequestException;
+import org.apache.cassandra.thrift.SchemaDisagreementException;
+import org.apache.cassandra.thrift.TimedOutException;
+import org.apache.cassandra.thrift.UnavailableException;
+import org.apache.thrift.TException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -34,16 +42,24 @@ import java.sql.SQLSyntaxErrorException;
 import java.sql.SQLTransientConnectionException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-import org.apache.cassandra.thrift.ConsistencyLevel;
-import org.apache.cassandra.thrift.CqlResult;
-import org.apache.cassandra.thrift.InvalidRequestException;
-import org.apache.cassandra.thrift.SchemaDisagreementException;
-import org.apache.cassandra.thrift.TimedOutException;
-import org.apache.cassandra.thrift.UnavailableException;
-import org.apache.thrift.TException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.cassandra.cql.jdbc.Utils.BAD_AUTO_GEN;
+import static org.apache.cassandra.cql.jdbc.Utils.BAD_FETCH_DIR;
+import static org.apache.cassandra.cql.jdbc.Utils.BAD_FETCH_SIZE;
+import static org.apache.cassandra.cql.jdbc.Utils.BAD_HOLD_RSET;
+import static org.apache.cassandra.cql.jdbc.Utils.BAD_KEEP_RSET;
+import static org.apache.cassandra.cql.jdbc.Utils.BAD_TYPE_RSET;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_BATCH;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_GEN_KEYS;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_INTERFACE;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_MULTIPLE;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_RESULTSET;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_SERVER;
+import static org.apache.cassandra.cql.jdbc.Utils.NO_UPDATE_COUNT;
+import static org.apache.cassandra.cql.jdbc.Utils.SCHEMA_MISMATCH;
+import static org.apache.cassandra.cql.jdbc.Utils.WAS_CLOSED_STMT;
 
 /**
  * Cassandra statement: implementation class for {@link PreparedStatement}.
@@ -83,6 +99,11 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
     protected boolean escapeProcessing = true;
     
     protected ConsistencyLevel consistencyLevel;
+
+    /**
+     * regular expression to parse CQL
+     */
+    private static final Pattern CQL_STATEMENT = Pattern.compile("(select|insert|update|delete).*(into|from)\\s+(\\w+).*\\;?", Pattern.CASE_INSENSITIVE);
 
     CassandraStatement(CassandraConnection con) throws SQLException
     {
@@ -128,6 +149,30 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
         throw new SQLFeatureNotSupportedException(NO_BATCH);
     }
 
+    /**
+     * Take a look at the CQL and determine the name of the columngroup (table)
+     * being queried. Cassandra does not support joins, so the FROM clause
+     * will be the name of the table.
+     * @return   Name of the table queried as part of this statement.
+     */
+    protected String getTableName() {
+
+        String tableName = "";
+
+        if (cql != null) {
+
+            Matcher matcher = CQL_STATEMENT.matcher(cql);
+
+            if (matcher.find()) {
+                tableName = matcher.group(3);
+            }
+
+        }
+
+        return tableName;
+
+    }
+
     protected final void checkNotClosed() throws SQLException
     {
         if (isClosed()) throw new SQLRecoverableException(WAS_CLOSED_STMT);
@@ -161,6 +206,8 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
             if (logger.isTraceEnabled()) logger.trace("CQL: "+ cql);
             
             resetResults();
+
+            this.cql = cql;
             CqlResult rSet = connection.execute(cql, consistencyLevel);
 
             switch (rSet.getType())

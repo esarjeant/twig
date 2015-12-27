@@ -20,7 +20,10 @@
 
 package org.apache.cassandra.cql.jdbc;
 
-import static org.apache.cassandra.cql.jdbc.JdbcDate.iso8601Patterns;
+import org.apache.cassandra.utils.ByteBufferUtil;
+import org.apache.commons.lang3.time.DateUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -36,7 +39,6 @@ import java.sql.Date;
 import java.sql.RowId;
 import java.sql.SQLException;
 import java.sql.SQLNonTransientException;
-import java.sql.SQLRecoverableException;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.sql.Types;
@@ -48,10 +50,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import org.apache.cassandra.utils.ByteBufferUtil;
-import org.apache.commons.lang.time.DateUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.cassandra.cql.jdbc.JdbcDate.iso8601Patterns;
+
+//import org.apache.commons.lang.time.DateUtils;
 
 public class HandleObjects
 {
@@ -451,6 +452,18 @@ public class HandleObjects
                 assert varint != null;
                 return JdbcInteger.instance.decompose(varint);
 
+            case Types.REAL:
+            case Types.DOUBLE:
+            case Types.DECIMAL:
+                Double dvalue = objectToDOUBLE(objectClass, object);
+                assert dvalue != null;
+                return JdbcDouble.instance.decompose(dvalue);
+
+            case Types.FLOAT:
+                Float fvalue = objectToFLOAT(objectClass, object);
+                assert fvalue != null;
+                return JdbcFloat.instance.decompose(fvalue);
+
             case Types.INTEGER:
                 Integer value = objectToINTEGER(objectClass, object);
                 assert value != null;
@@ -526,4 +539,22 @@ public class HandleObjects
                 return null;
         }
     }
+
+
+	private static Float objectToFLOAT(Class<? extends Object> objectClass, Object object) 
+	{
+		// Strings should always work
+        if (objectClass == String.class) return new Float((String) object);
+        else if (objectClass == Number.class) return new Float(((Number) object).floatValue());
+        else if (objectClass == Float.class) return new Float(((Number) object).floatValue());
+        else return null; // this should not happen
+    }
+
+	private static Double objectToDOUBLE(Class<? extends Object> objectClass, Object object) 
+	{
+		// Strings should always work
+        if (objectClass == String.class) return new Double((String) object);
+        else if ((objectClass == Number.class) || (objectClass == Double.class)) return new Double(((Number) object).doubleValue());
+        else return null; // this should not happen
+	}
 }
