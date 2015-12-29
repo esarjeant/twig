@@ -23,6 +23,7 @@ package com.micromux.cassandra.jdbc;
 import com.micromux.cassandra.ConnectionDetails;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -37,41 +38,20 @@ import java.sql.Statement;
 import static org.junit.Assert.assertEquals;
 
 
-public class MetadataResultSetsTest
+public class MetadataResultSetsTest extends BaseDriverTest
 {
-    private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
-    private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort()+""));
+
     private static final String KEYSPACE1 = "testks1";
     private static final String KEYSPACE2 = "testks2";
     private static final String DROP_KS = "DROP KEYSPACE \"%s\";";
     private static final String CREATE_KS = "CREATE KEYSPACE \"%s\" WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};";
       
-    private static java.sql.Connection con = null;
-
-    // use these for encrypted connections
-    private static final String TRUST_STORE = System.getProperty("trustStore");
-    private static final String TRUST_PASS = System.getProperty("trustPass", "cassandra");
-
-    private static String OPTIONS = "";
-
-
-    @BeforeClass
-    public static void setUpBeforeClass() throws Exception
+    @Before
+    public void setUpBeforeTest() throws Exception
     {
 
-        // configure OPTIONS
-        if (!StringUtils.isEmpty(TRUST_STORE)) {
-            OPTIONS = String.format("trustStore=%s&trustPass=%s",
-                    URLEncoder.encode(TRUST_STORE), TRUST_PASS);
-        }
-
-        Class.forName("com.micromux.cassandra.jdbc.CassandraDriver");
-        String URL = String.format("jdbc:cassandra://%s:%d/%s?version=3.0.0&%s",HOST,PORT,"system",OPTIONS);
-        System.out.println("Connection URL = '"+URL +"'");
-        
-        con = DriverManager.getConnection(URL);
         Statement stmt = con.createStatement();
-        
+
         // Drop Keyspace
         String dropKS1 = String.format(DROP_KS,KEYSPACE1);
         String dropKS2 = String.format(DROP_KS,KEYSPACE2);
@@ -115,14 +95,9 @@ public class MetadataResultSetsTest
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?version=3.0.0&%s",HOST,PORT,KEYSPACE1,OPTIONS));
+        String url = createConnectionUrl(KEYSPACE1);
+        con = DriverManager.getConnection(url);
 
-    }
-    
-    @AfterClass
-    public static void tearDownAfterClass() throws Exception
-    {
-        if (con!=null) con.close();
     }
 
     private String showColumn(int index, ResultSet result) throws SQLException

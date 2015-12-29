@@ -20,50 +20,23 @@
  */
 package com.micromux.cassandra.jdbc;
 
-import com.micromux.cassandra.ConnectionDetails;
-import org.apache.commons.lang3.StringUtils;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Test;
 
 import javax.sql.DataSource;
-import java.net.URLEncoder;
 import java.sql.*;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-public class PooledTest
+public class PooledTest extends BaseDriverTest
 {
-	private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
-	private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort() + ""));
-	private static final String KEYSPACE = "testks";
-	private static final String USER = "JohnDoe";
-	private static final String PASSWORD = "secret";
-	private static final String VERSION = "3.0.0";
-    private static final String CONSISTENCY = "ONE";
 
-	// use these for encyrpted connections
-	private static final String TRUST_STORE = System.getProperty("trustStore");
-	private static final String TRUST_PASS = System.getProperty("trustPass", "cassandra");
-
-	private static String OPTIONS = "";
-
-	private static java.sql.Connection con = null;
-
-	@BeforeClass
-	public static void setUpBeforeClass() throws Exception
+	@Before
+	public void setUpBeforeTest() throws Exception
 	{
 
-		// configure OPTIONS
-		if (!StringUtils.isEmpty(TRUST_STORE)) {
-			OPTIONS = String.format("trustStore=%s&trustPass=%s",
-					URLEncoder.encode(TRUST_STORE), TRUST_PASS);
-		}
-
-		Class.forName("com.micromux.cassandra.jdbc.CassandraDriver");
-		con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?%s", HOST, PORT, "system", OPTIONS));
 		Statement stmt = con.createStatement();
 
 		// Drop Keyspace
@@ -94,12 +67,6 @@ public class PooledTest
 
 		String insertWorld = "UPDATE pooled_test SET someInt = 1 WHERE somekey = 'world'";
 		stmt.execute(insertWorld);
-	}
-
-	@AfterClass
-	public static void tearDownAfterClass() throws Exception
-	{
-		if (con != null) con.close();
 	}
 
 	@Test

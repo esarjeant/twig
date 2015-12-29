@@ -24,6 +24,12 @@ Minor revisions of the Twig driver do not follow incremental versions from the C
 So 2.1.1 would in fact be the first point release for Twig in the 2.1 series but may not yet be using
 the 2.1.1 DataStax driver.
 
+Release Notes - 2.1.1
+---------------------
+A minor update that converts the build strategy to Gradle and away from Maven. The embedded Cassandra server
+provided by cassandra-unit is integrated with the build/test strategy and tests now use a base class 
+for core connectivity needs.
+
 Release Notes - 2.1.0
 ---------------------
 The 2.1 version of Twig should be considered a _major_ rewrite. As of this version,

@@ -21,7 +21,6 @@
 package com.micromux.cassandra.jdbc;
 
 import com.datastax.driver.core.BoundStatement;
-import org.apache.cassandra.utils.ByteBufferUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -177,7 +176,10 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
     @Override
     public void setByte(int parameterIndex, byte b) throws SQLException
     {
-        boundStatement.setBytes(parameterIndex - 1, ByteBufferUtil.bytes((int)b));
+        ByteBuffer bb = ByteBuffer.allocate(1);
+        bb.put(b);
+
+        boundStatement.setBytes(parameterIndex - 1, bb);
     }
 
     @Override

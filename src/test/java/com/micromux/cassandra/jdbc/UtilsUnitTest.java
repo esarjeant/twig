@@ -33,10 +33,6 @@ public class UtilsUnitTest
 {
     private static final Logger LOG = LoggerFactory.getLogger(CollectionsTest.class);
 
-    @BeforeClass
-    public static void setUpBeforeClass() throws Exception
-    {}
-
     @Test
     public void testParseURL() throws Exception
     {

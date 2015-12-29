@@ -20,15 +20,12 @@
 
 package com.micromux.cassandra.jdbc;
 
-import com.micromux.cassandra.ConnectionDetails;
-import org.apache.commons.lang3.StringUtils;
-import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URLEncoder;
 import java.sql.*;
 import java.util.*;
 import java.util.Date;
@@ -44,43 +41,16 @@ import static org.junit.Assert.assertTrue;
  * Set
  * 
  */
-public class CollectionsTest
+public class CollectionsTest extends BaseDriverTest
 {
     private static final Logger LOG = LoggerFactory.getLogger(CollectionsTest.class);
-
-
-    private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
-    private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort() + ""));
-    private static final String KEYSPACE = "testks";
-    private static final String SYSTEM = "system";
-    private static final String CQLV3 = "3.0.0";
-
-    // use these for encyrpted connections
-    private static final String TRUST_STORE = System.getProperty("trustStore");
-    private static final String TRUST_PASS = System.getProperty("trustPass", "cassandra");
-
-    private static String OPTIONS = "";
-
-    private static java.sql.Connection con = null;
 
     /**
      * @throws java.lang.Exception
      */
-    @BeforeClass
-    public static void setUpBeforeClass() throws Exception
+    @Before
+    public void setUpBeforeTest() throws Exception
     {
-        // configure OPTIONS
-        if (!StringUtils.isEmpty(TRUST_STORE)) {
-            OPTIONS = String.format("trustStore=%s&trustPass=%s",
-                    URLEncoder.encode(TRUST_STORE), TRUST_PASS);
-        }
-
-        Class.forName("com.micromux.cassandra.jdbc.CassandraDriver");
-        String URL = String.format("jdbc:cassandra://%s:%d/%s?%s&version=%s", HOST, PORT, SYSTEM, OPTIONS, CQLV3);
-
-        con = DriverManager.getConnection(URL);
-
-        if (LOG.isDebugEnabled()) LOG.debug("URL         = '{}'", URL);
 
         Statement stmt = con.createStatement();
 
@@ -99,8 +69,7 @@ public class CollectionsTest
 
         // Create KeySpace
         String createKS = String.format("CREATE KEYSPACE %s WITH replication = { 'class' : 'SimpleStrategy',  'replication_factor' : 1  };",KEYSPACE);
-//        String createKS = String.format("CREATE KEYSPACE %s WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1;",KEYSPACE);
-        if (LOG.isDebugEnabled()) LOG.debug("createKS    = '{}'", createKS);
+        LOG.debug("createKS    = '{}'", createKS);
 
         stmt = con.createStatement();
         stmt.execute("USE " + SYSTEM);
@@ -117,9 +86,9 @@ public class CollectionsTest
         con.close();
 
         // open it up again to see the new TABLE
-        URL = String.format("jdbc:cassandra://%s:%d/%s?%s&version=%s", HOST, PORT, KEYSPACE, OPTIONS, CQLV3);
+        String URL = createConnectionUrl(KEYSPACE);
         con = DriverManager.getConnection(URL);
-        if (LOG.isDebugEnabled()) LOG.debug("URL         = '{}'", URL);
+        LOG.debug("URL         = '{}'", URL);
 
         Statement statement = con.createStatement();
 
@@ -131,22 +100,15 @@ public class CollectionsTest
         statement.executeUpdate(update2);
 
 
-        if (LOG.isDebugEnabled()) LOG.debug("Unit Test: 'CollectionsTest' initialization complete.\n\n");
-    }
+        LOG.debug("Unit Test: 'CollectionsTest' initialization complete.\n\n");
 
-    /**
-     * Close down the connection when complete
-     */
-    @AfterClass
-    public static void tearDownAfterClass() throws Exception
-    {
-        if (con != null) con.close();
     }
 
     @Test
     public void testReadList() throws Exception
     {
-        if (LOG.isDebugEnabled()) LOG.debug("Test: 'testReadList'\n");
+
+        LOG.debug("Test: 'testReadList'\n");
 
         Statement statement = con.createStatement();
         
@@ -159,7 +121,8 @@ public class CollectionsTest
         assertEquals(1, result.getInt("k"));
 
         Object myObj = result.getObject("l");
-        if (LOG.isDebugEnabled()) LOG.debug("l           = '{}'\n", myObj);
+        LOG.debug("l           = '{}'\n", myObj);
+
         List<Long> myList = (List<Long>) myObj;
         assertEquals(3, myList.size());
         assertTrue(12345L == myList.get(2));
@@ -174,8 +137,7 @@ public class CollectionsTest
     @Test
     public void testUpdateList() throws Exception
     {
-        if (LOG.isDebugEnabled()) LOG.debug("Test: 'testUpdateList'\n");
-        
+        LOG.debug("Test: 'testUpdateList'\n");
         Statement statement = con.createStatement();
 
         String update1 = "UPDATE testcollection SET L = L + [2,4,6] WHERE k = 1;";
@@ -190,7 +152,7 @@ public class CollectionsTest
         assertEquals(6, myList.size());
         assertTrue(12345L == myList.get(2));
         
-        if (LOG.isDebugEnabled()) LOG.debug("l           = '{}'", myObj);
+        LOG.debug("l           = '{}'", myObj);
 
         String update2 = "UPDATE testcollection SET L = [98,99,100] + L WHERE k = 1;";
         statement.executeUpdate(update2);
@@ -222,8 +184,7 @@ public class CollectionsTest
         result = statement.executeQuery("SELECT * FROM testcollection WHERE k = 1;");
         result.next();
         myObj = result.getObject("l");
-        myList = (List<Long>) myObj;
-        
+
         if (LOG.isDebugEnabled()) LOG.debug("l           = '{}'", myObj);
         
 //        String update4 = "UPDATE testcollection SET L = L +  ? WHERE k = 1;";
@@ -239,15 +200,14 @@ public class CollectionsTest
         result = prepared.executeQuery("SELECT * FROM testcollection WHERE k = 1;");
         result.next();
         myObj = result.getObject("l");
-        myList = (List<Long>) myObj;
-        
+
         if (LOG.isDebugEnabled()) LOG.debug("l (prepared)= '{}'\n", myObj);
     }
 
     @Test
     public void testReadSet() throws Exception
     {
-        if (LOG.isDebugEnabled()) LOG.debug("Test: 'testReadSet'\n");
+        LOG.debug("Test: 'testReadSet'\n");
 
         Statement statement = con.createStatement();
 
@@ -261,7 +221,7 @@ public class CollectionsTest
         assertEquals(1, result.getInt("k"));
 
         Object myObj = result.getObject("s");
-        if (LOG.isDebugEnabled()) LOG.debug("s           = '{}'\n", myObj);
+        LOG.debug("s           = '{}'\n", myObj);
         Set<String> mySet = (Set<String>) myObj;
         assertEquals(3, mySet.size());
         assertTrue(mySet.contains("white"));
@@ -271,8 +231,7 @@ public class CollectionsTest
     @Test
     public void testUpdateSet() throws Exception
     {
-        if (LOG.isDebugEnabled()) LOG.debug("Test: 'testUpdateSet'\n");
-        
+        LOG.debug("Test: 'testUpdateSet'\n");
         Statement statement = con.createStatement();
 
         // add some items to the set
@@ -288,7 +247,7 @@ public class CollectionsTest
         assertEquals(5, mySet.size());
         assertTrue(mySet.contains("white"));
 
-        if (LOG.isDebugEnabled()) LOG.debug("s           = '{}'", myObj);
+        LOG.debug("s           = '{}'", myObj);
 
         // remove an item from the set
         String update2 = "UPDATE testcollection SET S = S - {'red'} WHERE k = 1;";
@@ -305,8 +264,8 @@ public class CollectionsTest
         assertTrue(mySet.contains("white"));
         assertFalse(mySet.contains("red"));
 
-        if (LOG.isDebugEnabled()) LOG.debug("s           = '{}'", myObj);
-        
+        LOG.debug("s           = '{}'", myObj);
+
         String update4 = "UPDATE testcollection SET S =  ? WHERE k = 1;";
         
         PreparedStatement prepared = con.prepareStatement(update4);
@@ -319,15 +278,14 @@ public class CollectionsTest
         result = prepared.executeQuery("SELECT * FROM testcollection WHERE k = 1;");
         result.next();
         myObj = result.getObject("s");
-        mySet = (Set<String>) myObj;
-        
+
         if (LOG.isDebugEnabled()) LOG.debug("s (prepared)= '{}'\n", myObj);
     }
 
     @Test
     public void testReadMap() throws Exception
     {
-        if (LOG.isDebugEnabled()) LOG.debug("Test: 'testReadMap'\n");
+        LOG.debug("Test: 'testReadMap'\n");
 
         Statement statement = con.createStatement();
 
@@ -339,7 +297,7 @@ public class CollectionsTest
         assertEquals(1, result.getInt("k"));
 
         Object myObj = result.getObject("m");
-        if (LOG.isDebugEnabled()) LOG.debug("m           = '{}'\n", myObj);
+        LOG.debug("m           = '{}'\n", myObj);
         Map<Double,Boolean> myMap = (Map<Double,Boolean>) myObj;
         assertEquals(3, myMap.size());
         assertTrue(myMap.keySet().contains(2.0));
@@ -349,7 +307,7 @@ public class CollectionsTest
     @Test
     public void testUpdateMap() throws Exception
     {
-        if (LOG.isDebugEnabled()) LOG.debug("Test: 'testUpdateMap'\n");
+        LOG.debug("Test: 'testUpdateMap'\n");
         
         Statement statement = con.createStatement();
 
@@ -366,7 +324,7 @@ public class CollectionsTest
         assertEquals(6, myMap.size());
         assertTrue(myMap.keySet().contains(5.0));
 
-        if (LOG.isDebugEnabled()) LOG.debug("m           = '{}'", myObj);
+        LOG.debug("m           = '{}'", myObj);
 
         // remove an item from the map
         String update2 = "DELETE M[6.0] FROM testcollection WHERE k = 1;";
@@ -383,7 +341,7 @@ public class CollectionsTest
         assertTrue(myMap.keySet().contains(5.0));
         assertFalse(myMap.keySet().contains(6.0));
 
-        if (LOG.isDebugEnabled()) LOG.debug("m           = '{}'", myObj);
+        LOG.debug("m           = '{}'", myObj);
         
         String update4 = "UPDATE testcollection SET M =  ? WHERE k = 1;";
         
@@ -397,15 +355,14 @@ public class CollectionsTest
         result = prepared.executeQuery("SELECT * FROM testcollection WHERE k = 1;");
         result.next();
         myObj = result.getObject("m");
-        myMap = (Map<Double,Boolean>) myObj;
-        
-        if (LOG.isDebugEnabled()) LOG.debug("m (prepared)= '{}'\n", myObj);
+
+        LOG.debug("m (prepared)= '{}'\n", myObj);
     }
     
     @Test
     public void testWriteReadTimestampMap() throws Exception
     {
-    	if (LOG.isDebugEnabled()) LOG.debug("Test: 'testWriteReadTimestampMap'\n");
+    	LOG.debug("Test: 'testWriteReadTimestampMap'\n");
         
         Statement statement = con.createStatement();        
         
@@ -428,19 +385,8 @@ public class CollectionsTest
         Map<String,Date> map = (Map<String,Date>)result.getObject("m2");
         //Map<Double,Boolean> myMap = (Map<Double,Boolean>) myObj;
         assertEquals(1, map.size());        
-        if (LOG.isDebugEnabled()) LOG.debug("map key : " + map);
-        
-
-        
+        LOG.debug("map key : " + map);
     	
     }
-    
-
-
-//    private CassandraResultSetExtras extras(ResultSet result) throws Exception
-//    {
-//        Class crse = Class.forName("org.apache.cassandra.cql.jdbc.CassandraResultSetExtras");
-//        return (CassandraResultSetExtras) result.unwrap(crse);
-//    }
 
 }

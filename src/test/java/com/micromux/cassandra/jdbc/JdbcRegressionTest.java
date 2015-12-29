@@ -25,8 +25,11 @@ import com.micromux.cassandra.ConnectionDetails;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.URLEncoder;
 import java.sql.*;
@@ -41,44 +44,25 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-public class JdbcRegressionTest
+public class JdbcRegressionTest extends BaseDriverTest
 {
-    private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
-    private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort()+""));
-    private static final String KEYSPACE = "testks";
+    private static final Logger LOG = LoggerFactory.getLogger(CollectionsTest.class);
+
     private static final String TABLE = "regressiontest";
     private static final String TYPETABLE = "datatypetest";
 
-    // use these for encrypted connections
-    private static final String TRUST_STORE = System.getProperty("trustStore");
-    private static final String TRUST_PASS = System.getProperty("trustPass", "cassandra");
-
-    private static String OPTIONS = "";
-
     private static final String CONSISTENCY_QUORUM = "QUORUM";
       
-    private static java.sql.Connection con = null;
-    
-
-    @BeforeClass
-    public static void setUpBeforeClass() throws Exception
+    @Before
+    public void setUpBeforeTest() throws Exception
     {
 
-        // configure OPTIONS
-        if (!StringUtils.isEmpty(TRUST_STORE)) {
-            OPTIONS = String.format("trustStore=%s&trustPass=%s",
-                    URLEncoder.encode(TRUST_STORE), TRUST_PASS);
-        }
-
-        Class.forName("com.micromux.cassandra.jdbc.CassandraDriver");
-        String URL = String.format("jdbc:cassandra://%s:%d/%s?%s", HOST, PORT, "system", OPTIONS);
-        System.out.println("Connection URL = '"+URL +"'");
-        
+        String URL = createConnectionUrl(SYSTEM);
         con = DriverManager.getConnection(URL);
         Statement stmt = con.createStatement();
         
         // Drop Keyspace
-        String dropKS = String.format("DROP KEYSPACE \"%s\";",KEYSPACE);
+        String dropKS = String.format("DROP KEYSPACE \"%s\";", KEYSPACE);
         
         try { stmt.execute(dropKS);}
         catch (Exception e){/* Exception on DROP is OK */}
@@ -117,15 +101,11 @@ public class JdbcRegressionTest
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?%s", HOST, PORT, KEYSPACE, OPTIONS));
-        System.out.println(con);
+        String urlKeyspace = createConnectionUrl(KEYSPACE);
+        con = DriverManager.getConnection(urlKeyspace);
 
-    }
-    
-    @AfterClass
-    public static void tearDownAfterClass() throws Exception
-    {
-        if (con!=null) con.close();
+        LOG.info("setupBeforeTest: Connection=", con);
+
     }
 
     /**
@@ -605,18 +585,7 @@ public class JdbcRegressionTest
     {
     	assert con.isValid(3);
     }
-    
-    @Test
-    public void isNotValid() throws Exception
-    {
-//        PreparedStatement currentStatement = ((CassandraConnection) con).isAlive;
-//        PreparedStatement mockedStatement = mock(PreparedStatement.class);
-//        when(mockedStatement.executeQuery()).thenThrow(new SQLException("A mocked ERROR"));
-//        ((CassandraConnection) con).isAlive = mockedStatement;
-//        assert con.isValid(5) == false;
-//        ((CassandraConnection) con).isAlive = currentStatement;
-    }
-    
+
     private String showColumn(int index, ResultSet result) throws SQLException
     {
         StringBuilder sb = new StringBuilder();
@@ -646,12 +615,6 @@ public class JdbcRegressionTest
         }
         
         return sb.toString();        
-    }
-    
-    private CassandraStatementExtras statementExtras(Statement statement) throws Exception
-    {
-        Class cse = Class.forName("com.micromux.cassandra.jdbc.CassandraStatementExtras");
-        return (CassandraStatementExtras) statement.unwrap(cse);
     }
 
 }

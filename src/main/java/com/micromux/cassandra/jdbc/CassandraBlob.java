@@ -1,11 +1,6 @@
 package com.micromux.cassandra.jdbc;
 
-import org.apache.cassandra.utils.ByteBufferUtil;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.sql.Blob;
 import java.sql.SQLException;
@@ -13,7 +8,7 @@ import java.util.Arrays;
 
 public class CassandraBlob implements Blob {
 
-    private ByteBuffer buffer = ByteBufferUtil.EMPTY_BYTE_BUFFER;
+    private ByteBuffer buffer = ByteBuffer.allocate(0);
     private int length = 0;
 
     public CassandraBlob(ByteBuffer buffer) {
@@ -22,8 +17,12 @@ public class CassandraBlob implements Blob {
     }
 
     public CassandraBlob(String buffer) {
-        this.buffer = ByteBufferUtil.bytes(buffer);
+
+        this.buffer = ByteBuffer.allocate(buffer.length());
+        this.buffer.wrap(buffer.getBytes());
+
         this.length = buffer.length();
+
     }
 
     public CassandraBlob(InputStream inputStream) throws SQLException {
@@ -60,12 +59,12 @@ public class CassandraBlob implements Blob {
     @Override
     public byte[] getBytes(long pos, int length) throws SQLException {
         // TODO: partial reads for blobs?
-        return ByteBufferUtil.getArray(buffer);
+        return this.buffer.array();
     }
 
     @Override
     public InputStream getBinaryStream() throws SQLException {
-        return ByteBufferUtil.inputStream(this.buffer);
+        return new ByteArrayInputStream(this.buffer.array());
     }
 
     @Override

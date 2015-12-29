@@ -20,74 +20,18 @@
  */
 package com.micromux.cassandra.jdbc;
 
-import com.micromux.cassandra.ConnectionDetails;
-import org.apache.commons.lang3.StringUtils;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
 import javax.sql.DataSource;
-import java.net.URLEncoder;
-import java.sql.DriverManager;
 import java.sql.SQLFeatureNotSupportedException;
-import java.sql.Statement;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-public class DataSourceTest
+public class DataSourceTest extends BaseDriverTest
 {
-    private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
-    private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort()+""));
-    private static final String KEYSPACE = "testks";
-    private static final String USER = "JohnDoe";
-    private static final String PASSWORD = "secret";
-    private static final String VERSION = "3.0.0";
-    private static final String CONSISTENCY = "ONE";
-
-    // use these for encyrpted connections
-    private static final String TRUST_STORE = System.getProperty("trustStore");
-    private static final String TRUST_PASS = System.getProperty("trustPass", "cassandra");
-
-    private static String OPTIONS = "";
-
-    private static java.sql.Connection con = null;
-
-
-    @BeforeClass
-    public static void setUpBeforeClass() throws Exception
-    {
-
-        // configure OPTIONS
-        if (!StringUtils.isEmpty(TRUST_STORE)) {
-            OPTIONS = String.format("trustStore=%s&trustPass=%s",
-                    URLEncoder.encode(TRUST_STORE), TRUST_PASS);
-        }
-
-        Class.forName("com.micromux.cassandra.jdbc.CassandraDriver");
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?%s",HOST,PORT,"system",OPTIONS));
-        Statement stmt = con.createStatement();
-        
-        // Drop Keyspace
-        String dropKS = String.format("DROP KEYSPACE \"%s\";",KEYSPACE);
-        
-        try { stmt.execute(dropKS);}
-        catch (Exception e){/* Exception on DROP is OK */}
-        
-        // Create KeySpace
-        String createKS = String.format("CREATE KEYSPACE \"%s\" WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};",KEYSPACE);
-//        String createKS = String.format("CREATE KEYSPACE %s WITH strategy_class = SimpleStrategy AND strategy_options:replication_factor = 1;",KEYSPACE);
-        stmt.execute(createKS);
-    }
-
-    @AfterClass
-    public static void tearDownAfterClass() throws Exception
-    {
-        if (con!=null) con.close();
-    }
-
 
     @Test
     public void testConstructor() throws Exception

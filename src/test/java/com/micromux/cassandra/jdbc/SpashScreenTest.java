@@ -26,37 +26,16 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 
-import com.micromux.cassandra.ConnectionDetails;
-import org.apache.commons.lang3.StringUtils;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Test;
 
-public class SpashScreenTest
+public class SpashScreenTest extends BaseDriverTest
 {
-    private static final String HOST = System.getProperty("host", ConnectionDetails.getHost());
-    private static final int PORT = Integer.parseInt(System.getProperty("port", ConnectionDetails.getPort()+""));
-    private static final String KEYSPACE = "testks";
-    
-    private static java.sql.Connection con = null;
 
-    // use these for encyrpted connections
-    private static final String TRUST_STORE = System.getProperty("trustStore");
-    private static final String TRUST_PASS = System.getProperty("trustPass", "cassandra");
-
-    private static String OPTIONS = "";
-
-    @BeforeClass
-    public static void setUpBeforeClass() throws Exception
+    @Before
+    public void setUpBeforeTest() throws Exception
     {
-        // configure OPTIONS
-        if (!StringUtils.isEmpty(TRUST_STORE)) {
-            OPTIONS = String.format("trustStore=%s&trustPass=%s",
-                    URLEncoder.encode(TRUST_STORE), TRUST_PASS);
-        }
 
-        Class.forName("com.micromux.cassandra.jdbc.CassandraDriver");
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?%s&version=3.0.0",HOST,PORT,"system",OPTIONS));
         Statement stmt = con.createStatement();
 
         // Drop Keyspace
@@ -83,30 +62,27 @@ public class SpashScreenTest
         con.close();
 
         // open it up again to see the new CF
-        con = DriverManager.getConnection(String.format("jdbc:cassandra://%s:%d/%s?%s",HOST,PORT,KEYSPACE,OPTIONS));
-    }
+        String url = createConnectionUrl(KEYSPACE);
+        con = DriverManager.getConnection(url);
 
-    @AfterClass
-    public static void tearDownAfterClass() throws Exception
-    {
-        if (con!=null) con.close();
     }
-
 
     @Test
     public void test() throws Exception
     {
         String query = "UPDATE Test SET a=?, b=? WHERE KEY=?";
         PreparedStatement statement = con.prepareStatement(query);
-        try {
-        statement.setLong(1, 100);
-        statement.setLong(2, 1000);
-        statement.setString(3, "key0");
 
-        statement.executeUpdate();
+        try {
+            int pos = 0;
+            statement.setLong(++pos, 100);
+            statement.setLong(++pos, 1000);
+            statement.setString(++pos, "key0");
+
+            statement.executeUpdate();
+
+        } finally {
+            statement.close();
         }
-        finally {
-        statement.close();
     }
-}
 }
