@@ -44,3 +44,5 @@ in the driver query string:
 The trustStore URL must be properly escaped for it to work. Also be aware that the default 
 port number has moved away from Thrift (9160) to the native Cassandra client port 9042. If
 you are still using Thrift then Twig 2.x will not be suitable for your needs.
+
+[![Build Status](https://travis-ci.org/esarjeant/twig.svg?branch=develop)](https://travis-ci.org/esarjeant/twig)
