@@ -1,2 +1,2 @@
 language: java
-script: clean test jar jarAll
+script: gradle test
