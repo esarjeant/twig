@@ -19,6 +19,9 @@ bin/
 
 # Gradle files
 .gradle
+gradlew
+gradlew.bat
+gradle
 
 # Backup files
 *~
