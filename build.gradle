@@ -6,6 +6,8 @@ version = '2.1.1-SNAPSHOT'
 
 description = """Twig JDBC driver for Cassandra/CQL"""
 
+test.outputs.upToDateWhen { false }
+
 sourceCompatibility = 1.5
 targetCompatibility = 1.5
 
