@@ -1,5 +1,4 @@
 [![Build Status](https://travis-ci.org/esarjeant/twig.svg?branch=develop)](https://travis-ci.org/esarjeant/twig)
-
 # Cassandra Twig JDBC Driver
 This is a fork of the Cassandra JDBC Driver:
 
