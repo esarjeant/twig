@@ -1,10 +1,9 @@
 apply plugin: 'java'
-//apply plugin: 'maven'
+
+description = """Twig JDBC driver for Cassandra/CQL"""
 
 group = 'com.micromux'
 version = '2.1.1-SNAPSHOT'
-
-description = """Twig JDBC driver for Cassandra/CQL"""
 
 test.outputs.upToDateWhen { false }
 
@@ -13,6 +12,10 @@ targetCompatibility = 1.5
 
 repositories {
      maven { url "http://repo.maven.apache.org/maven2" }
+}
+
+configurations {
+    distribution
 }
 
 dependencies {
@@ -26,24 +29,26 @@ dependencies {
     testCompile group: 'net.ju-n.compile-command-annotations', name: 'compile-command-annotations', version: '1.0.3'
 }
 
+// custom properties for testing
 tasks.withType(Test) {
     systemProperty 'host', System.getProperty('host', 'localhost')
     systemProperty 'port', System.getProperty('port', '19042')
 }
 
+// log test activity during execution
 test {
     afterTest { desc, result ->
         println "Completed ${desc.name} [${desc.className}] with result: ${result.resultType}"
     }
 }
 
-/**
- * Create single distribution JAR with all dependencies baked in.
- */
-task jarAll(type: Jar) {
-    baseName = project.name + '-all'
-    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
-    with jar
-}
+// JAR includes all dependencies
+jar {
+    manifest {
+        attributes "Main-Class": "com.micromux.cassandra.jdbc.CassandraDriver"
+    }
 
-task distribution(dependsOn: ['clean', 'test', 'jar', 'jarAll'])
+    from {
+        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+}
