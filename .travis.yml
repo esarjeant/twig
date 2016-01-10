@@ -6,4 +6,4 @@ deploy:
   file: "target/cassandra-twig-jdbc-2.1.0-jar-with-dependencies.jar"
   skip_cleanup: true
   on:
-    tags: true
+    branch: release
