@@ -2,7 +2,7 @@ language: java
 
 deploy:
   provider: releases
-  api_key: "$API_KEY_TWIG"
+  api_key: "$API_KEY"
   file: "target/cassandra-twig-jdbc-2.1.0-jar-with-dependencies.jar"
   skip_cleanup: true
   all_branches: true
