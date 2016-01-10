@@ -5,5 +5,7 @@ deploy:
   api_key: <%= ENV['API_KEY'] %>
   file: "target/cassandra-twig-jdbc-2.1.0-jar-with-dependencies.jar"
   skip_cleanup: true
+  all_branches: true
   on:
-    branch: release
+    all-branches: true
+    tags: true
