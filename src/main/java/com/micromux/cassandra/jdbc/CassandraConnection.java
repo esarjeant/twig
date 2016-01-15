@@ -33,7 +33,6 @@ import java.security.*;
 import java.security.cert.CertificateException;
 import java.sql.Connection;
 import java.sql.*;
-import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.Properties;
 import java.util.Random;
@@ -91,8 +90,10 @@ class CassandraConnection extends AbstractConnection implements Connection
     protected TreeSet<String> hostListBackup;
     int majorCqlVersion;
 
-    PreparedStatement isAlive = null;
-    
+    protected boolean sslEnable = false;
+    protected boolean intellijQuirksMode = false;
+    protected boolean dbvisQuirksMode = false;
+
     private String currentCqlVersion;
     
     ConsistencyLevel defaultConsistencyLevel;
@@ -124,6 +125,15 @@ class CassandraConnection extends AbstractConnection implements Connection
 
         // take a stab at the CQL version based on what was requested
         majorCqlVersion = getMajor(version);
+
+        // enable SSL communication
+        sslEnable = Boolean.parseBoolean(props.getProperty(TAG_SSL_ENABLE, "false"));
+
+        // is the IntelliJ quirks mode enabled?
+        intellijQuirksMode = Boolean.parseBoolean(props.getProperty(TAG_INTELLIJ_QUIRKS, "false"));
+
+        // DbVisualizer quirks mode enabled?
+        dbvisQuirksMode = Boolean.parseBoolean(props.getProperty(TAG_DBVIS_QUIRKS, "false"));
 
         // dealing with multiple hosts passed as seeds in the JDBC URL : jdbc:cassandra://lyn4e900.tlt--lyn4e901.tlt--lyn4e902.tlt:9160/fluks
         // in this phase we get the list of all the nodes of the cluster
@@ -159,10 +169,16 @@ class CassandraConnection extends AbstractConnection implements Connection
             }
 
             // configure SSL if specified
-            SSLOptions sslOptions = createSSLOptions(props);
+            if (sslEnable) {
 
-            if (sslOptions != null) {
-                connectionBuilder.withSSL(sslOptions);
+                SSLOptions sslOptions = createSSLOptions(props);
+
+                if (sslOptions != null) {
+                    connectionBuilder.withSSL(sslOptions);
+                } else {
+                    logger.warn("SSL requested but trust store not valid");
+                }
+
             }
 
             Cluster cluster = connectionBuilder.build();
@@ -549,12 +565,38 @@ class CassandraConnection extends AbstractConnection implements Connection
      */
     protected com.datastax.driver.core.ResultSet execute(String queryStr, ConsistencyLevel consistencyLevel)
     {
-        return session.execute(queryStr);
+        return session.execute(scrub(queryStr));
+    }
+
+    private String scrub(String queryStr) {
+
+        if (intellijQuirksMode) {
+            logger.info("intellijQuirksMode: " + intellijQuirksMode);
+
+            String sql = queryStr.replaceAll("t\\.\\*", "\\*").replaceAll("\\ t$", "");
+            logger.debug("SQL: " + sql);
+
+            return sql;
+
+        }
+
+        if (dbvisQuirksMode) {
+            logger.info("dbvisQuirksMode: " + dbvisQuirksMode);
+
+            String sql = queryStr.replaceAll("\"", "");
+            logger.debug("SQL: " + sql);
+
+            return sql;
+
+        }
+
+        return queryStr;
+
     }
 
     protected com.datastax.driver.core.PreparedStatement prepare(String queryStr)
     {
-        return session.prepare(queryStr);
+        return session.prepare(scrub(queryStr));
     }
     
     /**

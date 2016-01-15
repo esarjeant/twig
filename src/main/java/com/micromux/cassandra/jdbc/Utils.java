@@ -70,9 +70,12 @@ class Utils
     public static final String TAG_BUILD_VERSION = "buildVersion";
     public static final String TAG_THRIFT_VERSION = "thriftVersion";
     public static final String TAG_CONSISTENCY_LEVEL = "consistencyLevel";
+    public static final String TAG_INTELLIJ_QUIRKS = "intellijQuirks";
+    public static final String TAG_DBVIS_QUIRKS = "dbvisjQuirks";
 
-    public static final String TAG_TRUST_STORE = "truststore";
-    public static final String TAG_TRUST_PASSWORD = "trustpass";
+    public static final String TAG_TRUST_STORE = "ssltruststore";
+    public static final String TAG_TRUST_PASSWORD = "ssltrustpass";
+    public static final String TAG_SSL_ENABLE = "sslenable";
 
     public static final String TAG_PRIMARY_DC = "primaryDatacenter";
     public static final String TAG_BACKUP_DC = "backupDatacenter";
@@ -194,6 +197,9 @@ class Utils
                 }
                 if (params.containsKey(TAG_TRUST_PASSWORD)) {
                     props.setProperty(TAG_TRUST_PASSWORD, params.get(TAG_TRUST_PASSWORD));
+                }
+                if (params.containsKey(TAG_INTELLIJ_QUIRKS)) {
+                    props.setProperty(TAG_INTELLIJ_QUIRKS, params.get(TAG_INTELLIJ_QUIRKS));
                 }
 
 //               String[] items = query.split("&");

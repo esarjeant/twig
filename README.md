@@ -27,9 +27,22 @@ the 2.1.1 DataStax driver.
 
 Release Notes - 2.1.1
 ---------------------
-A minor update that converts the build strategy to Gradle and away from Maven. The embedded Cassandra server
-provided by cassandra-unit is integrated with the build/test strategy and tests now use a base class 
-for core connectivity needs.
+Adding support for quirks mode in IntelliJ and DbVisualizer. Moved all parameters to the JDBC _Parameters_ section
+and away from the URL; this includes:
+
+`ssltruststore`  Full path to a Java trust store with the certificate required for SSL communications.
+`ssltrustpass`   Password for the specified truststore.
+`sslenable`      Toggle to `true` to enable SSL; requires `truststore` and `trustpass` to be set correctly.
+`intellijQuirks` Set `true` to enable quirks processing for IntelliJ.
+`dbvisjQuirks`   Set `true` to enable quirks processing for DbVisualizer.
+
+Quirks processing is particularly helpful for IntelliJ; it makes it possible to browse tabular data without errors.
+
+Additionally, converts the build strategy to Gradle. The embedded Cassandra server provided by cassandra-unit is 
+integrated with the build/test strategy and tests now use a base class for core connectivity needs.
+
+The URL format specified from the previous release has been deprecated by Parameters. Use your JDBC client to
+more easily configure these settings.
 
 Release Notes - 2.1.0
 ---------------------

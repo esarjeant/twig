@@ -24,12 +24,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.*;
-import java.util.Properties;
+import java.util.*;
 
-import static com.micromux.cassandra.jdbc.Utils.NOT_SUPPORTED;
-import static com.micromux.cassandra.jdbc.Utils.PROTOCOL;
-import static com.micromux.cassandra.jdbc.Utils.TAG_PASSWORD;
-import static com.micromux.cassandra.jdbc.Utils.TAG_USER;
+import static com.micromux.cassandra.jdbc.Utils.*;
 
 /**
  * The Class CassandraDriver.
@@ -37,10 +34,8 @@ import static com.micromux.cassandra.jdbc.Utils.TAG_USER;
 public class CassandraDriver implements Driver
 {
     public static final int DVR_MAJOR_VERSION = 2;
-
     public static final int DVR_MINOR_VERSION = 1;
-
-    public static final int DVR_PATCH_VERSION = 0;
+    public static final int DVR_PATCH_VERSION = 1;
 
     public static final String DVR_NAME = "Cassandra Twig JDBC Driver";
 
@@ -115,13 +110,40 @@ public class CassandraDriver implements Driver
     {
         if (props == null) props = new Properties();
 
-        DriverPropertyInfo[] info = new DriverPropertyInfo[2];
+        DriverPropertyInfo[] info = new DriverPropertyInfo[6];
 
         info[0] = new DriverPropertyInfo(TAG_USER, props.getProperty(TAG_USER));
         info[0].description = "The 'user' property";
 
         info[1] = new DriverPropertyInfo(TAG_PASSWORD, props.getProperty(TAG_PASSWORD));
         info[1].description = "The 'password' property";
+
+        info[2] = new DriverPropertyInfo(TAG_TRUST_STORE, props.getProperty(TAG_TRUST_STORE));
+        info[2].description = "File path containing certificate for encyrpted communication (create with Java keytool)";
+
+        info[3] = new DriverPropertyInfo(TAG_TRUST_PASSWORD, props.getProperty(TAG_TRUST_PASSWORD));
+        info[3].description = "Password for the trust store";
+
+        info[4] = new DriverPropertyInfo(TAG_SSL_ENABLE, props.getProperty(TAG_SSL_ENABLE));
+        info[4].description = "Enable SSL communication";
+        info[5].choices = new String[2];
+        info[5].choices[0] = "true";
+        info[5].choices[1] = "false";
+        info[5].value = "false";
+
+        info[5] = new DriverPropertyInfo(TAG_INTELLIJ_QUIRKS, props.getProperty(TAG_INTELLIJ_QUIRKS));
+        info[5].description = "Enable special optimizations for IntelliJ";
+        info[5].choices = new String[2];
+        info[5].choices[0] = "true";
+        info[5].choices[1] = "false";
+        info[5].value = "false";
+
+        info[6] = new DriverPropertyInfo(TAG_DBVIS_QUIRKS, props.getProperty(TAG_DBVIS_QUIRKS));
+        info[6].description = "Enable special optimizations for DbVisualizer";
+        info[6].choices = new String[2];
+        info[6].choices[0] = "true";
+        info[6].choices[1] = "false";
+        info[6].value = "false";
 
         return info;
     }
