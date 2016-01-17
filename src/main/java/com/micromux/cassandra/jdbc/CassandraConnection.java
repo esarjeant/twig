@@ -21,14 +21,15 @@
 package com.micromux.cassandra.jdbc;
 
 import com.datastax.driver.core.*;
+import com.datastax.driver.core.PreparedStatement;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.security.*;
 import java.security.cert.CertificateException;
 import java.sql.Connection;
@@ -59,9 +60,8 @@ class CassandraConnection extends AbstractConnection implements Connection
     public static final String DB_PRODUCT_NAME = "Cassandra";
     public static final String DEFAULT_CQL_VERSION = "3.0.0";
 
-    private final boolean autoCommit = true;
-
-    private final int transactionIsolation = Connection.TRANSACTION_NONE;
+    protected boolean logEnable = false;
+    protected String logPath = null;
 
     /**
      * Connection Properties
@@ -86,16 +86,12 @@ class CassandraConnection extends AbstractConnection implements Connection
     protected String username = null;
     protected String url = null;
     protected String currentKeyspace;//current schema
-    protected TreeSet<String> hostListPrimary;
-    protected TreeSet<String> hostListBackup;
     int majorCqlVersion;
 
     protected boolean sslEnable = false;
     protected boolean intellijQuirksMode = false;
     protected boolean dbvisQuirksMode = false;
 
-    private String currentCqlVersion;
-    
     ConsistencyLevel defaultConsistencyLevel;
 
     /**
@@ -104,14 +100,12 @@ class CassandraConnection extends AbstractConnection implements Connection
     public CassandraConnection(Properties props) throws SQLException
     {
 
-        hostListPrimary = new TreeSet<String>();
-    	hostListBackup = new TreeSet<String>();
         connectionProps = (Properties)props.clone();
         clientInfo = new Properties();
 
         url = PROTOCOL + createSubName(props);
 
-        String[] hosts = {};
+        String[] hosts;
         String host = props.getProperty(TAG_SERVER_NAME);
         int port = Integer.parseInt(props.getProperty(TAG_PORT_NUMBER));
 
@@ -134,6 +128,10 @@ class CassandraConnection extends AbstractConnection implements Connection
 
         // DbVisualizer quirks mode enabled?
         dbvisQuirksMode = Boolean.parseBoolean(props.getProperty(TAG_DBVIS_QUIRKS, "false"));
+
+        // enable logging?
+        logPath = props.getProperty(TAG_LOG_PATH);
+        logEnable = (logPath != null) && Boolean.parseBoolean(props.getProperty(TAG_LOG_ENABLE, "false"));
 
         // dealing with multiple hosts passed as seeds in the JDBC URL : jdbc:cassandra://lyn4e900.tlt--lyn4e901.tlt--lyn4e902.tlt:9160/fluks
         // in this phase we get the list of all the nodes of the cluster
@@ -192,13 +190,16 @@ class CassandraConnection extends AbstractConnection implements Connection
             // request version from session
             Configuration configuration = session.getCluster().getConfiguration();
             if ((configuration != null) && (configuration.getProtocolOptions() != null) && (configuration.getProtocolOptions().getProtocolVersionEnum() != null)){
+
                 ProtocolVersion pv = configuration.getProtocolOptions().getProtocolVersionEnum();
-                this.currentCqlVersion = pv.name();
 
                 // recompute the CQL major version from the actual...
                 this.majorCqlVersion = pv.toInt();
 
             }
+
+            // drive trace logging
+            trace("*** " + this.getClass().getName() + ": " + this.toString());
 
         } catch (Exception e){
             String msg = String.format("Connection Fails to %s: %s", currentHost, e.toString());
@@ -208,33 +209,35 @@ class CassandraConnection extends AbstractConnection implements Connection
 
     }
 
-    private static SSLOptions createSSLOptions(Properties properties)
+    private static SSLOptions createSSLOptions(Properties properties) throws SQLException
     {
+
         String storePath = properties.getProperty(TAG_TRUST_STORE);
         String storePass = properties.getProperty(TAG_TRUST_PASSWORD);
+        String storeType = properties.getProperty(TAG_TRUST_TYPE, "JKS");
 
         if ((storePath != null) && (storePass != null))
         {
             SSLContext context;
             try
             {
-                context = getSSLContext(storePath, storePass);
+                context = getSSLContext(storePath, storePass, storeType);
 
                 return new SSLOptions(context, SSLOptions.DEFAULT_SSL_CIPHER_SUITES);
 
             }
             catch (UnrecoverableKeyException xk) {
-                logger.error("Key Fails for Trust Store: " + storePath, xk);
+                throw new SQLException("Key Fails for Trust Store: " + storePath, xk);
             } catch (KeyManagementException mx) {
-                logger.error("Key Management Error for Trust Store: " + storePath, mx);
+                throw new SQLException("Key Management Error for Trust Store: " + storePath, mx);
             } catch (NoSuchAlgorithmException nx) {
-                logger.error("Algorithm Not Found for Trust Store: " + storePath, nx);
+                throw new SQLException("Algorithm Not Found for Trust Store: " + storePath, nx);
             } catch (KeyStoreException kx) {
-                logger.error("Key Store Error for Trust Store: " + storePath, kx);
+                throw new SQLException("Key Store Error for Trust Store: " + storePath, kx);
             } catch (CertificateException cx) {
-                logger.error("Certificate Error for Trust Store: " + storePath, cx);
+                throw new SQLException("Certificate Error for Trust Store: " + storePath, cx);
             } catch (IOException ix) {
-                logger.error("Unable to Read Store Trust Store: " + storePath, ix);
+                throw new SQLException("Unable to Read Store Trust Store: " + storePath, ix);
             }
 
         }
@@ -243,7 +246,7 @@ class CassandraConnection extends AbstractConnection implements Connection
 
     }
 
-    private static SSLContext getSSLContext(String trustPath, String trustPass)
+    private static SSLContext getSSLContext(String trustPath, String trustPass, String storeType)
             throws NoSuchAlgorithmException, KeyStoreException, CertificateException, IOException, UnrecoverableKeyException, KeyManagementException {
 
         FileInputStream tsf = null;
@@ -254,15 +257,13 @@ class CassandraConnection extends AbstractConnection implements Connection
             tsf = new FileInputStream(trustPath);
             ctx = SSLContext.getInstance("SSL");
 
-            KeyStore ts = KeyStore.getInstance("JKS");
+            KeyStore ts = KeyStore.getInstance(storeType);
             ts.load(tsf, trustPass.toCharArray());
             TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
             tmf.init(ts);
 
             ctx.init(null, tmf.getTrustManagers(), new SecureRandom());
 
-        } catch (Exception e) {
-            e.printStackTrace();
         } finally {
             if (tsf != null) {
                 try {
@@ -279,11 +280,46 @@ class CassandraConnection extends AbstractConnection implements Connection
     }
 
     /**
+     * Audit SQL queries; this is intended for development purposes only. When debugging JDBC query tools, sometimes
+     * it is necessary to understand what kind of traditional SQL they are executing so that the statements can be
+     * adapted to CQL.
+     * @param sql   Raw query; original SQL.
+     */
+    private void trace(String sql) {
+
+        FileOutputStream logStream = null;
+
+        if (logEnable) try {
+
+            logStream = new FileOutputStream(logPath, true);
+
+            logStream.write((new java.util.Date()).toString().getBytes());
+            logStream.write("\t".getBytes());
+            logStream.write(sql.getBytes());
+            logStream.write("\n".getBytes());
+
+        } catch (FileNotFoundException fx) {
+            logger.error("Unable to open trace file: " + logPath, fx);
+        } catch (IOException ix) {
+            logger.error("Unable to write trace file: " + logPath, ix);
+        } finally {
+
+            if (logStream != null) {
+                try {
+                    logStream.close();
+                } catch (IOException ix) {
+                    logger.error("Close log trace fails", ix);
+                }
+            }
+        }
+    }
+
+    /**
      * Get the Major portion of a string like : Major.minor.patch where 2 is the default
      */
     private int getMajor(String version)
     {
-        int major = 0;
+        int major;
         String[] parts = version.split("\\.");
         try
         {
@@ -358,7 +394,7 @@ class CassandraConnection extends AbstractConnection implements Connection
     public boolean getAutoCommit() throws SQLException
     {
         checkNotClosed();
-        return autoCommit;
+        return true;
     }
 
     public Properties getConnectionProps()
@@ -431,7 +467,7 @@ class CassandraConnection extends AbstractConnection implements Connection
     public int getTransactionIsolation() throws SQLException
     {
         checkNotClosed();
-        return transactionIsolation;
+        return Connection.TRANSACTION_NONE;
     }
 
     public SQLWarning getWarnings() throws SQLException
@@ -474,6 +510,7 @@ class CassandraConnection extends AbstractConnection implements Connection
     public String nativeSQL(String sql) throws SQLException
     {
         checkNotClosed();
+        trace(sql);
         // the rationale is there are no distinction between grammars in this implementation...
         // so we are just return the input argument
         return sql;
@@ -565,13 +602,17 @@ class CassandraConnection extends AbstractConnection implements Connection
      */
     protected com.datastax.driver.core.ResultSet execute(String queryStr, ConsistencyLevel consistencyLevel)
     {
-        return session.execute(scrub(queryStr));
+        String sql = scrub(queryStr);
+        trace(sql);
+
+        return session.execute(sql);
+
     }
 
     private String scrub(String queryStr) {
 
         if (intellijQuirksMode) {
-            logger.info("intellijQuirksMode: " + intellijQuirksMode);
+            logger.info("Enabling intellijQuirksMode");
 
             String sql = queryStr.replaceAll("t\\.\\*", "\\*").replaceAll("\\ t$", "");
             logger.debug("SQL: " + sql);
@@ -581,7 +622,7 @@ class CassandraConnection extends AbstractConnection implements Connection
         }
 
         if (dbvisQuirksMode) {
-            logger.info("dbvisQuirksMode: " + dbvisQuirksMode);
+            logger.info("Enabling dbvisQuirksMode");
 
             String sql = queryStr.replaceAll("\"", "");
             logger.debug("SQL: " + sql);
@@ -625,14 +666,11 @@ class CassandraConnection extends AbstractConnection implements Connection
 
     public String toString()
     {
-        StringBuilder builder = new StringBuilder();
-        builder.append("CassandraConnection [connectionProps=");
-        builder.append(connectionProps);
-        builder.append("]");
-        return builder.toString();
+        return ReflectionToStringBuilder.toString(this);
     }
 
-    protected final com.datastax.driver.core.ResultSet execute(BoundStatement boundStatement) {
+    protected final com.datastax.driver.core.ResultSet execute(PreparedStatement preparedStatement, BoundStatement boundStatement) {
+        if (preparedStatement != null) trace(preparedStatement.getQueryString());
         return session.execute(boundStatement);
     }
 }

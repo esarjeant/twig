@@ -30,11 +30,14 @@ Release Notes - 2.1.1
 Adding support for quirks mode in IntelliJ and DbVisualizer. Moved all parameters to the JDBC _Parameters_ section
 and away from the URL; this includes:
 
-`ssltruststore`  Full path to a Java trust store with the certificate required for SSL communications.
-`ssltrustpass`   Password for the specified truststore.
-`sslenable`      Toggle to `true` to enable SSL; requires `truststore` and `trustpass` to be set correctly.
-`intellijQuirks` Set `true` to enable quirks processing for IntelliJ.
-`dbvisjQuirks`   Set `true` to enable quirks processing for DbVisualizer.
+* `ssltruststore`: Full path to a Java trust store with the certificate required for SSL communications.
+* `ssltrustpass`: Password for the specified truststore.
+* `ssltrusttype`: Encoding type for the trust store, this is usually JKS.
+* `sslenable`: Toggle to `true` to enable SSL; requires `truststore` and `trustpass` to be set correctly.
+* `intellijQuirks`: Set `true` to enable quirks processing for IntelliJ.
+* `dbvisjQuirks`: Set `true` to enable quirks processing for DbVisualizer.
+* `logpath`: Location for CQL query log; default to '/tmp/twig.log'
+* `logenable`: Toggle to `true` to enable CQL query logging.
 
 Quirks processing is particularly helpful for IntelliJ; it makes it possible to browse tabular data without errors.
 
