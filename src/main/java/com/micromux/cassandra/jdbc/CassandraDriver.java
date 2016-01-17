@@ -34,9 +34,15 @@ import static com.micromux.cassandra.jdbc.Utils.*;
  */
 public class CassandraDriver implements Driver
 {
-    public static final int DVR_MAJOR_VERSION = 2;
-    public static final int DVR_MINOR_VERSION = 1;
-    public static final int DVR_PATCH_VERSION = 1;
+
+    /**
+     * Current driver version; this mirrors the version flagged in the build script.
+     */
+    static class Version {
+        static int major = 2;
+        static int minor = 1;
+        static int patch = 2;
+    }
 
     public static final String DVR_NAME = "Cassandra Twig JDBC Driver";
 
@@ -93,7 +99,7 @@ public class CassandraDriver implements Driver
      */
     public int getMajorVersion()
     {
-        return DVR_MAJOR_VERSION;
+        return Version.major;
     }
 
     /**
@@ -101,7 +107,7 @@ public class CassandraDriver implements Driver
      */
     public int getMinorVersion()
     {
-        return DVR_MINOR_VERSION;
+        return Version.minor;
     }
 
     /**

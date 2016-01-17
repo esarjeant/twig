@@ -26,6 +26,8 @@ import java.sql.*;
 import static com.micromux.cassandra.jdbc.Utils.NOT_SUPPORTED;
 import static com.micromux.cassandra.jdbc.Utils.NO_INTERFACE;
 
+import static com.micromux.cassandra.jdbc.CassandraDriver.Version;
+
 class CassandraDatabaseMetaData implements DatabaseMetaData
 {
     private CassandraConnection connection;
@@ -205,12 +207,12 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public int getDriverMajorVersion()
     {
-        return CassandraDriver.DVR_MAJOR_VERSION;
+        return Version.major;
     }
 
     public int getDriverMinorVersion()
     {
-        return CassandraDriver.DVR_MINOR_VERSION;
+        return Version.minor;
     }
 
     public String getDriverName() throws SQLException
@@ -220,7 +222,7 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
 
     public String getDriverVersion() throws SQLException
     {
-        return String.format("%d.%d.%d", CassandraDriver.DVR_MAJOR_VERSION,CassandraDriver.DVR_MINOR_VERSION,CassandraDriver.DVR_PATCH_VERSION);
+        return String.format("%d.%d.%d", Version.major, Version.minor, Version.patch);
     }
 
     public ResultSet getExportedKeys(String arg0, String arg1, String arg2) throws SQLException
