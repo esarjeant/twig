@@ -20,16 +20,14 @@
  */
 package com.micromux.cassandra.jdbc;
 
+import com.datastax.driver.core.ConsistencyLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.*;
-import java.util.Properties;
+import java.util.*;
 
-import static com.micromux.cassandra.jdbc.Utils.NOT_SUPPORTED;
-import static com.micromux.cassandra.jdbc.Utils.PROTOCOL;
-import static com.micromux.cassandra.jdbc.Utils.TAG_PASSWORD;
-import static com.micromux.cassandra.jdbc.Utils.TAG_USER;
+import static com.micromux.cassandra.jdbc.Utils.*;
 
 /**
  * The Class CassandraDriver.
@@ -37,10 +35,8 @@ import static com.micromux.cassandra.jdbc.Utils.TAG_USER;
 public class CassandraDriver implements Driver
 {
     public static final int DVR_MAJOR_VERSION = 2;
-
     public static final int DVR_MINOR_VERSION = 1;
-
-    public static final int DVR_PATCH_VERSION = 0;
+    public static final int DVR_PATCH_VERSION = 1;
 
     public static final String DVR_NAME = "Cassandra Twig JDBC Driver";
 
@@ -109,31 +105,89 @@ public class CassandraDriver implements Driver
     }
 
     /**
-     * Returns default driver property info object.
+     * Driver properties for Cassandra. Includes the options that are configurable for this driver; for example,
+     * {@link Utils#TAG_SSL_ENABLE} can be used to allow secure communication.
      */
+    @Override
     public DriverPropertyInfo[] getPropertyInfo(String url, Properties props) throws SQLException
     {
         if (props == null) props = new Properties();
 
-        DriverPropertyInfo[] info = new DriverPropertyInfo[2];
+        int mp = 11;
+        DriverPropertyInfo[] info = new DriverPropertyInfo[mp];
 
-        info[0] = new DriverPropertyInfo(TAG_USER, props.getProperty(TAG_USER));
-        info[0].description = "The 'user' property";
+        info[--mp] = new DriverPropertyInfo(TAG_USER, props.getProperty(TAG_USER));
+        info[mp].description = "The 'user' property";
 
-        info[1] = new DriverPropertyInfo(TAG_PASSWORD, props.getProperty(TAG_PASSWORD));
-        info[1].description = "The 'password' property";
+        info[--mp] = new DriverPropertyInfo(TAG_PASSWORD, props.getProperty(TAG_PASSWORD));
+        info[mp].description = "The 'password' property";
+
+        info[--mp] = new DriverPropertyInfo(TAG_TRUST_STORE, props.getProperty(TAG_TRUST_STORE));
+        info[mp].description = "File path containing certificate for encyrpted communication (create with Java keytool)";
+
+        info[--mp] = new DriverPropertyInfo(TAG_TRUST_TYPE, props.getProperty(TAG_TRUST_TYPE));
+        info[mp].description = "Trust store encoding";
+        info[mp].value= "JKS";
+
+        info[--mp] = new DriverPropertyInfo(TAG_TRUST_PASSWORD, props.getProperty(TAG_TRUST_PASSWORD));
+        info[mp].description = "Password for the trust store";
+
+        info[--mp] = new DriverPropertyInfo(TAG_SSL_ENABLE, props.getProperty(TAG_SSL_ENABLE));
+        info[mp].description = "Enable SSL communication";
+        info[mp].choices = new String[2];
+        info[mp].choices[0] = "true";
+        info[mp].choices[1] = "false";
+        info[mp].value = "false";
+
+        info[--mp] = new DriverPropertyInfo(TAG_INTELLIJ_QUIRKS, props.getProperty(TAG_INTELLIJ_QUIRKS));
+        info[mp].description = "Enable special optimizations for IntelliJ";
+        info[mp].choices = new String[2];
+        info[mp].choices[0] = "true";
+        info[mp].choices[1] = "false";
+        info[mp].value = "false";
+
+        info[--mp] = new DriverPropertyInfo(TAG_DBVIS_QUIRKS, props.getProperty(TAG_DBVIS_QUIRKS));
+        info[mp].description = "Enable special optimizations for DbVisualizer";
+        info[mp].choices = new String[2];
+        info[mp].choices[0] = "true";
+        info[mp].choices[1] = "false";
+        info[mp].value = "false";
+
+        info[--mp] = new DriverPropertyInfo(TAG_CONSISTENCY_LEVEL, props.getProperty(TAG_CONSISTENCY_LEVEL));
+        info[mp].description = "Consistency level for accessing data";
+        info[mp].choices = new String[ConsistencyLevel.values().length];
+
+        int level = 0;
+        for (ConsistencyLevel cl : ConsistencyLevel.values()) {
+            info[mp].choices[level++] = cl.name();
+        }
+
+        info[mp].value = ConsistencyLevel.ONE.name();
+
+        info[--mp] = new DriverPropertyInfo(TAG_LOG_ENABLE, props.getProperty(TAG_LOG_ENABLE));
+        info[mp].description = "Enable logging to the specified logPath location";
+        info[mp].choices = new String[2];
+        info[mp].choices[0] = "true";
+        info[mp].choices[1] = "false";
+        info[mp].value = "false";
+
+        info[--mp] = new DriverPropertyInfo(TAG_LOG_PATH, props.getProperty(TAG_LOG_PATH));
+        info[mp].description = "File for logging CQL statements";
 
         return info;
+
     }
 
     /**
      * Returns true, if it is jdbc compliant.
      */
+    @Override
     public boolean jdbcCompliant()
     {
         return false;
     }
-    
+
+    @Override
     public java.util.logging.Logger getParentLogger() throws SQLFeatureNotSupportedException
     {
     	throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);

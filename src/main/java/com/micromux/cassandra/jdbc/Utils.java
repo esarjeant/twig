@@ -35,7 +35,6 @@ import java.sql.SQLSyntaxErrorException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import java.util.regex.Pattern;
 
 /**
  * A set of static utility methods used by the JDBC Suite, and various default values and error message strings
@@ -43,15 +42,8 @@ import java.util.regex.Pattern;
  */
 class Utils
 {
-    private static final Pattern KEYSPACE_PATTERN = Pattern.compile("USE (\\w+);?", Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
-    private static final Pattern SELECT_PATTERN = Pattern.compile("(?:SELECT|DELETE)\\s+.+\\s+FROM\\s+(\\w+).*", Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
-    private static final Pattern UPDATE_PATTERN = Pattern.compile("UPDATE\\s+(\\w+)\\s+.*", Pattern.CASE_INSENSITIVE);
-
     public static final String PROTOCOL = "jdbc:cassandra:";
-    public static final String DEFAULT_HOST = "localhost";
     public static final int DEFAULT_PORT = 9042;
-    public static final ConsistencyLevel DEFAULT_CONSISTENCY = ConsistencyLevel.ONE;
-    
 
     public static final String KEY_VERSION = "version";
     public static final String KEY_CONSISTENCY = "consistency";
@@ -59,7 +51,6 @@ class Utils
     public static final String KEY_BACKUP_DC = "backupdc";
     public static final String KEY_CONNECTION_RETRIES = "retries";
     
-    public static final String TAG_DESCRIPTION = "description";
     public static final String TAG_USER = "user";
     public static final String TAG_PASSWORD = "password";
     public static final String TAG_DATABASE_NAME = "databaseName";
@@ -67,12 +58,16 @@ class Utils
     public static final String TAG_PORT_NUMBER = "portNumber";
     public static final String TAG_ACTIVE_CQL_VERSION = "activeCqlVersion";
     public static final String TAG_CQL_VERSION = "cqlVersion";
-    public static final String TAG_BUILD_VERSION = "buildVersion";
-    public static final String TAG_THRIFT_VERSION = "thriftVersion";
     public static final String TAG_CONSISTENCY_LEVEL = "consistencyLevel";
+    public static final String TAG_INTELLIJ_QUIRKS = "intellijQuirks";
+    public static final String TAG_DBVIS_QUIRKS = "dbvisjQuirks";
+    public static final String TAG_LOG_ENABLE = "logEnable";
+    public static final String TAG_LOG_PATH = "logPath";
 
-    public static final String TAG_TRUST_STORE = "truststore";
-    public static final String TAG_TRUST_PASSWORD = "trustpass";
+    public static final String TAG_TRUST_STORE = "ssltruststore";
+    public static final String TAG_TRUST_TYPE = "ssltrusttype";
+    public static final String TAG_TRUST_PASSWORD = "ssltrustpass";
+    public static final String TAG_SSL_ENABLE = "sslenable";
 
     public static final String TAG_PRIMARY_DC = "primaryDatacenter";
     public static final String TAG_BACKUP_DC = "backupDatacenter";
@@ -195,14 +190,16 @@ class Utils
                 if (params.containsKey(TAG_TRUST_PASSWORD)) {
                     props.setProperty(TAG_TRUST_PASSWORD, params.get(TAG_TRUST_PASSWORD));
                 }
+                if (params.containsKey(TAG_INTELLIJ_QUIRKS)) {
+                    props.setProperty(TAG_INTELLIJ_QUIRKS, params.get(TAG_INTELLIJ_QUIRKS));
+                }
+                if (params.containsKey(TAG_LOG_ENABLE)) {
+                    props.setProperty(TAG_LOG_ENABLE, params.get(TAG_LOG_ENABLE));
+                }
+                if (params.containsKey(TAG_LOG_PATH)) {
+                    props.setProperty(TAG_LOG_PATH, params.get(TAG_LOG_PATH));
+                }
 
-//               String[] items = query.split("&");
-//               if (items.length != 1) throw new SQLNonTransientConnectionException(URI_IS_SIMPLE);
-//               
-//               String[] option = query.split("=");
-//               if (!option[0].equalsIgnoreCase("version")) throw new SQLNonTransientConnectionException(NOT_OPTION);
-//               if (option.length!=2) throw new SQLNonTransientConnectionException(NOT_OPTION);
-//               props.setProperty(TAG_CQL_VERSION, option[1]);
             }
         }
 
