@@ -35,8 +35,8 @@ and away from the URL; this includes:
 * `ssltrusttype`: Encoding type for the trust store, this is usually JKS.
 * `sslenable`: Toggle to `true` to enable SSL; requires `truststore` and `trustpass` to be set correctly.
 * `intellijQuirks`: Set `true` to enable quirks processing for IntelliJ.
-* `dbvisjQuirks`: Set `true` to enable quirks processing for DbVisualizer.
-* `logpath`: Location for CQL query log; default to '/tmp/twig.log'
+* `dbvisQuirks`: Set `true` to enable quirks processing for DbVisualizer.
+* `logpath`: Location for CQL query log; default is not set.
 * `logenable`: Toggle to `true` to enable CQL query logging.
 
 Quirks processing is particularly helpful for IntelliJ; it makes it possible to browse tabular data without errors.

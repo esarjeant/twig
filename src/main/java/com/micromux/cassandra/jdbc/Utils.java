@@ -58,7 +58,7 @@ class Utils
     public static final String TAG_CQL_VERSION = "cqlVersion";
     public static final String TAG_CONSISTENCY_LEVEL = "consistencyLevel";
     public static final String TAG_INTELLIJ_QUIRKS = "intellijQuirks";
-    public static final String TAG_DBVIS_QUIRKS = "dbvisjQuirks";
+    public static final String TAG_DBVIS_QUIRKS = "dbvisQuirks";
     public static final String TAG_LOG_ENABLE = "logEnable";
     public static final String TAG_LOG_PATH = "logPath";
 
