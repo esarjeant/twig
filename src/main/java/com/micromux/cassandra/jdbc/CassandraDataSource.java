@@ -215,7 +215,7 @@ class CassandraDataSource implements ConnectionPoolDataSource, DataSource
     
     public Logger getParentLogger() throws SQLFeatureNotSupportedException
     {
-    	throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
+    	return Utils.getLogger().getParent();
     }
 
 	@Override

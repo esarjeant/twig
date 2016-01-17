@@ -21,11 +21,11 @@
 package com.micromux.cassandra.jdbc;
 
 import com.datastax.driver.core.ConsistencyLevel;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.sql.*;
 import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static com.micromux.cassandra.jdbc.Utils.*;
 
@@ -40,7 +40,7 @@ public class CassandraDriver implements Driver
 
     public static final String DVR_NAME = "Cassandra Twig JDBC Driver";
 
-    private static final Logger logger = LoggerFactory.getLogger(CassandraDriver.class);
+    private static final Logger logger = Utils.getLogger();
 
     static
     {
@@ -78,7 +78,7 @@ public class CassandraDriver implements Driver
             // override any matching values in finalProps with values from props
             finalProps.putAll(props);
 
-            if (logger.isDebugEnabled()) logger.debug("Final Properties to Connection: {}", finalProps);
+            logger.log(Level.FINE, String.format("Final Properties to Connection: %s", finalProps.toString()));
 
             return new CassandraConnection(finalProps);
         }
@@ -188,8 +188,8 @@ public class CassandraDriver implements Driver
     }
 
     @Override
-    public java.util.logging.Logger getParentLogger() throws SQLFeatureNotSupportedException
+    public Logger getParentLogger() throws SQLFeatureNotSupportedException
     {
-    	throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
+    	return logger.getParent();
     }
 }

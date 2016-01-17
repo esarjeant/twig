@@ -23,8 +23,6 @@ package com.micromux.cassandra.jdbc;
 import com.datastax.driver.core.ColumnDefinitions;
 import com.datastax.driver.core.DataType;
 import com.datastax.driver.core.Row;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.net.URL;
@@ -34,6 +32,7 @@ import java.util.Calendar;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 
 import static com.micromux.cassandra.jdbc.Utils.BAD_FETCH_DIR;
 import static com.micromux.cassandra.jdbc.Utils.BAD_FETCH_SIZE;
@@ -125,7 +124,6 @@ import static com.micromux.cassandra.jdbc.Utils.NO_INTERFACE;
  */
 class CassandraResultSet extends AbstractResultSet implements ResultSet
 {
-    private static final Logger logger = LoggerFactory.getLogger(CassandraResultSet.class);
 
     public static final int DEFAULT_TYPE = ResultSet.TYPE_FORWARD_ONLY;
     public static final int DEFAULT_CONCURRENCY = ResultSet.CONCUR_READ_ONLY;
@@ -1117,13 +1115,8 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
         }
 
         @Override
-        public boolean isWritable(int column) throws SQLException
-        {
-            if (columnDefinitions.getType(column - 1) != null) {
-                return column > 0;
-            } else {
-                return false;
-            }
+        public boolean isWritable(int column) throws SQLException {
+            return columnDefinitions.getType(column - 1) != null && column > 0;
         }
 
         @Override

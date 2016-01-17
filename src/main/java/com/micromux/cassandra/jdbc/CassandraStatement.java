@@ -21,8 +21,6 @@
 package com.micromux.cassandra.jdbc;
 
 import com.datastax.driver.core.ConsistencyLevel;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.sql.*;
 
@@ -31,7 +29,6 @@ import java.sql.*;
  */
 class CassandraStatement extends AbstractStatement implements CassandraStatementExtras, Comparable<Object>, Statement
 {
-    private static final Logger logger = LoggerFactory.getLogger(CassandraStatement.class);
 
     /**
      * The connection.
@@ -109,39 +106,6 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
         throw new SQLFeatureNotSupportedException(Utils.NO_BATCH);
     }
 
-//    /**
-//     * Take a look at the CQL and determine the name of the columngroup (table)
-//     * being queried. Cassandra does not support joins, so the FROM clause
-//     * will be the name of the table.
-//     * @return   Name of the table queried as part of this statement.
-//     */
-//    protected String getTableName() {
-//
-//        String tableName = "";
-//
-//        if (cql != null) {
-//
-//            StringTokenizer st = new StringTokenizer(cql, " ", false);
-//            String field = "";
-//            boolean nextFieldTable = false;
-//
-//            while ((field = st.nextToken()) != null) {
-//
-//                if (nextFieldTable) {
-//                    tableName = field;
-//                    break;
-//                }
-//
-//                nextFieldTable = "FROM".equalsIgnoreCase(field);
-//
-//            }
-//
-//        }
-//
-//        return tableName;
-//
-//    }
-
     /**
      * Check the connection and return a fatal SQL Exception if it is no longer available.
      * @throws SQLException  SQL exception if the connection has been closed.
@@ -175,58 +139,6 @@ class CassandraStatement extends AbstractStatement implements CassandraStatement
         connection = null;
         cql = null;
     }
-
-
-//    private void doXExecute(String cql) throws SQLException
-//    {
-//        try
-//        {
-//            if (logger.isTraceEnabled()) logger.trace("CQL: "+ cql);
-//
-//            resetResults();
-//            connection.execute(cql, consistencyLevel);
-//
-////            switch (rSet.())
-////            {
-////                case ROWS:
-////                    currentResultSet = new CassandraResultSet(this, rSet);
-////                    break;
-////                case INT:
-////                    updateCount = rSet.getNum();
-////                    break;
-////                case VOID:
-////                    updateCount = 0;
-////                    break;
-////            }
-//        }
-//        catch (InvalidRequestException e)
-//        {
-//            throw new SQLSyntaxErrorException(e.getWhy()+"\n'"+cql+"'",e);
-//        }
-//        catch (UnavailableException e)
-//        {
-//            throw new SQLNonTransientConnectionException(NO_SERVER, e);
-//        }
-//        catch (TimedOutException e)
-//        {
-//            throw new SQLTransientConnectionException(e);
-//        }
-//        catch (SchemaDisagreementException e)
-//        {
-//            throw new SQLRecoverableException(SCHEMA_MISMATCH);
-//        }
-//        catch (TException e)
-//        {
-//        	try{
-//        		// Try to close the connection in order to force client to reconnect
-//        		connection.close();
-//        	}catch(Exception e1){
-//
-//        	}
-//            throw new SQLNonTransientConnectionException(e);
-//        }
-//
-//    }
 
     @Override
     public boolean execute(String query) throws SQLException

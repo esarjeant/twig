@@ -21,8 +21,6 @@
 package com.micromux.cassandra.jdbc;
 
 import com.datastax.driver.core.BoundStatement;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
 import java.math.BigDecimal;
@@ -34,10 +32,12 @@ import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 class CassandraPreparedStatement extends CassandraStatement implements PreparedStatement
 {
-    private static final Logger LOG = LoggerFactory.getLogger(CassandraPreparedStatement.class);
+    private static final Logger logger = Utils.getLogger();
 
     /**
      * Cassandra PreparedStatement - native implementation
@@ -66,7 +66,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
 
         super(con, cql, rsType, rsConcurrency, rsHoldability);
 
-        if (LOG.isTraceEnabled()) LOG.trace("CQL: " + this.cql);
+        logger.log(Level.FINER, String.format("CassandraPreparedStatement::CQL:%s", this.cql));
 
         preparedStatement = con.prepare(cql);
         boundStatement = new BoundStatement(preparedStatement);
@@ -83,7 +83,7 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         try{
         	connection.removeStatement(this);
         }catch(Exception e){
-        	LOG.warn("Failed to close() prepared statment", e);
+        	logger.log(Level.WARNING, "Failed to close() prepared statment", e);
         }
 
         connection = null;

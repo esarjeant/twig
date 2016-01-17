@@ -21,10 +21,6 @@
 
 package com.micromux.cassandra.jdbc;
 
-import com.datastax.driver.core.ConsistencyLevel;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -35,6 +31,8 @@ import java.sql.SQLSyntaxErrorException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * A set of static utility methods used by the JDBC Suite, and various default values and error message strings
@@ -109,7 +107,7 @@ class Utils
     protected static final String NOT_OPTION = "Connection url only supports the 'version' and 'consistency' options";
     protected static final String FORWARD_ONLY = "Can not position cursor with a type of TYPE_FORWARD_ONLY";
 
-    protected static final Logger logger = LoggerFactory.getLogger(Utils.class);
+    protected static final Logger logger = Logger.getLogger(Utils.class.getPackage().getName());
 
     /**
      * Parse a URL for the Cassandra JDBC Driver
@@ -203,7 +201,7 @@ class Utils
             }
         }
 
-        if (logger.isTraceEnabled()) logger.trace("URL : '{}' parses to: {}", url, props);
+        logger.log(Level.FINE, String.format("URL : '%s' parses to: %s", url, props));
 
         return props;
     }
@@ -244,8 +242,8 @@ class Utils
         {
             throw new SQLNonTransientConnectionException(e);
         }
-        
-        if (logger.isTraceEnabled()) logger.trace("Subname : '{}' created from : {}",uri.toString(), props);
+
+        logger.log(Level.FINE, String.format("Subname : '%s' created from : %s", uri.toString(), props));
         
         return uri.toString();
     }
@@ -284,5 +282,13 @@ class Utils
             }
         }
         return params;
+    }
+
+    /**
+     * Global logger for this driver.
+     * @return  Global logger for the driver.
+     */
+    public static Logger getLogger() {
+        return logger;
     }
 }

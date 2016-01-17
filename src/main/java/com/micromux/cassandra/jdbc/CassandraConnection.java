@@ -24,8 +24,6 @@ import com.datastax.driver.core.*;
 import com.datastax.driver.core.PreparedStatement;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
@@ -38,8 +36,9 @@ import java.sql.Statement;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static com.micromux.cassandra.jdbc.CassandraResultSet.DEFAULT_CONCURRENCY;
 import static com.micromux.cassandra.jdbc.CassandraResultSet.DEFAULT_HOLDABILITY;
@@ -53,7 +52,7 @@ import static com.micromux.cassandra.jdbc.Utils.*;
 class CassandraConnection extends AbstractConnection implements Connection
 {
 
-    private static final Logger logger = LoggerFactory.getLogger(CassandraConnection.class);
+    private static final Logger logger = Utils.getLogger();
 
     public static final int DB_MAJOR_VERSION = 2;
     public static final int DB_MINOR_VERSION = 1;
@@ -154,7 +153,7 @@ class CassandraConnection extends AbstractConnection implements Connection
             Random rand = new Random();
 
             currentHost = hosts[rand.nextInt( hosts.length)];
-            logger.debug("Chosen seed : " + currentHost);
+            logger.log(Level.INFO, "Chosen seed : " + currentHost);
 
             Cluster.Builder connectionBuilder = Cluster.builder().addContactPoint(host);
 
@@ -174,7 +173,7 @@ class CassandraConnection extends AbstractConnection implements Connection
                 if (sslOptions != null) {
                     connectionBuilder.withSSL(sslOptions);
                 } else {
-                    logger.warn("SSL requested but trust store not valid");
+                    logger.log(Level.WARNING, "SSL requested but trust store not valid");
                 }
 
             }
@@ -203,7 +202,7 @@ class CassandraConnection extends AbstractConnection implements Connection
 
         } catch (Exception e){
             String msg = String.format("Connection Fails to %s: %s", currentHost, e.toString());
-            logger.error(msg, e);
+            logger.log(Level.SEVERE, msg, e);
             throw new SQLException(msg, e);
         }
 
@@ -269,7 +268,7 @@ class CassandraConnection extends AbstractConnection implements Connection
                 try {
                     tsf.close();
                 } catch (IOException ix) {
-                    logger.warn("Error Closing Trust Store: " + trustPath, ix);
+                    logger.log(Level.WARNING, String.format("Error Closing Trust Store: %s", trustPath), ix);
                 }
             }
 
@@ -299,16 +298,16 @@ class CassandraConnection extends AbstractConnection implements Connection
             logStream.write("\n".getBytes());
 
         } catch (FileNotFoundException fx) {
-            logger.error("Unable to open trace file: " + logPath, fx);
+            logger.log(Level.WARNING, "Unable to open trace file: " + logPath, fx);
         } catch (IOException ix) {
-            logger.error("Unable to write trace file: " + logPath, ix);
+            logger.log(Level.WARNING, "Unable to write trace file: " + logPath, ix);
         } finally {
 
             if (logStream != null) {
                 try {
                     logStream.close();
                 } catch (IOException ix) {
-                    logger.error("Close log trace fails", ix);
+                    logger.log(Level.WARNING, "Close log trace fails", ix);
                 }
             }
         }
@@ -612,20 +611,20 @@ class CassandraConnection extends AbstractConnection implements Connection
     private String scrub(String queryStr) {
 
         if (intellijQuirksMode) {
-            logger.info("Enabling intellijQuirksMode");
+            logger.log(Level.INFO, "Enabling intellijQuirksMode");
 
             String sql = queryStr.replaceAll("t\\.\\*", "\\*").replaceAll("\\ t$", "");
-            logger.debug("SQL: " + sql);
+            logger.log(Level.FINER, "scrub::SQL: " + sql);
 
             return sql;
 
         }
 
         if (dbvisQuirksMode) {
-            logger.info("Enabling dbvisQuirksMode");
+            logger.log(Level.INFO, "Enabling dbvisQuirksMode");
 
             String sql = queryStr.replaceAll("\"", "");
-            logger.debug("SQL: " + sql);
+            logger.log(Level.FINER, "scrub::SQL:" + sql);
 
             return sql;
 

@@ -26,6 +26,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.sql.ConnectionEvent;
 import javax.sql.ConnectionEventListener;
@@ -33,12 +35,9 @@ import javax.sql.PooledConnection;
 import javax.sql.StatementEvent;
 import javax.sql.StatementEventListener;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 class PooledCassandraConnection implements PooledConnection
 {
-	private static final Logger logger = LoggerFactory.getLogger(PooledCassandraConnection.class);
+	private static final Logger logger = Utils.getLogger();
 	
 	private CassandraConnection physicalConnection;
 
@@ -129,9 +128,9 @@ class PooledCassandraConnection implements PooledConnection
 			preparedStatement.clearParameters();
 			freeStatements.add(preparedStatement);
 		}
-		catch (SQLException e)
+		catch (SQLException sx)
 		{
-			logger.error(e.getMessage());
+			logger.log(Level.WARNING, "Failed to close statement: " + cql, sx);
 		}
 
 	}

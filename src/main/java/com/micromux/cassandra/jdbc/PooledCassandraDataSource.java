@@ -26,24 +26,24 @@ import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.sql.ConnectionEvent;
 import javax.sql.ConnectionEventListener;
 import javax.sql.DataSource;
 import javax.sql.PooledConnection;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 public class PooledCassandraDataSource implements DataSource, ConnectionEventListener
 {
+
+	private static final Logger logger = Utils.getLogger();
+
 	private static final int CONNECTION_IS_VALID_TIMEOUT = 5;
 
 	private static final int MIN_POOL_SIZE = 4;
 
 	protected static final String NOT_SUPPORTED = "the Cassandra implementation does not support this method";
-
-	private static final Logger logger = LoggerFactory.getLogger(PooledCassandraDataSource.class);
 
 	private CassandraDataSource connectionPoolDataSource;
 
@@ -96,9 +96,9 @@ public class PooledCassandraDataSource implements DataSource, ConnectionEventLis
 			{
 				connection.close();
 			}
-			catch (SQLException e)
+			catch (SQLException sx)
 			{
-				logger.error(e.getMessage());
+				logger.log(Level.WARNING, "Unable to close connection", sx);
 			}
 		}
 	}
@@ -113,9 +113,9 @@ public class PooledCassandraDataSource implements DataSource, ConnectionEventLis
 				connection.getConnection().close();
 			}
 		}
-		catch (SQLException e)
+		catch (SQLException sx)
 		{
-			logger.error(e.getMessage());
+			logger.log(Level.WARNING, "Unable to handle connectionErrorOcurred", sx);
 		}
 		usedConnections.remove(connection);
 	}
@@ -134,9 +134,9 @@ public class PooledCassandraDataSource implements DataSource, ConnectionEventLis
 			{
 				connection.close();
 			}
-			catch (SQLException e)
+			catch (SQLException sx)
 			{
-				logger.error(e.getMessage());
+				logger.log(Level.WARNING, "Failed to close pooled connection", sx);
 			}
 		}
 	}
