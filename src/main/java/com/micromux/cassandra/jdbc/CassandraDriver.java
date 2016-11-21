@@ -39,9 +39,9 @@ public class CassandraDriver implements Driver
      * Current driver version; this mirrors the version flagged in the build script.
      */
     static class Version {
-        static int major = 2;
-        static int minor = 1;
-        static int patch = 2;
+        static int major = 3;
+        static int minor = 0;
+        static int patch = 0;
     }
 
     public static final String DVR_NAME = "Cassandra Twig JDBC Driver";
@@ -114,7 +114,6 @@ public class CassandraDriver implements Driver
      * Driver properties for Cassandra. Includes the options that are configurable for this driver; for example,
      * {@link Utils#TAG_SSL_ENABLE} can be used to allow secure communication.
      */
-    @Override
     public DriverPropertyInfo[] getPropertyInfo(String url, Properties props) throws SQLException
     {
         if (props == null) props = new Properties();
@@ -187,13 +186,11 @@ public class CassandraDriver implements Driver
     /**
      * Returns true, if it is jdbc compliant.
      */
-    @Override
     public boolean jdbcCompliant()
     {
         return false;
     }
 
-    @Override
     public Logger getParentLogger() throws SQLFeatureNotSupportedException
     {
     	return logger.getParent();
