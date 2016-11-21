@@ -7,8 +7,8 @@ version = '3.0.0-SNAPSHOT'
 
 test.outputs.upToDateWhen { false }
 
-sourceCompatibility = 1.8
-targetCompatibility = 1.8
+sourceCompatibility = 1.7
+targetCompatibility = 1.7
 
 repositories {
      maven { url "http://repo.maven.apache.org/maven2" }
