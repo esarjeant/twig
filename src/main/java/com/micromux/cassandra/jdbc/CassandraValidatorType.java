@@ -1,31 +1,56 @@
 package com.micromux.cassandra.jdbc;
 
+import com.datastax.driver.core.DataType;
+
 import java.sql.Types;
 
 public enum CassandraValidatorType {
 
-    CompositeType("org.apache.cassandra.db.marshal.CompositeType", Types.STRUCT, 20, 0),
-    SetType("org.apache.cassandra.db.marshal.SetType", Types.ARRAY, 40, 0),
-    MapType("org.apache.cassandra.db.marshal.MapType", Types.JAVA_OBJECT, 40, 0),
-    UTF8Type("org.apache.cassandra.db.marshal.UTF8Type", Types.VARCHAR, 25, 0),
-    BooleanType("org.apache.cassandra.db.marshal.BooleanType", Types.BOOLEAN, 1, 0),
-    Int32Type("org.apache.cassandra.db.marshal.Int32Type", Types.INTEGER, 8, 2),
-    LongType("org.apache.cassandra.db.marshal.LongType", Types.BIGINT, 10, 2),
-    DoubleType("org.apache.cassandra.db.marshal.DoubleType", Types.DOUBLE, 10, 10),
-    DecimalType("org.apache.cassandra.db.marshal.DecimalType", Types.DECIMAL, 10, 10),
-    BytesType("org.apache.cassandra.db.marshal.BytesType", Types.NCLOB, 50, 0),
-    UUIDType("org.apache.cassandra.db.marshal.UUIDType", Types.JAVA_OBJECT, 50, 0),
-    InetAddressType("org.apache.cassandra.db.marshal.InetAddressType", Types.JAVA_OBJECT, 10, 0),
-    TimestampType("org.apache.cassandra.db.marshal.TimestampType", Types.TIMESTAMP, 25, 0),
-    TimeUUIDType("org.apache.cassandra.db.marshal.TimeUUIDType", Types.JAVA_OBJECT, 50, 0),
-    Unknown("Unknown", Types.OTHER, 20, 0);
+    //    counter
+//    decimal
+//    cdouble
+//    cfloat
+//    inet
+//    tinyint
+//    smallint
+//    cint
+//    timestamp
+//    date
+//    time
+//    uuid
+//    varchar
+//    varint
+//    timeuuid
 
-    private String validatorName;
+//    ascii
+//    text
+//                    bigint
+
+    CompositeType(DataType.Name.CUSTOM, Types.STRUCT, 20, 0),
+    SetType(DataType.Name.SET, Types.ARRAY, 40, 0),
+    MapType(DataType.Name.MAP, Types.JAVA_OBJECT, 40, 0),
+    UdtType(DataType.Name.UDT, Types.JAVA_OBJECT, 40, 0),
+    UTF8Type(DataType.Name.TEXT, Types.VARCHAR, 25, 0),
+    BooleanType(DataType.Name.BOOLEAN, Types.BOOLEAN, 1, 0),
+    Int32Type(DataType.Name.INT, Types.INTEGER, 8, 2),
+    SmallIntType(DataType.Name.SMALLINT, Types.INTEGER, 8, 2),
+    TinyIntType(DataType.Name.TINYINT, Types.INTEGER, 8, 2),
+    LongType(DataType.Name.BIGINT, Types.BIGINT, 10, 2),
+    DoubleType(DataType.Name.DOUBLE, Types.DOUBLE, 10, 10),
+    DecimalType(DataType.Name.DECIMAL, Types.DECIMAL, 10, 10),
+    BytesType(DataType.Name.BLOB, Types.NCLOB, 50, 0),
+    UUIDType(DataType.Name.UUID, Types.JAVA_OBJECT, 50, 0),
+    InetAddressType(DataType.Name.INET, Types.JAVA_OBJECT, 10, 0),
+    TimestampType(DataType.Name.TIMESTAMP, Types.TIMESTAMP, 25, 0),
+    TimeUUIDType(DataType.Name.TIMEUUID, Types.JAVA_OBJECT, 50, 0),
+    Unknown(DataType.Name.CUSTOM, Types.JAVA_OBJECT, 50, 0);
+
+    private DataType.Name validatorName;
     int sqlType;
     int sqlWidth;
     int sqlRadix;
 
-    CassandraValidatorType(String validatorName, int sqlType, int sqlWidth, int sqlRadix) {
+    CassandraValidatorType(DataType.Name validatorName, int sqlType, int sqlWidth, int sqlRadix) {
         this.validatorName = validatorName;
         this.sqlType = sqlType;
         this.sqlWidth = sqlWidth;
@@ -49,7 +74,11 @@ public enum CassandraValidatorType {
     }
 
     public String getSqlName() {
-        return validatorName.substring(validatorName.lastIndexOf('.') + 1);
+        return validatorName.name();
+    }
+
+    public DataType.Name getName() {
+        return validatorName;
     }
 
     public String getSqlDisplayName() {
@@ -106,13 +135,22 @@ public enum CassandraValidatorType {
      */
     public static CassandraValidatorType fromValidator(String validator) {
 
+
         CassandraValidatorType validatorType = Unknown;
 
-        for (CassandraValidatorType cvt : CassandraValidatorType.values()) {
-            if (validator.contains(cvt.validatorName)) {
-                validatorType = cvt;
-                break;
+        try {
+
+            DataType.Name name = DataType.Name.valueOf(validator.toUpperCase());
+
+            for (CassandraValidatorType cvt : CassandraValidatorType.values()) {
+                if (name.equals(cvt.getName())) {
+                    validatorType = cvt;
+                    break;
+                }
             }
+
+        } catch (IllegalArgumentException ix) {
+            // requested validator does not exist...
         }
 
         return validatorType;

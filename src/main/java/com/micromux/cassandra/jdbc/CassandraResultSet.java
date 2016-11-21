@@ -120,10 +120,8 @@ import static com.micromux.cassandra.jdbc.Utils.NO_INTERFACE;
  * <td>Arbitrary-precision integer</td>
  * </tr>
  * </table>
- * 
  */
-class CassandraResultSet extends AbstractResultSet implements ResultSet
-{
+class CassandraResultSet extends AbstractResultSet implements ResultSet {
 
     public static final int DEFAULT_TYPE = ResultSet.TYPE_FORWARD_ONLY;
     public static final int DEFAULT_CONCURRENCY = ResultSet.CONCUR_READ_ONLY;
@@ -160,8 +158,7 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
     /**
      * no argument constructor.
      */
-    CassandraResultSet()
-    {
+    CassandraResultSet() {
         statement = null;
         meta = new CResultSetMetaData();
     }
@@ -169,8 +166,7 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
     /**
      * Instantiates a new cassandra result set from a CqlResult.
      */
-    CassandraResultSet(CassandraStatement statement, com.datastax.driver.core.ResultSet resultSet) throws SQLException
-    {
+    CassandraResultSet(CassandraStatement statement, com.datastax.driver.core.ResultSet resultSet) throws SQLException {
         this.statement = statement;
         this.resultSetType = statement.getResultSetType();
         this.fetchDirection = statement.getFetchDirection();
@@ -191,66 +187,52 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
 
     /**
      * Move to an absolute location in the resultset. This is not supported.
-     * @param arg0   Row to move to.
+     *
+     * @param arg0 Row to move to.
      * @return Value is {@code true} for success.
-     * @throws SQLException  Operation is not supported; {@link SQLFeatureNotSupportedException} returns from here.
+     * @throws SQLException Operation is not supported; {@link SQLFeatureNotSupportedException} returns from here.
      */
-    @Override
-    public boolean absolute(int arg0) throws SQLException
-    {
+    public boolean absolute(int arg0) throws SQLException {
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
-    @Override
-    public void afterLast() throws SQLException
-    {
+    public void afterLast() throws SQLException {
         if (resultSetType == TYPE_FORWARD_ONLY) throw new SQLNonTransientException(FORWARD_ONLY);
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
-    @Override
-    public void beforeFirst() throws SQLException
-    {
+    public void beforeFirst() throws SQLException {
         if (resultSetType == TYPE_FORWARD_ONLY) throw new SQLNonTransientException(FORWARD_ONLY);
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     /**
      * Determine if a row has been selected from the resultset.
+     *
      * @return Result is {@code true} if a row is currently selected in the result or {@code false} if it is not.
-     * @throws SQLException  Database error requesting the row.
+     * @throws SQLException Database error requesting the row.
      */
     private boolean hasRow() throws SQLException {
         return (row != null);
     }
 
-    @Override
-    public void clearWarnings() throws SQLException
-    {
+    public void clearWarnings() throws SQLException {
         // not implemented
     }
 
-    @Override
-    public void close() throws SQLException
-    {
+    public void close() throws SQLException {
         // not implemented
     }
 
-    @Override
-    public int findColumn(String name) throws SQLException
-    {
+    public int findColumn(String name) throws SQLException {
         return columnDefinitions.getIndexOf(name) + 1;
     }
 
-    @Override
-    public boolean first() throws SQLException
-    {
+    public boolean first() throws SQLException {
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
-    @Override
-    public BigDecimal getBigDecimal(int index) throws SQLException
-    {
+    public BigDecimal getBigDecimal(int index) throws SQLException {
         if (hasRow()) {
             BigDecimal val = row.getDecimal(index - 1);
             wasNull = row.isNull(index - 1);
@@ -262,29 +244,25 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
         }
     }
 
-    /** @deprecated */
-    @Override
-    public BigDecimal getBigDecimal(int index, int scale) throws SQLException
-    {
+    /**
+     * @deprecated
+     */
+    public BigDecimal getBigDecimal(int index, int scale) throws SQLException {
         return getBigDecimal(index);
     }
 
-    @Override
-    public BigDecimal getBigDecimal(String name) throws SQLException
-    {
+    public BigDecimal getBigDecimal(String name) throws SQLException {
         return getBigDecimal(findColumn(name));
     }
 
-    /** @deprecated */
-    @Override
-    public BigDecimal getBigDecimal(String name, int scale) throws SQLException
-    {
+    /**
+     * @deprecated
+     */
+    public BigDecimal getBigDecimal(String name, int scale) throws SQLException {
         return getBigDecimal(name);
     }
 
-    @Override
-    public boolean getBoolean(int index) throws SQLException
-    {
+    public boolean getBoolean(int index) throws SQLException {
 
         if (hasRow()) {
             Boolean val = row.getBool(index - 1);
@@ -297,15 +275,11 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
         }
     }
 
-    @Override
-    public boolean getBoolean(String name) throws SQLException
-    {
+    public boolean getBoolean(String name) throws SQLException {
         return getBoolean(findColumn(name));
     }
 
-    @Override
-    public byte getByte(int index) throws SQLException
-    {
+    public byte getByte(int index) throws SQLException {
         if (hasRow()) {
 
             ByteBuffer val = row.getBytes(index - 1);
@@ -323,15 +297,11 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
         }
     }
 
-    @Override
-    public byte getByte(String name) throws SQLException
-    {
+    public byte getByte(String name) throws SQLException {
         return getByte(findColumn(name));
     }
 
-    @Override
-    public byte[] getBytes(int index) throws SQLException
-    {
+    public byte[] getBytes(int index) throws SQLException {
         if (hasRow()) {
             ByteBuffer val = row.getBytes(index - 1);
             wasNull = row.isNull(index - 1) || (null == val);
@@ -343,23 +313,17 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
         }
     }
 
-    @Override
-    public byte[] getBytes(String name) throws SQLException
-    {
+    public byte[] getBytes(String name) throws SQLException {
         return getBytes(findColumn(name));
     }
 
-    @Override
-    public int getConcurrency() throws SQLException
-    {
+    public int getConcurrency() throws SQLException {
         return statement.getResultSetConcurrency();
     }
 
-    @Override
-    public Date getDate(int index) throws SQLException
-    {
+    public Date getDate(int index) throws SQLException {
         if (hasRow()) {
-            java.util.Date val = row.getDate(index - 1);
+            java.util.Date val = row.getTimestamp(index - 1);
             wasNull = row.isNull(index - 1) || (null == val);
 
             return wasNull ? null : new java.sql.Date(val.getTime());
@@ -369,27 +333,19 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
         }
     }
 
-    @Override
-    public Date getDate(int index, Calendar calendar) throws SQLException
-    {
+    public Date getDate(int index, Calendar calendar) throws SQLException {
         return getDate(index);
     }
 
-    @Override
-    public Date getDate(String name) throws SQLException
-    {
+    public Date getDate(String name) throws SQLException {
         return getDate(findColumn(name));
     }
 
-    @Override
-    public Date getDate(String name, Calendar calendar) throws SQLException
-    {
+    public Date getDate(String name, Calendar calendar) throws SQLException {
         return getDate(name);
     }
 
-    @Override
-    public double getDouble(int index) throws SQLException
-    {
+    public double getDouble(int index) throws SQLException {
         if (hasRow()) {
             double val = row.getDouble(index - 1);
             wasNull = row.isNull(index - 1);
@@ -401,27 +357,19 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
         }
     }
 
-    @Override
-    public double getDouble(String name) throws SQLException
-    {
+    public double getDouble(String name) throws SQLException {
         return getDouble(findColumn(name));
     }
 
-    @Override
-    public int getFetchDirection() throws SQLException
-    {
+    public int getFetchDirection() throws SQLException {
         return fetchDirection;
     }
 
-    @Override
-    public int getFetchSize() throws SQLException
-    {
+    public int getFetchSize() throws SQLException {
         return fetchSize;
     }
 
-    @Override
-    public float getFloat(int index) throws SQLException
-    {
+    public float getFloat(int index) throws SQLException {
         if (hasRow()) {
             float val = row.getFloat(index - 1);
             wasNull = row.isNull(index - 1);
@@ -433,21 +381,15 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
         }
     }
 
-    @Override
-    public float getFloat(String name) throws SQLException
-    {
+    public float getFloat(String name) throws SQLException {
         return getFloat(findColumn(name));
     }
 
-    @Override
-    public int getHoldability() throws SQLException
-    {
+    public int getHoldability() throws SQLException {
         return statement.getResultSetHoldability();
     }
 
-    @Override
-    public int getInt(int index) throws SQLException
-    {
+    public int getInt(int index) throws SQLException {
         if (hasRow()) {
             wasNull = row.isNull(index - 1);
             return row.getInt(index - 1);
@@ -456,15 +398,11 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
         }
     }
 
-    @Override
-    public int getInt(String name) throws SQLException
-    {
+    public int getInt(String name) throws SQLException {
         return getInt(findColumn(name));
     }
 
-    @Override
-    public long getLong(int index) throws SQLException
-    {
+    public long getLong(int index) throws SQLException {
         if (hasRow()) {
             wasNull = row.isNull(index - 1);
             return wasNull ? 0 : row.getLong(index - 1);
@@ -473,21 +411,15 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
         }
     }
 
-    @Override
-    public long getLong(String name) throws SQLException
-    {
+    public long getLong(String name) throws SQLException {
         return getLong(findColumn(name));
     }
 
-    @Override
-    public ResultSetMetaData getMetaData() throws SQLException
-    {
+    public ResultSetMetaData getMetaData() throws SQLException {
         return meta;
     }
 
-    @Override
-    public Object getObject(int index) throws SQLException
-    {
+    public Object getObject(int index) throws SQLException {
         if (hasRow()) {
             wasNull = row.isNull(index - 1);
             return row.getObject(index - 1);
@@ -496,9 +428,7 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
         }
     }
 
-    @Override
-    public Object getObject(String name) throws SQLException
-    {
+    public Object getObject(String name) throws SQLException {
         return getObject(findColumn(name));
     }
 
@@ -507,57 +437,51 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
      * type of entity based on a column index lookup. For many of the common types (String, Integer, etc.) the
      * native implementation is used here.
      *
-     * @param columnIndex   Column entry to request.
-     * @param type          Type of object expected.
-     * @param <T>           Class of object expected.
+     * @param columnIndex Column entry to request.
+     * @param type        Type of object expected.
+     * @param <T>         Class of object expected.
      * @return Instance of the object or an exception if this fails.
      * @throws SQLException Exception occurs if the request object does not match the data definition.
      */
-    @Override
     public <T> T getObject(int columnIndex, Class<T> type) throws SQLException {
 
         if (type == String.class) {
-            return (T)getString(columnIndex);
+            return (T) getString(columnIndex);
         } else if (type == Integer.class) {
-            return (T)Integer.valueOf(getInt(columnIndex));
+            return (T) Integer.valueOf(getInt(columnIndex));
         } else if (type == Long.class) {
-            return (T)Long.valueOf(getLong(columnIndex));
+            return (T) Long.valueOf(getLong(columnIndex));
         } else if (type == Double.class) {
-            return (T)Double.valueOf(getDouble(columnIndex));
+            return (T) Double.valueOf(getDouble(columnIndex));
         } else if (type == Float.class) {
-            return (T)Float.valueOf(getFloat(columnIndex));
+            return (T) Float.valueOf(getFloat(columnIndex));
         } else if (type == java.sql.Date.class) {
             Date date = getDate(columnIndex);
             long millis = date.getTime();
-            return (T)(new java.sql.Date(millis));
+            return (T) (new java.sql.Date(millis));
         } else if (type == java.sql.Time.class) {
             Date date = getDate(columnIndex);
             long millis = date.getTime();
-            return (T)(new java.sql.Time(millis));
+            return (T) (new java.sql.Time(millis));
         } else if (type == java.sql.Timestamp.class) {
             Date date = getDate(columnIndex);
             long millis = date.getTime();
-            return (T)(new java.sql.Timestamp(millis));
+            return (T) (new java.sql.Timestamp(millis));
         } else {
-            return (T)getObject(columnIndex);
+            return (T) getObject(columnIndex);
         }
 
     }
 
-    @Override
     public <T> T getObject(String columnLabel, Class<T> type) throws SQLException {
         return getObject(findColumn(columnLabel), type);
     }
 
-    @Override
-    public int getRow() throws SQLException
-    {
+    public int getRow() throws SQLException {
         return rowNumber;
     }
 
-    @Override
-    public RowId getRowId(int index) throws SQLException
-    {
+    public RowId getRowId(int index) throws SQLException {
         if (hasRow()) {
             wasNull = row.isNull(index - 1);
 
@@ -572,47 +496,38 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
         }
     }
 
-    @Override
-    public RowId getRowId(String name) throws SQLException
-    {
+    public RowId getRowId(String name) throws SQLException {
         return getRowId(findColumn(name));
     }
 
     /**
      * Cassandra does not natively support short; it is possible this may result in loss of data.
-     * @param index  Column identifier to retrieve.
+     *
+     * @param index Column identifier to retrieve.
      * @return Column as a short or {@code 0} if it cannot be converted.
-     * @throws SQLException  Error requesting this from the database.
+     * @throws SQLException Error requesting this from the database.
      */
-    @Override
-    public short getShort(int index) throws SQLException
-    {
+    public short getShort(int index) throws SQLException {
         if (hasRow()) {
             int val = row.getInt(index - 1);
             wasNull = row.isNull(index - 1);
 
-            return wasNull ? 0 : (short)val;
+            return wasNull ? 0 : (short) val;
 
         } else {
             throw new SQLDataException("Record Not Found At Index: " + index);
         }
     }
 
-    @Override
-    public short getShort(String name) throws SQLException
-    {
+    public short getShort(String name) throws SQLException {
         return getShort(findColumn(name));
     }
 
-    @Override
-    public Statement getStatement() throws SQLException
-    {
+    public Statement getStatement() throws SQLException {
         return statement;
     }
 
-    @Override
-    public String getString(int index) throws SQLException
-    {
+    public String getString(int index) throws SQLException {
         if (hasRow()) {
             wasNull = row.isNull(index - 1);
 
@@ -623,29 +538,29 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
                 DataType dataType = row.getColumnDefinitions().getType(index - 1);
 
                 // TODO: should this go elsewhere?
-                if ("UUID".equalsIgnoreCase(dataType.getName().toString())) {
+                if (DataType.Name.UUID.equals(dataType.getName())) {
                     return row.getUUID(index - 1).toString();
-                } else if ("TIMESTAMP".equalsIgnoreCase(dataType.getName().toString())) {
+                } else if (DataType.Name.TIMESTAMP.equals(dataType.getName())) {
                     return row.getDate(index - 1).toString();
-                } else if ("BOOLEAN".equalsIgnoreCase(dataType.getName().toString())) {
+                } else if (DataType.Name.BOOLEAN.equals(dataType.getName())) {
                     return Boolean.toString(row.getBool(index - 1));
-                } else if ("LONG".equalsIgnoreCase(dataType.getName().toString())) {
+                } else if (DataType.Name.BIGINT.equals(dataType.getName())) {
                     return Long.toString(row.getLong(index - 1));
-                } else if ("INT32".equalsIgnoreCase(dataType.getName().toString())) {
-                    return Long.toString(row.getLong(index - 1));
-                } else if ("DECIMAL".equalsIgnoreCase(dataType.getName().toString())) {
+                } else if (DataType.Name.INT.equals(dataType.getName())) {
+                    return Long.toString(row.getInt(index - 1));
+                } else if (DataType.Name.DECIMAL.equals(dataType.getName())) {
                     return row.getDecimal(index - 1).toString();
-                } else if ("DOUBLE".equalsIgnoreCase(dataType.getName().toString())) {
+                } else if (DataType.Name.DOUBLE.equals(dataType.getName())) {
                     return Double.toString(row.getDouble(index - 1));
-                } else if ("INETADDRESS".equalsIgnoreCase(dataType.getName().toString())) {
+                } else if (DataType.Name.INET.equals(dataType.getName())) {
                     return row.getInet(index - 1).toString();
-                } else if ("TIMEUUID".equalsIgnoreCase(dataType.getName().toString())) {
+                } else if (DataType.Name.TIMEUUID.equals(dataType.getName())) {
                     return row.getUUID(index - 1).toString();
-                } else if ("MAP".equalsIgnoreCase(dataType.getName().toString())) {
-                    Map<Object,Object> map = row.getMap(index - 1, Object.class, Object.class);
+                } else if (DataType.Name.MAP.equals(dataType.getName())) {
+                    Map<Object, Object> map = row.getMap(index - 1, Object.class, Object.class);
                     StringBuilder sbout = new StringBuilder();
 
-                    for (Map.Entry<Object,Object> mapEntry : map.entrySet()) {
+                    for (Map.Entry<Object, Object> mapEntry : map.entrySet()) {
                         sbout.append(mapEntry.getKey()).append("=").append(mapEntry.getValue()).append(",");
                     }
                     return sbout.toString();
@@ -659,15 +574,11 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
         }
     }
 
-    @Override
-    public String getString(String name) throws SQLException
-    {
+    public String getString(String name) throws SQLException {
         return getString(findColumn(name));
     }
 
-    @Override
-    public Time getTime(int index) throws SQLException
-    {
+    public Time getTime(int index) throws SQLException {
         if (hasRow()) {
 
             wasNull = row.isNull(index - 1);
@@ -675,7 +586,7 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
             if (wasNull) {
                 return null;
             } else {
-                java.util.Date dt = row.getDate(index - 1);
+                java.util.Date dt = row.getTimestamp(index - 1);
                 return new Time(dt.getTime());
             }
         } else {
@@ -683,36 +594,28 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
         }
     }
 
-    @Override
-    public Time getTime(int index, Calendar calendar) throws SQLException
-    {
+    public Time getTime(int index, Calendar calendar) throws SQLException {
         // silently ignore the Calendar argument; its a hint we do not need
         return getTime(index);
     }
 
-    @Override
-    public Time getTime(String name) throws SQLException
-    {
+    public Time getTime(String name) throws SQLException {
         return getTime(findColumn(name));
     }
 
-    @Override
-    public Time getTime(String name, Calendar calendar) throws SQLException
-    {
+    public Time getTime(String name, Calendar calendar) throws SQLException {
         // silently ignore the Calendar argument; its a hint we do not need
         return getTime(findColumn(name));
     }
 
-    @Override
-    public Timestamp getTimestamp(int index) throws SQLException
-    {
+    public Timestamp getTimestamp(int index) throws SQLException {
         if (hasRow()) {
             wasNull = row.isNull(index - 1);
 
             if (wasNull) {
                 return null;
             } else {
-                java.util.Date dt = row.getDate(index - 1);
+                java.util.Date dt = row.getTimestamp(index - 1);
                 return new Timestamp(dt.getTime());
             }
         } else {
@@ -720,29 +623,21 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
         }
     }
 
-    @Override
-    public Timestamp getTimestamp(int index, Calendar calendar) throws SQLException
-    {
+    public Timestamp getTimestamp(int index, Calendar calendar) throws SQLException {
         // silently ignore the Calendar argument; its a hint we do not need
         return getTimestamp(index);
     }
 
-    @Override
-    public Timestamp getTimestamp(String name) throws SQLException
-    {
+    public Timestamp getTimestamp(String name) throws SQLException {
         return getTimestamp(findColumn(name));
     }
 
-    @Override
-    public Timestamp getTimestamp(String name, Calendar calendar) throws SQLException
-    {
+    public Timestamp getTimestamp(String name, Calendar calendar) throws SQLException {
         // silently ignore the Calendar argument; its a hint we do not need
         return getTimestamp(name);
     }
 
-    @Override
-    public Blob getBlob(int index) throws SQLException
-    {
+    public Blob getBlob(int index) throws SQLException {
         if (hasRow()) {
 
             wasNull = row.isNull(index - 1);
@@ -758,149 +653,107 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
         }
     }
 
-    @Override
-    public Blob getBlob(String name) throws SQLException
-    {
+    public Blob getBlob(String name) throws SQLException {
         return getBlob(findColumn(name));
     }
 
-    @Override
-    public int getType() throws SQLException
-    {
+    public int getType() throws SQLException {
         return resultSetType;
     }
 
     // URL (awaiting some clarifications as to how it is stored in C* ... just a validated Sting in URL format?
-    @Override
-    public URL getURL(int arg0) throws SQLException
-    {
+    public URL getURL(int arg0) throws SQLException {
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
-    @Override
-    public URL getURL(String arg0) throws SQLException
-    {
+    public URL getURL(String arg0) throws SQLException {
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     // These Methods are planned to be implemented soon; but not right now...
     // Each set of methods has a more detailed set of issues that should be considered fully...
-
-
-    @Override
-    public SQLWarning getWarnings() throws SQLException
-    {
+    public SQLWarning getWarnings() throws SQLException {
         // the rationale is there are no warnings to return in this implementation...
         return null;
     }
 
-    @Override
-    public boolean isAfterLast() throws SQLException
-    {
+    public boolean isAfterLast() throws SQLException {
         return rowNumber == Integer.MAX_VALUE;
     }
 
-    @Override
-    public boolean isBeforeFirst() throws SQLException
-    {
+    public boolean isBeforeFirst() throws SQLException {
         return rowNumber == 0;
     }
 
-    @Override
-    public boolean isClosed() throws SQLException
-    {
+    public boolean isClosed() throws SQLException {
         return closed;
     }
 
-    @Override
-    public boolean isFirst() throws SQLException
-    {
+    public boolean isFirst() throws SQLException {
         return rowNumber == 1;
     }
 
-    @Override
-    public boolean isLast() throws SQLException
-    {
+    public boolean isLast() throws SQLException {
         return !rowsIterator.hasNext();
     }
 
-    @Override
-    public boolean isWrapperFor(Class<?> iface) throws SQLException
-    {
+    public boolean isWrapperFor(Class<?> iface) throws SQLException {
         // TODO: should this be implemented?
         return false;
     }
 
     // Navigation between rows within the returned set of rows
     // Need to use a list iterator so next() needs completely re-thought
-    @Override
-    public boolean last() throws SQLException
-    {
+    public boolean last() throws SQLException {
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
     /**
      * Move to the next row in the ResultSet. This navigates the internal resultset iterator and returns
      * {@code true} if the next record can be read or {@code false} if there are no more rows.
+     *
      * @return {@code true} if the next row can be read or {@code false} if it cannot.
-     * @throws SQLException  Fatal error communicating with the resultset.
+     * @throws SQLException Fatal error communicating with the resultset.
      */
-    @Override
-    public synchronized boolean next() throws SQLException
-    {
-        if ((rowsIterator != null) && rowsIterator.hasNext())
-        {
+    public synchronized boolean next() throws SQLException {
+        if ((rowsIterator != null) && rowsIterator.hasNext()) {
             this.row = rowsIterator.next();
             rowNumber++;
             return true;
-        }
-        else
-        {
+        } else {
             rowNumber = Integer.MAX_VALUE;
             return false;
         }
     }
 
-    @Override
-    public boolean previous() throws SQLException
-    {
+    public boolean previous() throws SQLException {
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
-    @Override
-    public boolean relative(int arg0) throws SQLException
-    {
+    public boolean relative(int arg0) throws SQLException {
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
-    @Override
-    public void setFetchDirection(int direction) throws SQLException
-    {
-        if (direction == FETCH_FORWARD || direction == FETCH_REVERSE || direction == FETCH_UNKNOWN)
-        {
-            if ((getType() == TYPE_FORWARD_ONLY) && (direction != FETCH_FORWARD)) throw new SQLSyntaxErrorException("attempt to set an illegal direction : " + direction);
+    public void setFetchDirection(int direction) throws SQLException {
+        if (direction == FETCH_FORWARD || direction == FETCH_REVERSE || direction == FETCH_UNKNOWN) {
+            if ((getType() == TYPE_FORWARD_ONLY) && (direction != FETCH_FORWARD))
+                throw new SQLSyntaxErrorException("attempt to set an illegal direction : " + direction);
             fetchDirection = direction;
         }
         throw new SQLSyntaxErrorException(String.format(BAD_FETCH_DIR, direction));
     }
 
-    @Override
-    public void setFetchSize(int size) throws SQLException
-    {
+    public void setFetchSize(int size) throws SQLException {
         if (size < 0) throw new SQLException(String.format(BAD_FETCH_SIZE, size));
         fetchSize = size;
     }
 
-    @Override
-    public <T> T unwrap(Class<T> iface) throws SQLException
-    {
+    public <T> T unwrap(Class<T> iface) throws SQLException {
         // TODO: should this be implemented?
         throw new SQLFeatureNotSupportedException(String.format(NO_INTERFACE, iface.getSimpleName()));
     }
 
-    @Override
-    public boolean wasNull() throws SQLException
-    {
+    public boolean wasNull() throws SQLException {
         return wasNull;
     }
 
@@ -908,8 +761,7 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
      * RSMD implementation. The metadata returned refers to the column
      * values, not the column names.
      */
-    class CResultSetMetaData implements ResultSetMetaData
-    {
+    class CResultSetMetaData implements ResultSetMetaData {
 
         private ColumnDefinitions columnDefinitions;
 
@@ -924,41 +776,34 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
         /**
          * Return the Cassandra Cluster Name as the Catalog
          */
-        @Override
-        public String getCatalogName(int column) throws SQLException
-        {
+        public String getCatalogName(int column) throws SQLException {
             return columnDefinitions.getKeyspace(column - 1);
         }
 
         /**
          * Get the JDBC class for this column.
-         * @param column   Column identifier.
+         *
+         * @param column Column identifier.
          * @return JDBC class for the column.
          * @throws SQLException Database error.
          */
-        @Override
-        public String getColumnClassName(int column) throws SQLException
-        {
+        public String getColumnClassName(int column) throws SQLException {
             return columnDefinitions.getType(column - 1).getName().toString();
         }
 
-        @Override
-        public int getColumnCount() throws SQLException
-        {
+        public int getColumnCount() throws SQLException {
             return (null == columnDefinitions) ? 0 : columnDefinitions.size();
         }
 
-        @Override
-        public int getColumnDisplaySize(int column) throws SQLException
-        {
+        public int getColumnDisplaySize(int column) throws SQLException {
 
-            Class colClass  = columnDefinitions.getType(column - 1).asJavaClass();
+            DataType dataType = columnDefinitions.getType(column - 1);
 
-            if (colClass == String.class) {
+            if (dataType.getName().equals(DataType.Name.TEXT)) {
                 return 50;
-            } else if (colClass == ByteBuffer.class) {
+            } else if (dataType.getName().equals(DataType.Name.BLOB)) {
                 return 75;
-            } else if (colClass == Boolean.class) {
+            } else if (dataType.getName().equals(DataType.Name.BOOLEAN)) {
                 return 4;
             } else {
                 return 10;
@@ -966,36 +811,81 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
 
         }
 
-        public String getColumnLabel(int column) throws SQLException
-        {
+        public String getColumnLabel(int column) throws SQLException {
             return columnDefinitions.getName(column - 1);
         }
 
-        public String getColumnName(int column) throws SQLException
-        {
+        public String getColumnName(int column) throws SQLException {
             return columnDefinitions.getName(column - 1);
         }
 
-        public int getColumnType(int column) throws SQLException
-        {
+        public int getColumnType(int column) throws SQLException {
 
             DataType dataType = columnDefinitions.getType(column - 1);
-            Class clazz = dataType.asJavaClass();
+            DataType.Name dataTypeName = dataType.getName();
 
-            if (clazz == String.class) {
-                return Types.NVARCHAR;
+            //    varchar
+            //    ascii
+            //    text
+            if (dataTypeName.equals(DataType.Name.ASCII) ||
+                    dataTypeName.equals(DataType.Name.VARCHAR) ||
+                    dataTypeName.equals(DataType.Name.TEXT)) {
+                return Types.VARCHAR;
             }
 
-            if ((clazz == Integer.class) || (clazz == Long.class)) {
+            // cint
+            // bigint
+            // counter
+            // tinyint
+            // smallint
+            // varint
+            if (dataTypeName.equals(DataType.Name.INT) ||
+                    dataTypeName.equals(DataType.Name.VARINT) ||
+                    dataTypeName.equals(DataType.Name.BIGINT) ||
+                    dataTypeName.equals(DataType.Name.COUNTER) ||
+                    dataTypeName.equals(DataType.Name.TINYINT) ||
+                    dataTypeName.equals(DataType.Name.SMALLINT)) {
                 return Types.INTEGER;
             }
 
-            if (clazz == Boolean.class) {
+            // cboolean
+            if (dataTypeName.equals(DataType.Name.BOOLEAN)) {
                 return Types.BOOLEAN;
             }
 
-            if (clazz == ByteBuffer.class) {
+            // blob
+            if (dataTypeName.equals(DataType.Name.BLOB)) {
                 return Types.BLOB;
+            }
+
+            //    decimal
+            if (dataTypeName.equals(DataType.Name.DECIMAL)) {
+                return Types.DECIMAL;
+            }
+
+            //    cdouble
+            if (dataTypeName.equals(DataType.Name.DOUBLE)) {
+                return Types.DOUBLE;
+            }
+
+            //    cfloat
+            if (dataTypeName.equals(DataType.Name.FLOAT)) {
+                return Types.FLOAT;
+            }
+
+            //    timestamp
+            if (dataTypeName.equals(DataType.Name.TIMESTAMP)) {
+                return Types.TIMESTAMP;
+            }
+
+            //    date
+            if (dataTypeName.equals(DataType.Name.DATE)) {
+                return Types.DATE;
+            }
+
+            //    time
+            if (dataTypeName.equals(DataType.Name.TIME)) {
+                return Types.TIME;
             }
 
             if (dataType.isCollection()) {
@@ -1003,6 +893,9 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
             }
 
             // TODO: JDBC Types missing -- additional needed here
+            //    inet
+            //    uuid
+            //    timeuuid
 
             // default type is Object
             return Types.JAVA_OBJECT;
@@ -1012,22 +905,16 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
         /**
          * Spec says "database specific type name"; for Cassandra this means the AbstractType.
          */
-        @Override
-        public String getColumnTypeName(int column) throws SQLException
-        {
-            return columnDefinitions.getType(column - 1).asJavaClass().toString();
+        public String getColumnTypeName(int column) throws SQLException {
+            return columnDefinitions.getType(column - 1).getName().toString();
         }
 
-        @Override
-        public int getPrecision(int column) throws SQLException
-        {
+        public int getPrecision(int column) throws SQLException {
             // TODO: column size should vary depending on the type
             return 50;
         }
 
-        @Override
-        public int getScale(int column) throws SQLException
-        {
+        public int getScale(int column) throws SQLException {
             int colType = getColumnType(column);
 
             if ((colType == Types.FLOAT) || (colType == Types.DOUBLE)) {
@@ -1040,91 +927,65 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet
         /**
          * return the DEFAULT current Keyspace as the Schema Name
          */
-        @Override
-        public String getSchemaName(int column) throws SQLException
-        {
+        public String getSchemaName(int column) throws SQLException {
             return columnDefinitions.getKeyspace(column - 1);
         }
 
-        @Override
-        public String getTableName(int column) throws SQLException
-        {
+        public String getTableName(int column) throws SQLException {
             return columnDefinitions.getTable(column - 1);
         }
 
-        @Override
-        public boolean isAutoIncrement(int column) throws SQLException
-        {
+        public boolean isAutoIncrement(int column) throws SQLException {
             // TODO: how should this be implemented?
             return false;
         }
 
 
-        @Override
-        public boolean isCaseSensitive(int column) throws SQLException
-        {
+        public boolean isCaseSensitive(int column) throws SQLException {
             // TODO: why wouldn't this be case sensitive?
             return true;
         }
 
-        @Override
-        public boolean isCurrency(int column) throws SQLException
-        {
+        public boolean isCurrency(int column) throws SQLException {
             // TODO: how should this support currency type?
             return false;
         }
 
-        @Override
-        public boolean isDefinitelyWritable(int column) throws SQLException
-        {
+        public boolean isDefinitelyWritable(int column) throws SQLException {
             return isWritable(column);
         }
 
         /**
          * absence is the equivalent of null in Cassandra
          */
-        @Override
-        public int isNullable(int column) throws SQLException
-        {
+        public int isNullable(int column) throws SQLException {
             return ResultSetMetaData.columnNullable;
         }
 
-        @Override
-        public boolean isReadOnly(int column) throws SQLException
-        {
+        public boolean isReadOnly(int column) throws SQLException {
             return column == 0;
         }
 
-        @Override
-        public boolean isSearchable(int column) throws SQLException
-        {
+        public boolean isSearchable(int column) throws SQLException {
             return false;
         }
 
-        @Override
-        public boolean isSigned(int column) throws SQLException
-        {
+        public boolean isSigned(int column) throws SQLException {
             // TODO: determine if this is signed
             return false;
         }
 
-        @Override
-        public boolean isWrapperFor(Class<?> iface) throws SQLException
-        {
+        public boolean isWrapperFor(Class<?> iface) throws SQLException {
             return false;
         }
 
-        @Override
         public boolean isWritable(int column) throws SQLException {
             return columnDefinitions.getType(column - 1) != null && column > 0;
         }
 
-        @Override
-        public <T> T unwrap(Class<T> iface) throws SQLException
-        {
+        public <T> T unwrap(Class<T> iface) throws SQLException {
             throw new SQLFeatureNotSupportedException(String.format(NO_INTERFACE, iface.getSimpleName()));
         }
-        
-        
+
     }
 }

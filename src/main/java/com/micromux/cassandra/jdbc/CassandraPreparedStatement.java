@@ -94,7 +94,6 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
-    @Override
     public void setBlob(int parameterIndex, Blob value) throws SQLException {
         checkNotClosed();
 
@@ -126,7 +125,6 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
 
     }
 
-    @Override
     public ResultSet executeQuery() throws SQLException
     {
         checkNotClosed();
@@ -137,7 +135,6 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
 
     }
 
-    @Override
     public int executeUpdate() throws SQLException
     {
         checkNotClosed();
@@ -149,31 +146,26 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         }
     }
 
-    @Override
     public ResultSetMetaData getMetaData() throws SQLException
     {
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
-    @Override
     public ParameterMetaData getParameterMetaData() throws SQLException
     {
         throw new SQLFeatureNotSupportedException(NOT_SUPPORTED);
     }
 
-    @Override
     public void setBigDecimal(int parameterIndex, BigDecimal decimal) throws SQLException
     {
         boundStatement.setDecimal(parameterIndex - 1, decimal);
     }
 
-    @Override
     public void setBoolean(int parameterIndex, boolean truth) throws SQLException
     {
         boundStatement.setBool(parameterIndex - 1, truth);
     }
 
-    @Override
     public void setByte(int parameterIndex, byte b) throws SQLException
     {
         ByteBuffer bb = ByteBuffer.allocate(1);
@@ -182,75 +174,63 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         boundStatement.setBytes(parameterIndex - 1, bb);
     }
 
-    @Override
     public void setBytes(int parameterIndex, byte[] bytes) throws SQLException
     {
         boundStatement.setBytes(parameterIndex - 1, ByteBuffer.wrap(bytes));
     }
 
-    @Override
     public void setDate(int parameterIndex, Date value) throws SQLException
     {
-        boundStatement.setDate(parameterIndex - 1, value);
+        boundStatement.setTimestamp(parameterIndex - 1, value);
     }
 
-    @Override
     public void setDate(int parameterIndex, Date date, Calendar cal) throws SQLException
     {
         // silently ignore the calendar argument it is not useful for the Cassandra implementation
         setDate(parameterIndex, date);
     }
 
-    @Override
     public void setDouble(int parameterIndex, double decimal) throws SQLException
     {
         boundStatement.setDouble(parameterIndex - 1, decimal);
     }
 
-    @Override
     public void setFloat(int parameterIndex, float decimal) throws SQLException
     {
         boundStatement.setFloat(parameterIndex - 1, decimal);
     }
 
-    @Override
     public void setInt(int parameterIndex, int integer) throws SQLException
     {
         boundStatement.setInt(parameterIndex - 1, integer);
     }
 
-    @Override
     public void setLong(int parameterIndex, long bigint) throws SQLException
     {
         boundStatement.setLong(parameterIndex - 1, bigint);
     }
 
-    @Override
     public void setNString(int parameterIndex, String value) throws SQLException
     {
         // treat like a String
         boundStatement.setString(parameterIndex - 1, value);
     }
 
-    @Override
     public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException {
         setBlob(parameterIndex, new CassandraBlob(inputStream));
     }
 
-    @Override
     public void setNull(int parameterIndex, int sqlType) throws SQLException
     {
         boundStatement.setToNull(parameterIndex - 1);
     }
 
-    @Override
     public void setNull(int parameterIndex, int sqlType, String typeName) throws SQLException
     {
         // silently ignore type and type name for cassandra... just store an empty BB
         setNull(parameterIndex, sqlType);
     }
 
-    @Override
     public void setURL(int parameterIndex, URL x) throws SQLException {
         boundStatement.setString(parameterIndex - 1, x.toString());
     }
@@ -290,10 +270,10 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
             boundStatement.setList(parameterIndex - 1, (List)object);
         } else if (object instanceof Timestamp) {
             long millis = ((Timestamp) object).getTime();
-            boundStatement.setDate(parameterIndex - 1, new Date(millis));
+            boundStatement.setTimestamp(parameterIndex - 1, new Date(millis));
         } else if (object instanceof java.sql.Date) {
             long millis = ((java.sql.Date) object).getTime();
-            boundStatement.setDate(parameterIndex - 1, new Date(millis));
+            boundStatement.setTimestamp(parameterIndex - 1, new Date(millis));
         } else if (object instanceof String) {
             setString(parameterIndex, (String)object);
         } else if (object instanceof Integer) {
@@ -309,51 +289,43 @@ class CassandraPreparedStatement extends CassandraStatement implements PreparedS
         }
     }
 
-    @Override
     public void setBlob(int parameterIndex, InputStream inputStream) throws SQLException {
         setBlob(parameterIndex, new CassandraBlob(inputStream));
     }
 
-    @Override
     public void setRowId(int parameterIndex, RowId value) throws SQLException
     {
         // TODO: how should Cassandra support this?
     }
 
-    @Override
     public void setShort(int parameterIndex, short smallint) throws SQLException
     {
         checkNotClosed();
         boundStatement.setInt(parameterIndex - 1, (int)smallint);
     }
 
-    @Override
     public void setString(int parameterIndex, String value) throws SQLException
     {
         checkNotClosed();
         boundStatement.setString(parameterIndex - 1, value);
     }
 
-    @Override
     public void setTime(int parameterIndex, Time value) throws SQLException
     {
-        boundStatement.setDate(parameterIndex - 1, new Date(value.getTime()));
+        boundStatement.setTimestamp(parameterIndex - 1, new Date(value.getTime()));
     }
 
-    @Override
     public void setTime(int parameterIndex, Time value, Calendar cal) throws SQLException
     {
         // silently ignore the calendar argument it is not useful for the Cassandra implementation
-        boundStatement.setDate(parameterIndex - 1, new Date(value.getTime()));
+        boundStatement.setTimestamp(parameterIndex - 1, new Date(value.getTime()));
     }
 
-    @Override
     public void setTimestamp(int parameterIndex, Timestamp value) throws SQLException
     {
-        boundStatement.setDate(parameterIndex - 1, new Date(value.getTime()));
+        boundStatement.setTimestamp(parameterIndex - 1, new Date(value.getTime()));
     }
 
-    @Override
     public void setTimestamp(int parameterIndex, Timestamp value, Calendar cal) throws SQLException
     {
         // silently ignore the calendar argument it is not useful for the Cassandra implementation

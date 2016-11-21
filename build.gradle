@@ -3,12 +3,12 @@ apply plugin: 'java'
 description = """Twig JDBC driver for Cassandra/CQL"""
 
 group = 'com.micromux'
-version = '2.1.2-SNAPSHOT'
+version = '3.0.0-SNAPSHOT'
 
 test.outputs.upToDateWhen { false }
 
-sourceCompatibility = 1.5
-targetCompatibility = 1.5
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
 
 repositories {
      maven { url "http://repo.maven.apache.org/maven2" }
@@ -20,10 +20,10 @@ configurations {
 
 dependencies {
     compile group: 'org.apache.commons', name: 'commons-lang3', version:'3.0'
-    compile group: 'com.datastax.cassandra', name: 'cassandra-driver-core', version:'2.1.9'
+    compile group: 'com.datastax.cassandra', name: 'cassandra-driver-core', version:'3.1.2'
     compile group: 'com.google.guava', name: 'guava', version:'18.0'
-    testCompile group: 'junit', name: 'junit', version:'4.10'
-    testCompile group: 'org.cassandraunit', name: 'cassandra-unit', version:'2.1.9.2'
+    testCompile group: 'junit', name: 'junit', version:'4.12'
+    testCompile group: 'org.cassandraunit', name: 'cassandra-unit', version:'3.0.0.1'
     testCompile group: 'io.netty', name: 'netty-all', version: '4.0.27.Final'
     testCompile group: 'net.ju-n.compile-command-annotations', name: 'compile-command-annotations', version: '1.0.3'
 }

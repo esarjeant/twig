@@ -43,7 +43,7 @@ public class BaseDriverTest {
         try {
 
             // start embedded Cassandra
-            EmbeddedCassandraServerHelper.startEmbeddedCassandra("cu-cassandra.yaml", "build/embeddedCassandra");
+            EmbeddedCassandraServerHelper.startEmbeddedCassandra("cu-cassandra.yaml", "build/embeddedCassandra", TimeUnit.MINUTES.toMillis(1));
 
             // configure OPTIONS
             if (!StringUtils.isEmpty(TRUST_STORE)) {

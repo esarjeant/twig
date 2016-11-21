@@ -31,9 +31,9 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
+import java.util.Map;
 
-public class MetadataResultSets extends AbstractResultSet implements ResultSet
-{
+public class MetadataResultSets extends AbstractResultSet implements ResultSet {
     static final String TABLE_CONSTANT = "TABLE";
 
     // array backed results - navigate using rowId
@@ -46,11 +46,13 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
     private boolean wasNull = false;
 
     // Private Constructor
-    private MetadataResultSets() {}
+    private MetadataResultSets() {
+    }
 
     /**
      * Add a new row to the resultset.
-     * @param row   Row to add to the resultset.
+     *
+     * @param row Row to add to the resultset.
      */
     void addRow(CassandraRow row) {
         this.rows.add(row);
@@ -59,7 +61,8 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
     /**
      * Add a new row to the resultset as one of the first records. This is used
      * for primary key columns.
-     * @param row   Row to add first to the resultset.
+     *
+     * @param row Row to add first to the resultset.
      */
     void addFirst(CassandraRow row) {
         this.rows.add(0, row);
@@ -67,12 +70,12 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
     /**
      * The table types available in this database.
-     * @param statement  Statement that needs meta-data.
+     *
+     * @param statement Statement that needs meta-data.
      * @return The resultset containing the available table types.
-     * @throws SQLException  Fatal database error.
+     * @throws SQLException Fatal database error.
      */
-    public static ResultSet makeTableTypes(CassandraStatement statement) throws SQLException
-    {
+    public static ResultSet makeTableTypes(CassandraStatement statement) throws SQLException {
         //final  Entry[][] tableTypes = { { new Entry("TABLE_TYPE",bytes(TABLE_CONSTANT),Entry.ASCII_TYPE)} };
 
         // use tableTypes with the key in column number 1 (one based)
@@ -89,8 +92,7 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
     }
 
-    public static ResultSet makeCatalogs(CassandraStatement statement) throws SQLException
-    {
+    public static ResultSet makeCatalogs(CassandraStatement statement) throws SQLException {
 
         CassandraColumn<String> tableCat = new CassandraColumn<String>("TABLE_CAT", statement.connection.getCatalog());
         CassandraRow row = new CassandraRow(tableCat);
@@ -106,39 +108,36 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
      * Retrieves the schema names available in this database.  The results
      * are ordered by <code>TABLE_CATALOG</code> and
      * <code>TABLE_SCHEM</code>.
-     *
+     * <p/>
      * <P>The schema columns are:
-     *  <OL>
-     *  <LI><B>TABLE_SCHEM</B> String {@code =>} schema name
-     *  <LI><B>TABLE_CATALOG</B> String {@code =>} catalog name (may be <code>null</code>)
-     *  </OL>
+     * <OL>
+     * <LI><B>TABLE_SCHEM</B> String {@code =>} schema name
+     * <LI><B>TABLE_CATALOG</B> String {@code =>} catalog name (may be <code>null</code>)
+     * </OL>
      *
      * @return a <code>ResultSet</code> object in which each row is a
-     *         schema description
-     * @exception SQLException if a database access error occurs
-     *
+     * schema description
+     * @throws SQLException if a database access error occurs
      */
-    public static ResultSet makeSchemas(CassandraStatement statement, String schemaPattern) throws SQLException
-    {
+    public static ResultSet makeSchemas(CassandraStatement statement, String schemaPattern) throws SQLException {
         if ("%".equals(schemaPattern)) schemaPattern = null;
 
         // TABLE_SCHEM String => schema name
         // TABLE_CATALOG String => catalog name (may be null)
 
-        String query = "SELECT keyspace_name FROM system.schema_keyspaces";
-        if (schemaPattern!=null) query = query + " where keyspace_name = '" + schemaPattern + "'";
+        String query = "SELECT keyspace_name FROM system_schema.keyspaces";
+        if (schemaPattern != null) query = query + " where keyspace_name = '" + schemaPattern + "'";
 
         String catalog = statement.connection.getCatalog();
         CassandraColumn<String> entryCatalog = new CassandraColumn<String>("TABLE_CATALOG", catalog);
 
         // determine the schemas
-        CassandraResultSet result = (CassandraResultSet)statement.executeQuery(query);
+        CassandraResultSet result = (CassandraResultSet) statement.executeQuery(query);
 
         // create meta resultset
         MetadataResultSets metaResult = new MetadataResultSets();
 
-        while (result.next())
-        {
+        while (result.next()) {
             CassandraColumn<String> entrySchema = new CassandraColumn<String>("TABLE_SCHEM", result.getString(1));
 
             CassandraRow row = new CassandraRow(entrySchema, entryCatalog);
@@ -158,10 +157,9 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
      * @param schemaPattern    Pattern to match on; this may be {@code null}.
      * @param tableNamePattern Pattern to match on; this may be {@code null}.
      * @return Navigable resultset that can be used to review the results of the table query.
-     * @throws SQLException  Fatal database error.
+     * @throws SQLException Fatal database error.
      */
-    public static ResultSet makeTables(CassandraStatement statement, String schemaPattern, String tableNamePattern) throws SQLException
-    {
+    public static ResultSet makeTables(CassandraStatement statement, String schemaPattern, String tableNamePattern) throws SQLException {
         //   1.   TABLE_CAT String => table catalog (may be null)
         //   2.   TABLE_SCHEM String => table schema (may be null)
         //   3.   TABLE_NAME String => table name
@@ -178,24 +176,22 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
         // example query to retrieve tables
         // SELECT keyspace_name,columnfamily_name,comment from schema_columnfamilies WHERE columnfamily_name = 'Test2';
-        StringBuilder query = new StringBuilder("SELECT keyspace_name,columnfamily_name,comment FROM system.schema_columnfamilies");
+        StringBuilder query = new StringBuilder("SELECT keyspace_name,table_name,comment FROM system_schema.tables");
 
         int filterCount = 0;
         if (schemaPattern != null) filterCount++;
         if (tableNamePattern != null) filterCount++;
 
         // check to see if it is qualified
-        if (filterCount > 0)
-        {
+        if (filterCount > 0) {
             String expr = "%s = '%s'";
             query.append(" WHERE ");
-            if (schemaPattern != null)
-            {
-            	query.append(String.format(expr, "keyspace_name", schemaPattern));
+            if (schemaPattern != null) {
+                query.append(String.format(expr, "keyspace_name", schemaPattern));
                 filterCount--;
                 if (filterCount > 0) query.append(" AND ");
             }
-            if (tableNamePattern != null) query.append(String.format(expr, "columnfamily_name", tableNamePattern));
+            if (tableNamePattern != null) query.append(String.format(expr, "table_name", tableNamePattern));
             query.append(" ALLOW FILTERING");
         }
 
@@ -209,18 +205,17 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
         CassandraColumn<String> entryRefGeneration = new CassandraColumn<String>("REF_GENERATION", "");
 
         // determine the schemas
-        CassandraResultSet result = (CassandraResultSet)statement.executeQuery(query.toString());
+        CassandraResultSet result = (CassandraResultSet) statement.executeQuery(query.toString());
 
         // create returned resultset
         MetadataResultSets metaResults = new MetadataResultSets();
 
-        while (result.next())
-        {
+        while (result.next()) {
             CassandraColumn<String> entrySchema = new CassandraColumn<String>("TABLE_SCHEM", result.getString(1));
             CassandraColumn<String> entryTableName = new CassandraColumn<String>("TABLE_NAME",
-                (result.getString(2) == null) ? "" : result.getString(2));
+                    (result.getString(2) == null) ? "" : result.getString(2));
             CassandraColumn<String> entryRemarks = new CassandraColumn<String>("REMARKS",
-                (result.getString(3) == null) ? "" : result.getString(3));
+                    (result.getString(3) == null) ? "" : result.getString(3));
 
             CassandraRow row = new CassandraRow(entryCatalog,
                     entrySchema,
@@ -243,6 +238,7 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
     /**
      * Query the column schema for the specified table name pattern.
+     *
      * @param statement         Valid statement with Connection.
      * @param schemaPattern     Optional schema pattern or {@code null}
      * @param tableNamePattern  Optional table name pattern or {@code null} for all.
@@ -293,7 +289,7 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
         if ("%".equals(tableNamePattern)) tableNamePattern = null;
         if ("%".equals(columnNamePattern)) columnNamePattern = null;
 
-        StringBuilder query = new StringBuilder("SELECT keyspace_name, columnfamily_name, column_name, validator FROM system.schema_columns");
+        StringBuilder query = new StringBuilder("SELECT keyspace_name, table_name, column_name, type FROM system_schema.columns");
 
 
         int filterCount = 0;
@@ -302,19 +298,16 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
         if (columnNamePattern != null) filterCount++;
 
         // check to see if it is qualified
-        if (filterCount > 0)
-        {
+        if (filterCount > 0) {
             String expr = "%s = '%s'";
             query.append(" WHERE ");
-            if (schemaPattern != null)
-            {
-            	query.append(String.format(expr, "keyspace_name", schemaPattern));
+            if (schemaPattern != null) {
+                query.append(String.format(expr, "keyspace_name", schemaPattern));
                 filterCount--;
                 if (filterCount > 0) query.append(" AND ");
             }
-            if (tableNamePattern != null)
-            {
-            	query.append(String.format(expr, "columnfamily_name", tableNamePattern));
+            if (tableNamePattern != null) {
+                query.append(String.format(expr, "table_name", tableNamePattern));
                 filterCount--;
                 if (filterCount > 0) query.append(" AND ");
             }
@@ -339,20 +332,19 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
         int ordinalPosition = 0;
 
         // define the PK columns
-		List<PKInfo> pks = getPrimaryKeys(statement, schemaPattern, tableNamePattern);
+        List<PKInfo> pks = getPrimaryKeys(statement, schemaPattern, tableNamePattern);
 
         // create the resultsets that will return...
         MetadataResultSets metaResults = new MetadataResultSets();
 
         // define the columns
         CassandraResultSet result = (CassandraResultSet) statement.executeQuery(query.toString());
-        while (result.next())
-        {
+        while (result.next()) {
             CassandraColumn<String> entrySchema = new CassandraColumn<String>("TABLE_SCHEM", result.getString(1));
             CassandraColumn<String> entryTableName = new CassandraColumn<String>("TABLE_NAME",
-                (result.getString(2) == null) ? "" : result.getString(2));
+                    (result.getString(2) == null) ? "" : result.getString(2));
             CassandraColumn<String> entryColumnName = new CassandraColumn<String>("COLUMN_NAME",
-                (result.getString(3) == null) ? "" : result.getString(3));
+                    (result.getString(3) == null) ? "" : result.getString(3));
 
             String validator = result.getString(4);
             CassandraValidatorType validatorType = CassandraValidatorType.fromValidator(validator);
@@ -424,79 +416,78 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
     /**
      * Query for indexes from Cassandra. These are essentially the primary keys both clustered and non-clustered.
-     * @param statement     Statement from which the Connection should be derived.
-     * @param schema        Schema to query (keyspace).
-     * @param table         Table to query (column group).
+     *
+     * @param statement Statement from which the Connection should be derived.
+     * @param schema    Schema to query (keyspace).
+     * @param table     Table to query (column group).
      * @return Set of unique indexes for the specified table (column group)
      * @throws SQLException Database error during index query.
      */
-    public static ResultSet makeIndexes(CassandraStatement statement, String schema, String table) throws SQLException
-	{
-		//1.TABLE_CAT String => table catalog (may be null)
-		//2.TABLE_SCHEM String => table schema (may be null)
-		//3.TABLE_NAME String => table name
-		//4.NON_UNIQUE boolean => Can index values be non-unique. false when TYPE is tableIndexStatistic
-		//5.INDEX_QUALIFIER String => index catalog (may be null); null when TYPE is tableIndexStatistic
-		//6.INDEX_NAME String => index name; null when TYPE is tableIndexStatistic
-		//7.TYPE short => index type: - tableIndexStatistic - this identifies table statistics that are returned in conjuction with a table's index descriptions
-		//- tableIndexClustered - this is a clustered index
-		//- tableIndexHashed - this is a hashed index
-		//- tableIndexOther - this is some other style of index
-		//
-		//8.ORDINAL_POSITION short => column sequence number within index; zero when TYPE is tableIndexStatistic
-		//9.COLUMN_NAME String => column name; null when TYPE is tableIndexStatistic
-		//10.ASC_OR_DESC String => column sort sequence, "A" => ascending, "D" => descending, may be null if sort sequence is not supported; null when TYPE is tableIndexStatistic
-		//11.CARDINALITY int => When TYPE is tableIndexStatistic, then this is the number of rows in the table; otherwise, it is the number of unique values in the index.
-		//12.PAGES int => When TYPE is tableIndexStatisic then this is the number of pages used for the table, otherwise it is the number of pages used for the current index.
-		//13.FILTER_CONDITION String => Filter condition, if any. (may be null)
+    public static ResultSet makeIndexes(CassandraStatement statement, String schema, String table) throws SQLException {
+        //1.TABLE_CAT String => table catalog (may be null)
+        //2.TABLE_SCHEM String => table schema (may be null)
+        //3.TABLE_NAME String => table name
+        //4.NON_UNIQUE boolean => Can index values be non-unique. false when TYPE is tableIndexStatistic
+        //5.INDEX_QUALIFIER String => index catalog (may be null); null when TYPE is tableIndexStatistic
+        //6.INDEX_NAME String => index name; null when TYPE is tableIndexStatistic
+        //7.TYPE short => index type: - tableIndexStatistic - this identifies table statistics that are returned in conjuction with a table's index descriptions
+        //- tableIndexClustered - this is a clustered index
+        //- tableIndexHashed - this is a hashed index
+        //- tableIndexOther - this is some other style of index
+        //
+        //8.ORDINAL_POSITION short => column sequence number within index; zero when TYPE is tableIndexStatistic
+        //9.COLUMN_NAME String => column name; null when TYPE is tableIndexStatistic
+        //10.ASC_OR_DESC String => column sort sequence, "A" => ascending, "D" => descending, may be null if sort sequence is not supported; null when TYPE is tableIndexStatistic
+        //11.CARDINALITY int => When TYPE is tableIndexStatistic, then this is the number of rows in the table; otherwise, it is the number of unique values in the index.
+        //12.PAGES int => When TYPE is tableIndexStatisic then this is the number of pages used for the table, otherwise it is the number of pages used for the current index.
+        //13.FILTER_CONDITION String => Filter condition, if any. (may be null)
 
-	    StringBuilder query = new StringBuilder("SELECT keyspace_name, columnfamily_name, column_name, component_index, index_name, index_options, index_type FROM system.schema_columns");
+        StringBuilder query = new StringBuilder("SELECT keyspace_name, table_name, index_name, options FROM system_schema.indexes");
 
-	    int filterCount = 0;
-	    if (schema != null) filterCount++;
-	    if (table != null) filterCount++;
+        int filterCount = 0;
+        if (schema != null) filterCount++;
+        if (table != null) filterCount++;
 
-	    // check to see if it is qualified
-	    if (filterCount > 0)
-	    {
-	        String expr = "%s = '%s'";
-	        query.append(" WHERE ");
-	        if (schema != null)
-	        {
-	        	query.append(String.format(expr, "keyspace_name", schema));
+        // check to see if it is qualified
+        if (filterCount > 0) {
+            String expr = "%s = '%s'";
+            query.append(" WHERE ");
+            if (schema != null) {
+                query.append(String.format(expr, "keyspace_name", schema));
                 filterCount--;
-		        if (filterCount > 0) query.append(" AND ");
-	        }
-	        if (table != null) query.append(String.format(expr, "columnfamily_name", table));
-	        query.append(" ALLOW FILTERING");
-	    }
+                if (filterCount > 0) query.append(" AND ");
+            }
+            if (table != null) query.append(String.format(expr, "table_name", table));
+            query.append(" ALLOW FILTERING");
+        }
 
-	    // name of the catalog (keyspace)
-	    String catalog = statement.connection.getCatalog();
-	    CassandraColumn<String> entryCatalog = new CassandraColumn<String>("TABLE_CAT", catalog);
+        // name of the catalog (keyspace)
+        String catalog = statement.connection.getCatalog();
+        CassandraColumn<String> entryCatalog = new CassandraColumn<String>("TABLE_CAT", catalog);
 
         // resultset for return
-	    MetadataResultSets metaResults = new MetadataResultSets();
+        MetadataResultSets metaResults = new MetadataResultSets();
 
         int ordinalPosition = 0;
-	    // define the columns
-        CassandraResultSet result = (CassandraResultSet) statement.executeQuery(query.toString());
-	    while (result.next())
-	    {
-	        if (result.getString(7) == null) continue; //if there is no index_type its not an index
-	        ordinalPosition++;
 
-	        CassandraColumn<String> entrySchema = new CassandraColumn<String>("TABLE_SCHEM", result.getString(1));
-	        CassandraColumn<String> entryTableName = new CassandraColumn<String>("TABLE_NAME",
-	            (result.getString(2) == null) ? "" : result.getString(2));
-	        CassandraColumn<Boolean> entryNonUnique = new CassandraColumn<Boolean>("NON_UNIQUE", Boolean.TRUE);
-	        CassandraColumn<String>  entryIndexQualifier = new CassandraColumn<String>("INDEX_QUALIFIER", catalog);
-            CassandraColumn<String> entryIndexName = new CassandraColumn<String>("INDEX_NAME", (result.getString(5) == null ? "" : result.getString(5)));
+        // define the columns
+        CassandraResultSet result = (CassandraResultSet) statement.executeQuery(query.toString());
+        while (result.next()) {
+
+            ordinalPosition++;
+
+            CassandraColumn<String> entrySchema = new CassandraColumn<String>("TABLE_SCHEM", result.getString(1));
+            CassandraColumn<String> entryTableName = new CassandraColumn<String>("TABLE_NAME",
+                    (result.getString(2) == null) ? "" : result.getString(2));
+            CassandraColumn<Boolean> entryNonUnique = new CassandraColumn<Boolean>("NON_UNIQUE", Boolean.TRUE);
+            CassandraColumn<String> entryIndexQualifier = new CassandraColumn<String>("INDEX_QUALIFIER", catalog);
+            CassandraColumn<String> entryIndexName = new CassandraColumn<String>("INDEX_NAME", (result.getString(3) == null ? "" : result.getString(3)));
             CassandraColumn<Short> entryType = new CassandraColumn<Short>("TYPE", DatabaseMetaData.tableIndexHashed);
             CassandraColumn<Integer> entryOrdinalPosition = new CassandraColumn<Integer>("ORDINAL_POSITION", ordinalPosition);
-            CassandraColumn<String> entryColumnName = new CassandraColumn<String>("COLUMN_NAME",
-                    (result.getString(3) == null) ? "" : result.getString(3));
-            CassandraColumn<String> entryAoD = new CassandraColumn<String>("ASC_OR_DESC", "");
+
+            Map<String,String> options = (Map)result.getObject(4);
+            CassandraColumn<String> entryColumnName = new CassandraColumn<String>("COLUMN_NAME", options.get("target"));
+            CassandraColumn<String> entryAoD = new CassandraColumn<String>("ASC_OR_DESC", null);
             CassandraColumn<Integer> entryCardinality = new CassandraColumn<Integer>("CARDINALITY", -1);
             CassandraColumn<Integer> entryPages = new CassandraColumn<Integer>("PAGES", -1);
             CassandraColumn<String> entryFilter = new CassandraColumn<String>("FILTER_CONDITION", "");
@@ -519,44 +510,40 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
             metaResults.addRow(row);
 
-	    }
+        }
 
         return metaResults;
 
-	}
+    }
 
-	private static List<PKInfo> getPrimaryKeys(CassandraStatement statement, String schema, String table) throws SQLException
-	{
-		StringBuilder query = new StringBuilder("SELECT keyspace_name, columnfamily_name, column_name, validator, type FROM system.schema_columns");
+    private static List<PKInfo> getPrimaryKeys(CassandraStatement statement, String schema, String table) throws SQLException {
+        StringBuilder query = new StringBuilder("SELECT keyspace_name, table_name, column_name, type, kind FROM system_schema.columns");
 
-	    int filterCount = 0;
-	    if (schema != null) filterCount++;
-	    if (table != null) filterCount++;
+        int filterCount = 0;
+        if (schema != null) filterCount++;
+        if (table != null) filterCount++;
 
-	    // check to see if it is qualified
-	    if (filterCount > 0)
-	    {
-	        String expr = "%s = '%s'";
-	        query.append(" WHERE ");
-	        if (schema != null)
-	        {
-	        	query.append(String.format(expr, "keyspace_name", schema));
+        // check to see if it is qualified
+        if (filterCount > 0) {
+            String expr = "%s = '%s'";
+            query.append(" WHERE ");
+            if (schema != null) {
+                query.append(String.format(expr, "keyspace_name", schema));
                 filterCount--;
-		        if (filterCount > 0) query.append(" AND ");
-	        }
-	        if (table != null) query.append(String.format(expr, "columnfamily_name", table));
-	        query.append(" ALLOW FILTERING");
-	    }
+                if (filterCount > 0) query.append(" AND ");
+            }
+            if (table != null) query.append(String.format(expr, "table_name", table));
+            query.append(" ALLOW FILTERING");
+        }
 
-        // interrogate the results forp primary keys
-	    List<PKInfo> primaryKeys = new ArrayList<PKInfo>();
-	    CassandraResultSet result = (CassandraResultSet) statement.executeQuery(query.toString());
-	    while (result.next())
-	    {
+        // interrogate the results for primary keys
+        List<PKInfo> primaryKeys = new ArrayList<PKInfo>();
+        CassandraResultSet result = (CassandraResultSet) statement.executeQuery(query.toString());
+        while (result.next()) {
 
-	    	String rschema = result.getString(1);
-   	    	String rtable = result.getString(2);
-	        String columnName = result.getString(3);
+            String rschema = result.getString(1);
+            String rtable = result.getString(2);
+            String columnName = result.getString(3);
             String validator = result.getString(4);
             String type = result.getString(5);
 
@@ -569,14 +556,13 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
             }
 
-	    }
+        }
 
-	    return primaryKeys;
+        return primaryKeys;
 
-	}
+    }
 
-	private static PKInfo createPKInfo(List<PKInfo> retval, String schema, String table, String columnName, CassandraValidatorType validator)
-	{
+    private static PKInfo createPKInfo(List<PKInfo> retval, String schema, String table, String columnName, CassandraValidatorType validator) {
         PKInfo pki = new PKInfo();
         pki.name = columnName;
         pki.schema = schema;
@@ -586,195 +572,160 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
         return pki;
 
-	}
+    }
 
-    @Override
     public boolean next() throws SQLException {
         return (++rowId < rows.size());
     }
 
-    @Override
     public void close() throws SQLException {
         rowId = 0;
         rows.clear();
     }
 
-    @Override
     public boolean wasNull() throws SQLException {
         return wasNull;
     }
 
-    @Override
     public String getString(int columnIndex) throws SQLException {
         Object value = rows.get(getRow()).getColumnValue(columnIndex - 1);
 
         if (value instanceof Integer) {
-            return ((Integer)value).toString();
+            return ((Integer) value).toString();
         } else if (value instanceof Long) {
-            return ((Long)value).toString();
+            return ((Long) value).toString();
         } else if (value instanceof Double) {
-            return ((Double)value).toString();
+            return ((Double) value).toString();
         } else if (value instanceof Float) {
-            return ((Float)value).toString();
+            return ((Float) value).toString();
         } else if (value instanceof String) {
-            return ((String)value);
+            return ((String) value);
         } else {
             return value.getClass().getName();
         }
     }
 
-    @Override
     public boolean getBoolean(int columnIndex) throws SQLException {
         return rows.get(getRow()).getColumnValue(columnIndex - 1);
     }
 
-    @Override
     public byte getByte(int columnIndex) throws SQLException {
         return 0;
     }
 
-    @Override
     public short getShort(int columnIndex) throws SQLException {
-        return (short)getInt(columnIndex);
+        return (short) getInt(columnIndex);
     }
 
-    @Override
     public int getInt(int columnIndex) throws SQLException {
         Integer i = rows.get(getRow()).getColumnValue(columnIndex - 1);
         return i.shortValue();
     }
 
-    @Override
     public long getLong(int columnIndex) throws SQLException {
         return rows.get(getRow()).getColumnValue(columnIndex - 1);
     }
 
-    @Override
     public float getFloat(int columnIndex) throws SQLException {
         return rows.get(getRow()).getColumnValue(columnIndex - 1);
     }
 
-    @Override
     public double getDouble(int columnIndex) throws SQLException {
         return rows.get(getRow()).getColumnValue(columnIndex - 1);
     }
 
-    @Override
     public BigDecimal getBigDecimal(int columnIndex, int scale) throws SQLException {
         return rows.get(getRow()).getColumnValue(columnIndex - 1);
     }
 
-    @Override
     public byte[] getBytes(int columnIndex) throws SQLException {
         return new byte[0];
     }
 
-    @Override
     public Date getDate(int columnIndex) throws SQLException {
         return rows.get(getRow()).getColumnValue(columnIndex - 1);
     }
 
-    @Override
     public Time getTime(int columnIndex) throws SQLException {
         return rows.get(getRow()).getColumnValue(columnIndex - 1);
     }
 
-    @Override
     public Timestamp getTimestamp(int columnIndex) throws SQLException {
         return rows.get(getRow()).getColumnValue(columnIndex - 1);
     }
 
-    @Override
     public String getString(String columnLabel) throws SQLException {
         return getString(findColumn(columnLabel));
     }
 
-    @Override
     public boolean getBoolean(String columnLabel) throws SQLException {
         return getBoolean(findColumn(columnLabel));
     }
 
-    @Override
     public byte getByte(String columnLabel) throws SQLException {
         return 0;
     }
 
-    @Override
     public short getShort(String columnLabel) throws SQLException {
         return getShort(findColumn(columnLabel));
     }
 
-    @Override
     public int getInt(String columnLabel) throws SQLException {
         return getInt(findColumn(columnLabel));
     }
 
-    @Override
     public long getLong(String columnLabel) throws SQLException {
         return getLong(findColumn(columnLabel));
     }
 
-    @Override
     public float getFloat(String columnLabel) throws SQLException {
         return getFloat(findColumn(columnLabel));
     }
 
-    @Override
     public double getDouble(String columnLabel) throws SQLException {
         return getDouble(findColumn(columnLabel));
     }
 
-    @Override
     public BigDecimal getBigDecimal(String columnLabel, int scale) throws SQLException {
         return getBigDecimal(findColumn(columnLabel));
     }
 
-    @Override
     public byte[] getBytes(String columnLabel) throws SQLException {
         return new byte[0];
     }
 
-    @Override
     public Date getDate(String columnLabel) throws SQLException {
         return getDate(findColumn(columnLabel));
     }
 
-    @Override
     public Time getTime(String columnLabel) throws SQLException {
         return getTime(findColumn(columnLabel));
     }
 
-    @Override
     public Timestamp getTimestamp(String columnLabel) throws SQLException {
         return getTimestamp(findColumn(columnLabel));
     }
 
-    @Override
     public SQLWarning getWarnings() throws SQLException {
         return null;
     }
 
-    @Override
     public void clearWarnings() throws SQLException {
 
     }
 
-    @Override
     public ResultSetMetaData getMetaData() throws SQLException {
         return new CassandraResultSetMetaData(this);
     }
 
-    @Override
     public Object getObject(int columnIndex) throws SQLException {
         return rows.get(getRow()).getColumnValue(columnIndex - 1);
     }
 
-    @Override
     public Object getObject(String columnLabel) throws SQLException {
         return rows.get(getRow()).getColumnValue(findColumn(columnLabel));
     }
 
-    @Override
     public int findColumn(String columnLabel) throws SQLException {
 
         if (rows.size() > 0) {
@@ -785,64 +736,52 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
     }
 
-    @Override
     public BigDecimal getBigDecimal(int columnIndex) throws SQLException {
         return rows.get(getRow()).getColumnValue(columnIndex - 1);
     }
 
-    @Override
     public BigDecimal getBigDecimal(String columnLabel) throws SQLException {
         return getBigDecimal(findColumn(columnLabel));
     }
 
-    @Override
     public boolean isBeforeFirst() throws SQLException {
         return (-1 == rowId);
     }
 
-    @Override
     public boolean isAfterLast() throws SQLException {
         return (rowId > rows.size());
     }
 
-    @Override
     public boolean isFirst() throws SQLException {
         return (rowId <= 0);
     }
 
-    @Override
     public boolean isLast() throws SQLException {
         return (rowId > rows.size());
     }
 
-    @Override
     public void beforeFirst() throws SQLException {
         rowId = -1;
     }
 
-    @Override
     public void afterLast() throws SQLException {
         rowId = (rows.size() + 1);
     }
 
-    @Override
     public boolean first() throws SQLException {
         rowId = 0;
         return true;
     }
 
-    @Override
     public boolean last() throws SQLException {
         rowId = rows.size();
         return true;
     }
 
-    @Override
     public int getRow() throws SQLException {
         return rowId <= 0 ? 0 : rowId;
     }
 
-    @Override
     public boolean absolute(int row) throws SQLException {
         if (row < rows.size()) {
             rowId = row;
@@ -852,7 +791,6 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
         }
     }
 
-    @Override
     public boolean relative(int rows) throws SQLException {
         if ((rowId + rows) < this.rows.size()) {
             rowId += rows;
@@ -862,7 +800,6 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
         }
     }
 
-    @Override
     public boolean previous() throws SQLException {
 
         if (rowId > 0) {
@@ -873,132 +810,106 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
         }
     }
 
-    @Override
     public void setFetchDirection(int direction) throws SQLException {
 
     }
 
-    @Override
     public int getFetchDirection() throws SQLException {
         return 0;
     }
 
-    @Override
     public void setFetchSize(int rows) throws SQLException {
 
     }
 
-    @Override
     public int getFetchSize() throws SQLException {
         return 0;
     }
 
-    @Override
     public int getType() throws SQLException {
         return 0;
     }
 
-    @Override
     public int getConcurrency() throws SQLException {
         return 0;
     }
 
-    @Override
     public Statement getStatement() throws SQLException {
         return null;
     }
 
-    @Override
     public Blob getBlob(int columnIndex) throws SQLException {
         return null;
     }
 
-    @Override
     public Blob getBlob(String columnLabel) throws SQLException {
         return null;
     }
 
-    @Override
     public Date getDate(int columnIndex, Calendar cal) throws SQLException {
         return rows.get(getRow()).getColumnValue(columnIndex - 1);
     }
 
-    @Override
     public Date getDate(String columnLabel, Calendar cal) throws SQLException {
         return getDate(findColumn(columnLabel));
     }
 
-    @Override
     public Time getTime(int columnIndex, Calendar cal) throws SQLException {
         return rows.get(getRow()).getColumnValue(columnIndex - 1);
     }
 
-    @Override
     public Time getTime(String columnLabel, Calendar cal) throws SQLException {
         return getTime(findColumn(columnLabel));
     }
 
-    @Override
     public Timestamp getTimestamp(int columnIndex, Calendar cal) throws SQLException {
         return rows.get(getRow()).getColumnValue(columnIndex - 1);
     }
 
-    @Override
     public Timestamp getTimestamp(String columnLabel, Calendar cal) throws SQLException {
         return getTimestamp(findColumn(columnLabel));
     }
 
-    @Override
     public URL getURL(int columnIndex) throws SQLException {
         return null;
     }
 
-    @Override
     public URL getURL(String columnLabel) throws SQLException {
         return null;
     }
 
-    @Override
     public RowId getRowId(int columnIndex) throws SQLException {
         return null;
     }
 
-    @Override
     public RowId getRowId(String columnLabel) throws SQLException {
         return new RowId() {
-            @Override
             public byte[] getBytes() {
                 return new byte[rowId];
             }
         };
     }
 
-    @Override
     public int getHoldability() throws SQLException {
         return 0;
     }
 
-    @Override
     public boolean isClosed() throws SQLException {
         return false;
     }
 
-    @Override
     public <T> T getObject(int columnIndex, Class<T> type) throws SQLException {
         return rows.get(getRow()).getColumnValue(columnIndex - 1);
     }
 
-    @Override
     public <T> T getObject(String columnLabel, Class<T> type) throws SQLException {
         return rows.get(getRow()).getColumnValue(findColumn(columnLabel));
     }
 
-    @Override
     public <T> T unwrap(Class<T> iface) throws SQLException {
         return null;
     }
 
-    @Override
     public boolean isWrapperFor(Class<?> iface) throws SQLException {
         return false;
     }
@@ -1024,35 +935,34 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
     }
 
-    private static class PKInfo
-	{
-		public String typeName;
-		public String schema;
-		public String table;
-		public String name;
-		public int type;
-	}
+    private static class PKInfo {
+        public String typeName;
+        public String schema;
+        public String table;
+        public String name;
+        public int type;
+    }
 
     /**
      * Construct the primary keys for the specified schema and table name.
-     * @param statement     Statement to use for the Connection
-     * @param schema        Schema (keyspace) for the primary keys request
-     * @param table         Table (column group) for the keys request.
+     *
+     * @param statement Statement to use for the Connection
+     * @param schema    Schema (keyspace) for the primary keys request
+     * @param table     Table (column group) for the keys request.
      * @return Set of primary keys in standard format.
-     * @throws SQLException  Database error.
+     * @throws SQLException Database error.
      */
-	public static ResultSet makePrimaryKeys(CassandraStatement statement, String schema, String table) throws SQLException
-	{
-		//1.TABLE_CAT String => table catalog (may be null)
-		//2.TABLE_SCHEM String => table schema (may be null)
-		//3.TABLE_NAME String => table name
-		//4.COLUMN_NAME String => column name
-		//5.KEY_SEQ short => sequence number within primary key( a value of 1 represents the first column of the primary key, a value of 2 would represent the second column within the primary key).
-		//6.PK_NAME String => primary key name (may be null)
+    public static ResultSet makePrimaryKeys(CassandraStatement statement, String schema, String table) throws SQLException {
+        //1.TABLE_CAT String => table catalog (may be null)
+        //2.TABLE_SCHEM String => table schema (may be null)
+        //3.TABLE_NAME String => table name
+        //4.COLUMN_NAME String => column name
+        //5.KEY_SEQ short => sequence number within primary key( a value of 1 represents the first column of the primary key, a value of 2 would represent the second column within the primary key).
+        //6.PK_NAME String => primary key name (may be null)
 
-		List<PKInfo> pks = getPrimaryKeys(statement, schema, table);
+        List<PKInfo> pks = getPrimaryKeys(statement, schema, table);
 
-	    String catalog = statement.connection.getCatalog();
+        String catalog = statement.connection.getCatalog();
         CassandraColumn<String> entryCatalog = new CassandraColumn<String>("TABLE_CAT", catalog);
 
         int seq = 0;
@@ -1060,11 +970,10 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
         // resulting metadata
         MetadataResultSets metaResults = new MetadataResultSets();
 
-	    // define the columns
-        for (PKInfo info : pks)
-        {
+        // define the columns
+        for (PKInfo info : pks) {
 
-	        CassandraColumn<String> entrySchema = new CassandraColumn<String>("TABLE_SCHEM", info.schema);
+            CassandraColumn<String> entrySchema = new CassandraColumn<String>("TABLE_SCHEM", info.schema);
             CassandraColumn<String> entryTableName = new CassandraColumn<String>("TABLE_NAME", info.table);
             CassandraColumn<String> entryColumnName = new CassandraColumn<String>("COLUMN_NAME", info.name);
 
@@ -1083,10 +992,10 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet
 
             metaResults.addRow(row);
 
-	    }
+        }
 
         return metaResults;
 
-	}
+    }
 
 }

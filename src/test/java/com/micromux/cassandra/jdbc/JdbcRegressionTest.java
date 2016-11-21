@@ -243,7 +243,7 @@ public class JdbcRegressionTest extends BaseDriverTest
                         break;
                     case 2:
                         assertEquals("Second Column: c", "c", metadata.getColumnName(2));
-                        assertEquals("Second Column Type: text", Types.NVARCHAR, metadata.getColumnType(2));
+                        assertEquals("Second Column Type: text", Types.VARCHAR, metadata.getColumnType(2));
                         break;
                 }
             }

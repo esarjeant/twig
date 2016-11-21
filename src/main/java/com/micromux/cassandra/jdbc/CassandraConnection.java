@@ -188,9 +188,9 @@ class CassandraConnection extends AbstractConnection implements Connection
 
             // request version from session
             Configuration configuration = session.getCluster().getConfiguration();
-            if ((configuration != null) && (configuration.getProtocolOptions() != null) && (configuration.getProtocolOptions().getProtocolVersionEnum() != null)){
+            if ((configuration != null) && (configuration.getProtocolOptions() != null) && (configuration.getProtocolOptions().getProtocolVersion() != null)){
 
-                ProtocolVersion pv = configuration.getProtocolOptions().getProtocolVersionEnum();
+                ProtocolVersion pv = configuration.getProtocolOptions().getProtocolVersion();
 
                 // recompute the CQL major version from the actual...
                 this.majorCqlVersion = pv.toInt();
@@ -222,7 +222,7 @@ class CassandraConnection extends AbstractConnection implements Connection
             {
                 context = getSSLContext(storePath, storePass, storeType);
 
-                return new SSLOptions(context, SSLOptions.DEFAULT_SSL_CIPHER_SUITES);
+                return JdkSSLOptions.builder().withSSLContext(context).build();
 
             }
             catch (UnrecoverableKeyException xk) {
@@ -495,7 +495,6 @@ class CassandraConnection extends AbstractConnection implements Connection
      *         to verify and times out.
      * @throws SQLTimeoutException
      */
-    @Override
     public boolean isValid(int timeout) throws SQLTimeoutException
     {
         return ((session != null) && !session.isClosed());

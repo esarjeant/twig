@@ -103,6 +103,9 @@ data_file_directories:
 # commit log
 commitlog_directory: build/embeddedCassandra/commitlog
 
+# hints directory (C3)
+hints_directory: build/embeddedCassandra/data/hints
+
 # commit log.  when running on magnetic HDD, this should be a
 # separate spindle than the data directories.
 # If not set, the default directory is $CASSANDRA_HOME/data/commitlog.
@@ -400,7 +403,7 @@ native_transport_port: 19042
 # native_transport_max_frame_size_in_mb: 256
 
 # Whether to start the thrift rpc server.
-start_rpc: true
+start_rpc: false
 
 # The address or interface to bind the Thrift RPC service and native transport
 # server to.

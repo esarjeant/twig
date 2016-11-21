@@ -507,7 +507,6 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
      *         single <code>String</code> column that is a table type
      * @exception SQLException if a database access error occurs
      */
-    @Override
     public ResultSet getTableTypes() throws SQLException
     {
         return MetadataResultSets.makeTableTypes(statement);
