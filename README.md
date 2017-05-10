@@ -24,6 +24,15 @@ Minor revisions of the Twig driver do not follow incremental versions from the C
 So 2.1.1 would in fact be the first point release for Twig in the 2.1 series but may not yet be using
 the 2.1.1 DataStax driver.
 
+Release Notes - 3.0.1
+---------------------
+Add support for additional native data-tpes in Cassandra 3.x:
+
+* LocalDate
+* LocalTime
+
+Update conversion logic for LIST, SET and MAP types returning from Cassandra.
+
 Release Notes - 3.0.0
 ---------------------
 First version to provide Cassandra 3.x support. This release also requires JDK 1.7 or later to run.

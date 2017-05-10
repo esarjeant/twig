@@ -22,17 +22,18 @@ package com.micromux.cassandra.jdbc;
 
 import com.datastax.driver.core.ColumnDefinitions;
 import com.datastax.driver.core.DataType;
+import com.datastax.driver.core.LocalDate;
 import com.datastax.driver.core.Row;
+import com.google.common.reflect.TypeToken;
+import org.apache.commons.lang3.StringUtils;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.sql.*;
-import java.util.Calendar;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.logging.Logger;
+import java.sql.Date;
+import java.util.*;
 
 import static com.micromux.cassandra.jdbc.Utils.BAD_FETCH_DIR;
 import static com.micromux.cassandra.jdbc.Utils.BAD_FETCH_SIZE;
@@ -422,7 +423,21 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet {
     public Object getObject(int index) throws SQLException {
         if (hasRow()) {
             wasNull = row.isNull(index - 1);
-            return row.getObject(index - 1);
+
+            if (wasNull) {
+                return null;
+            } else {
+
+                ColumnDefinitions columnDefinitions = row.getColumnDefinitions();
+
+                if (columnDefinitions.getType(index - 1).isCollection()) {
+                    return getString(index);
+                } else {
+                    return row.getObject(index - 1);
+                }
+
+            }
+
         } else {
             throw new SQLDataException("Record Not Found At Index: " + index);
         }
@@ -541,6 +556,9 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet {
                 if (DataType.Name.UUID.equals(dataType.getName())) {
                     return row.getUUID(index - 1).toString();
                 } else if (DataType.Name.TIMESTAMP.equals(dataType.getName())) {
+                    java.util.Date dt = row.getTimestamp(index - 1);
+                    return Utils.toISODateTime(dt);
+                } else if (DataType.Name.DATE.equals(dataType.getName())) {
                     return row.getDate(index - 1).toString();
                 } else if (DataType.Name.BOOLEAN.equals(dataType.getName())) {
                     return Boolean.toString(row.getBool(index - 1));
@@ -556,14 +574,50 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet {
                     return row.getInet(index - 1).toString();
                 } else if (DataType.Name.TIMEUUID.equals(dataType.getName())) {
                     return row.getUUID(index - 1).toString();
-                } else if (DataType.Name.MAP.equals(dataType.getName())) {
-                    Map<Object, Object> map = row.getMap(index - 1, Object.class, Object.class);
-                    StringBuilder sbout = new StringBuilder();
+                } else if (DataType.Name.SET.equals(dataType.getName())) {
 
-                    for (Map.Entry<Object, Object> mapEntry : map.entrySet()) {
-                        sbout.append(mapEntry.getKey()).append("=").append(mapEntry.getValue()).append(",");
+                    List<DataType> typeArguments = dataType.getTypeArguments();
+                    TypeToken typeValue = getTypeToken(typeArguments.get(0));
+
+                    Set set = row.getSet(index - 1, typeValue);
+                    List<String> strMap = new ArrayList<String>(set.size());
+
+                    for (Object value : set) {
+                        strMap.add(String.format("'%s'", value.toString()));
                     }
-                    return sbout.toString();
+
+                    return String.format("[%s]", StringUtils.join(strMap, ","));
+
+                } else if (DataType.Name.LIST.equals(dataType.getName())) {
+
+                    List<DataType> typeArguments = dataType.getTypeArguments();
+                    TypeToken typeValue = getTypeToken(typeArguments.get(0));
+
+                    List list = row.getList(index - 1, typeValue);
+                    List<String> strMap = new ArrayList<String>(list.size());
+
+                    for (Object value : list) {
+                        strMap.add(String.format("'%s'", value.toString()));
+                    }
+
+                    return String.format("[%s]", StringUtils.join(strMap, ","));
+
+                } else if (DataType.Name.MAP.equals(dataType.getName())) {
+
+                    List<DataType> typeArguments = dataType.getTypeArguments();
+                    TypeToken typeKey = getTypeToken(typeArguments.get(0));
+                    TypeToken typeValue = getTypeToken(typeArguments.get(1));
+
+                    Map map = row.getMap(index - 1, typeKey, typeValue);
+                    List<String> strMap = new ArrayList<String>(map.size());
+
+                    for (Object key : map.keySet()) {
+                        Object value = map.get(key);
+                        strMap.add(String.format("'%s'='%s'", key.toString(), value.toString()));
+                    }
+
+                    return String.format("[%s]", StringUtils.join(strMap, ","));
+
                 } else {
                     return row.getString(index - 1);
                 }
@@ -572,6 +626,54 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet {
         } else {
             throw new SQLDataException("Record Not Found At Index: " + index);
         }
+    }
+
+    /**
+     * Convert a DataType to a TypeToken.
+     * @param dataType  Data type to convert.
+     * @return  Type token
+     */
+    private TypeToken getTypeToken(DataType dataType) {
+
+        if (StringUtils.equalsIgnoreCase("bigint", dataType.getName().toString())   ||
+            StringUtils.equalsIgnoreCase("counter", dataType.getName().toString())  ||
+            StringUtils.equalsIgnoreCase("int", dataType.getName().toString())      ||
+            StringUtils.equalsIgnoreCase("varint", dataType.getName().toString())      ||
+            StringUtils.equalsIgnoreCase("smallint", dataType.getName().toString())) {
+            return TypeToken.of(BigInteger.class);
+        }
+
+        if (StringUtils.equalsIgnoreCase("boolean", dataType.getName().toString())) {
+            return TypeToken.of(Boolean.class);
+        }
+
+        if (StringUtils.equalsIgnoreCase("date", dataType.getName().toString())) {
+            return TypeToken.of(LocalDate.class);
+        }
+
+        if (StringUtils.equalsIgnoreCase("decimal", dataType.getName().toString())) {
+            return TypeToken.of(BigDecimal.class);
+        }
+
+        if (StringUtils.equalsIgnoreCase("double", dataType.getName().toString())) {
+            return TypeToken.of(Double.class);
+        }
+
+        if (StringUtils.equalsIgnoreCase("float", dataType.getName().toString())) {
+            return TypeToken.of(Float.class);
+        }
+
+        if (StringUtils.equalsIgnoreCase("timestamp", dataType.getName().toString())) {
+            return TypeToken.of(Date.class);
+        }
+
+        if (StringUtils.equalsIgnoreCase("uuid", dataType.getName().toString()) ||
+                StringUtils.equalsIgnoreCase("timeuuid", dataType.getName().toString())) {
+            return TypeToken.of(UUID.class);
+        }
+
+        return TypeToken.of(String.class);
+
     }
 
     public String getString(String name) throws SQLException {

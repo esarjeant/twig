@@ -3,7 +3,7 @@ apply plugin: 'java'
 description = """Twig JDBC driver for Cassandra/CQL"""
 
 group = 'com.micromux'
-version = '3.0.0-SNAPSHOT'
+version = '3.0.1-SNAPSHOT'
 
 test.outputs.upToDateWhen { false }
 

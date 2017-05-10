@@ -21,17 +21,12 @@
 package com.micromux.cassandra.jdbc;
 
 import com.datastax.driver.core.ConsistencyLevel;
-import com.micromux.cassandra.ConnectionDetails;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URLEncoder;
 import java.sql.*;
 import java.util.HashSet;
 import java.util.Map;
@@ -93,6 +88,23 @@ public class JdbcRegressionTest extends BaseDriverTest
                 + " blobValue blob,"
                 + " blobSetValue set<blob>,"
                 + " dataMapValue map<text,blob>,"
+                + " t_ascii ascii,"
+                + " t_bigint bigint,"
+                + " t_boolean boolean,"
+                + " t_decimal decimal,"
+                + " t_double double,"
+                + " t_float float,"
+                + " t_inet inet,"
+                + " t_int int,"
+                + " t_list_text list<text>,"
+                + " t_list_uuid list<uuid>,"
+                + " t_map map<text,text>,"
+                + " t_set set<text>,"
+                + " t_text text,"
+                + " t_timeuuid timeuuid,"
+                + " t_date date,"
+                + " t_timestamp timestamp,"
+                + " t_datemap map<date,text>"
                 + ") WITH comment = 'datatype TABLE in the Keyspace'"
                 + ";";
         stmt.execute(createCF2);
@@ -576,6 +588,136 @@ public class JdbcRegressionTest extends BaseDriverTest
         assertEquals("There should be 1 record in the map", 1, ((Map)mapResult).size());
         assertNotNull("Entry for '12345' should be in the map", ((Map)mapResult).get("12345"));
         assertNull("Entry for '54321' should NOT be in the map", ((Map)mapResult).get("54321"));
+
+    }
+
+    @Test
+    public void testLocalDate() throws Exception
+    {
+        UUID id = UUID.randomUUID();
+        String insert = "INSERT INTO " + TYPETABLE + " (id,t_date,t_timestamp) " +
+                        " VALUES(" + id.toString() + ", '2015-01-01', '2015-12-31T00:00:00-05:00');";
+
+        PreparedStatement statement = con.prepareStatement(insert);
+        statement.executeUpdate();
+        statement.close();
+
+        Statement select1 = con.createStatement();
+        String query = "SELECT t_date FROM "+TYPETABLE+" WHERE id=" + id.toString() + ";";
+        ResultSet result = select1.executeQuery(query);
+        result.next();
+
+        Object tDate = result.getObject(1);
+        assertNotNull(tDate);
+        //assertEquals(blobValue, blobResult);
+
+        Statement select2 = con.createStatement();
+        String query2 = "SELECT t_timestamp FROM "+TYPETABLE+" WHERE id=" + id.toString() + ";";
+        ResultSet result2 = select2.executeQuery(query2);
+        result2.next();
+
+        Object tTimestamp = result2.getObject(1);
+        assertNotNull(tTimestamp);
+
+    }
+
+    @Test
+    public void testLocalDateMap() throws Exception
+    {
+        UUID id = UUID.randomUUID();
+        String insert = "UPDATE " + TYPETABLE + " SET t_datemap['2011-03-21'] = 'HELLOWORLD' where id = " + id.toString() + ";";
+
+        PreparedStatement statement = con.prepareStatement(insert);
+        statement.executeUpdate();
+        statement.close();
+
+        Statement select1 = con.createStatement();
+        String query = "SELECT t_datemap FROM "+TYPETABLE+" WHERE id=" + id.toString() + ";";
+        ResultSet result = select1.executeQuery(query);
+        result.next();
+
+        Object tDateMap = result.getObject(1);
+        assertNotNull(tDateMap);
+
+        String tDateMapStr = result.getString(1);
+        assertNotNull(tDateMapStr);
+        assertTrue(tDateMapStr.startsWith("['2011-03-21'"));
+        assertTrue(tDateMapStr.endsWith("'HELLOWORLD']"));
+
+    }
+
+    @Test
+    public void testTimestamp() throws Exception
+    {
+        UUID id = UUID.randomUUID();
+        String insert = "INSERT INTO " + TYPETABLE + " (id,t_timestamp) " +
+                " VALUES(" + id.toString() + ", '2015-12-31T00:00:00-05:00');";
+
+        PreparedStatement statement = con.prepareStatement(insert);
+        statement.executeUpdate();
+        statement.close();
+
+        Statement select2 = con.createStatement();
+        String query2 = "SELECT t_timestamp FROM "+TYPETABLE+" WHERE id=" + id.toString() + ";";
+        ResultSet result2 = select2.executeQuery(query2);
+        result2.next();
+
+        Object tTimestamp = result2.getObject(1);
+        assertNotNull(tTimestamp);
+
+        String tTimestampStr = result2.getString(1);
+        assertNotNull(tTimestampStr);
+        assertEquals("2015-12-31T00:00:00-0500", tTimestampStr);
+
+    }
+
+    @Test
+    public void testListString() throws Exception
+    {
+
+        UUID id = UUID.randomUUID();
+        String insert = "UPDATE " + TYPETABLE + " SET t_list_text = ['first in the list', 'second in the list'] where id = " + id.toString() + ";";
+
+        PreparedStatement statement = con.prepareStatement(insert);
+        statement.executeUpdate();
+        statement.close();
+
+        Statement select2 = con.createStatement();
+        String query2 = "SELECT t_list_text FROM "+TYPETABLE+" WHERE id=" + id.toString() + ";";
+        ResultSet result2 = select2.executeQuery(query2);
+        result2.next();
+
+        Object tList = result2.getObject(1);
+        assertNotNull(tList);
+
+        assertTrue(tList instanceof String);
+        assertTrue(((String)tList).contains("first in the list"));
+        assertTrue(((String)tList).contains("second in the list"));
+
+    }
+
+    @Test
+    public void testListUUID() throws Exception
+    {
+
+        UUID id = UUID.randomUUID();
+        String insert = "UPDATE " + TYPETABLE + " SET t_list_uuid = [c44a0a36-349d-475b-9980-b2534e750ef8, e2c68903-2beb-40ba-a915-604d7c8f5fb6] where id = " + id.toString() + ";";
+
+        PreparedStatement statement = con.prepareStatement(insert);
+        statement.executeUpdate();
+        statement.close();
+
+        Statement select2 = con.createStatement();
+        String query2 = "SELECT t_list_uuid FROM "+TYPETABLE+" WHERE id=" + id.toString() + ";";
+        ResultSet result2 = select2.executeQuery(query2);
+        result2.next();
+
+        Object tList = result2.getObject(1);
+        assertNotNull(tList);
+
+        assertTrue(tList instanceof String);
+        assertTrue(((String)tList).contains("first in the list"));
+        assertTrue(((String)tList).contains("second in the list"));
 
     }
 

@@ -28,6 +28,8 @@ import java.net.URLDecoder;
 import java.sql.SQLException;
 import java.sql.SQLNonTransientConnectionException;
 import java.sql.SQLSyntaxErrorException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -108,6 +110,8 @@ class Utils
     protected static final String FORWARD_ONLY = "Can not position cursor with a type of TYPE_FORWARD_ONLY";
 
     protected static final Logger logger = Logger.getLogger(Utils.class.getPackage().getName());
+
+    protected static final String ISO_DATETIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ssZ";
 
     /**
      * Parse a URL for the Cassandra JDBC Driver
@@ -290,5 +294,15 @@ class Utils
      */
     public static Logger getLogger() {
         return logger;
+    }
+
+    public static String toISODateTime(Date dt) {
+        SimpleDateFormat sdf = new SimpleDateFormat(ISO_DATETIME_FORMAT);
+
+        try {
+            return (dt != null) ? sdf.format(dt) : null;
+        } catch (Exception ex) {
+            return null;
+        }
     }
 }
