@@ -28,10 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.*;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 import static junit.framework.Assert.assertNull;
 import static org.junit.Assert.assertEquals;
@@ -479,7 +476,7 @@ public class JdbcRegressionTest extends BaseDriverTest
 
         // try reading Timestamp as an object
         stamp = result.getObject(2, Timestamp.class);
-        assertEquals(now, stamp);
+        assertEquals(now.getTime(), stamp.getTime());
 
         System.out.println(resultToDisplay(result,74, "current date"));
        
@@ -641,8 +638,12 @@ public class JdbcRegressionTest extends BaseDriverTest
 
         String tDateMapStr = result.getString(1);
         assertNotNull(tDateMapStr);
-        assertTrue(tDateMapStr.startsWith("['2011-03-21'"));
-        assertTrue(tDateMapStr.endsWith("'HELLOWORLD']"));
+        assertTrue(tDateMap instanceof Map);
+        assertEquals(((Map)tDateMap).size(), 1);
+
+        java.sql.Date dtSqlKey = new java.sql.Date(1300665600000L);
+        assertTrue(((Map)tDateMap).containsKey(dtSqlKey));
+        assertTrue(((Map)tDateMap).containsValue("HELLOWORLD"));
 
     }
 
@@ -690,9 +691,9 @@ public class JdbcRegressionTest extends BaseDriverTest
         Object tList = result2.getObject(1);
         assertNotNull(tList);
 
-        assertTrue(tList instanceof String);
-        assertTrue(((String)tList).contains("first in the list"));
-        assertTrue(((String)tList).contains("second in the list"));
+        assertTrue(tList instanceof List);
+        assertTrue(((List)tList).contains("first in the list"));
+        assertTrue(((List)tList).contains("second in the list"));
 
     }
 
@@ -715,9 +716,10 @@ public class JdbcRegressionTest extends BaseDriverTest
         Object tList = result2.getObject(1);
         assertNotNull(tList);
 
-        assertTrue(tList instanceof String);
-        assertTrue(((String)tList).contains("first in the list"));
-        assertTrue(((String)tList).contains("second in the list"));
+        assertTrue(tList instanceof List);
+        assertEquals(2, ((List)tList).size());
+        assertTrue(((List)tList).contains(UUID.fromString("c44a0a36-349d-475b-9980-b2534e750ef8")));
+        assertTrue(((List)tList).contains(UUID.fromString("e2c68903-2beb-40ba-a915-604d7c8f5fb6")));
 
     }
 

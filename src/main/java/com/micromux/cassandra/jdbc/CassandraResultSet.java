@@ -324,10 +324,10 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet {
 
     public Date getDate(int index) throws SQLException {
         if (hasRow()) {
-            java.util.Date val = row.getTimestamp(index - 1);
+            LocalDate val = row.getDate(index - 1);
             wasNull = row.isNull(index - 1) || (null == val);
 
-            return wasNull ? null : new java.sql.Date(val.getTime());
+            return wasNull ? null : new java.sql.Date(val.getMillisSinceEpoch());
 
         } else {
             throw new SQLDataException("Record Not Found At Index: " + index);
@@ -429,9 +429,15 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet {
             } else {
 
                 ColumnDefinitions columnDefinitions = row.getColumnDefinitions();
+                DataType dataType = row.getColumnDefinitions().getType(index - 1);
 
                 if (columnDefinitions.getType(index - 1).isCollection()) {
-                    return getString(index);
+                    return getObjectCollection(index);
+                } else if (DataType.Name.TIMESTAMP.equals(dataType.getName())) {
+                    return row.getTimestamp(index - 1);
+                } else if (DataType.Name.DATE.equals(dataType.getName())) {
+                    LocalDate date = row.getDate(index - 1);
+                    return new java.util.Date(date.getMillisSinceEpoch());
                 } else {
                     return row.getObject(index - 1);
                 }
@@ -441,6 +447,86 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet {
         } else {
             throw new SQLDataException("Record Not Found At Index: " + index);
         }
+    }
+
+    private Object getObjectCollection(int index) {
+
+        DataType dataType = row.getColumnDefinitions().getType(index - 1);
+
+        if (DataType.Name.SET.equals(dataType.getName())) {
+
+            List<DataType> typeArguments = dataType.getTypeArguments();
+            Set objSet = new LinkedHashSet();
+
+            if (typeArguments.size() > 0) {
+
+                DataType typeValue = typeArguments.get(0);
+
+                Set set = row.getSet(index - 1, getTypeToken(typeValue));
+
+                for (Object value : set) {
+                    objSet.add(getObjectValue(typeValue, value));
+                }
+            }
+
+            return objSet;
+
+        } else if (DataType.Name.LIST.equals(dataType.getName())) {
+
+            List<DataType> typeArguments = dataType.getTypeArguments();
+            List objList = new ArrayList();
+
+            if (typeArguments.size() > 0) {
+                DataType typeValue = typeArguments.get(0);
+
+                List list = row.getList(index - 1, getTypeToken(typeValue));
+
+                for (Object value : list) {
+                    objList.add(getObjectValue(typeValue, value));
+                }
+            }
+
+            return objList;
+
+        } else if (DataType.Name.MAP.equals(dataType.getName())) {
+
+            List<DataType> typeArguments = dataType.getTypeArguments();
+            Map objMap = new HashMap();
+
+            if (typeArguments.size() > 1) {
+                DataType typeKey = typeArguments.get(0);
+                DataType typeValue = typeArguments.get(1);
+
+                Map map = row.getMap(index - 1, getTypeToken(typeKey), getTypeToken(typeValue));
+
+                for (Object key : map.keySet()) {
+                    Object value = map.get(key);
+                    objMap.put(getObjectValue(typeKey, key), getObjectValue(typeValue, value));
+                }
+            }
+
+            return objMap;
+
+        }
+
+        return null;
+
+    }
+
+    /**
+     * Convert native Cassandra type to a serializable Java object.
+     * @param dataType    Type to convert.
+     * @param value       Value for the conversion.
+     * @return Resulting Object as the converted to a native Java type.
+     */
+    private Object getObjectValue(DataType dataType, Object value) {
+
+        if (DataType.Name.DATE.equals(dataType.getName())) {
+            return new Date(((LocalDate)value).getMillisSinceEpoch());
+        } else {
+            return value;
+        }
+
     }
 
     public Object getObject(String name) throws SQLException {
@@ -479,9 +565,7 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet {
             long millis = date.getTime();
             return (T) (new java.sql.Time(millis));
         } else if (type == java.sql.Timestamp.class) {
-            Date date = getDate(columnIndex);
-            long millis = date.getTime();
-            return (T) (new java.sql.Timestamp(millis));
+            return (T)getTimestamp(columnIndex);
         } else {
             return (T) getObject(columnIndex);
         }
@@ -586,7 +670,7 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet {
                         strMap.add(String.format("'%s'", value.toString()));
                     }
 
-                    return String.format("[%s]", StringUtils.join(strMap, ","));
+                    return String.format("{%s}", StringUtils.join(strMap, ","));
 
                 } else if (DataType.Name.LIST.equals(dataType.getName())) {
 
@@ -613,10 +697,10 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet {
 
                     for (Object key : map.keySet()) {
                         Object value = map.get(key);
-                        strMap.add(String.format("'%s'='%s'", key.toString(), value.toString()));
+                        strMap.add(String.format("'%s': '%s'", key.toString(), value.toString()));
                     }
 
-                    return String.format("[%s]", StringUtils.join(strMap, ","));
+                    return String.format("{%s}", StringUtils.join(strMap, ","));
 
                 } else {
                     return row.getString(index - 1);
@@ -635,12 +719,15 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet {
      */
     private TypeToken getTypeToken(DataType dataType) {
 
-        if (StringUtils.equalsIgnoreCase("bigint", dataType.getName().toString())   ||
-            StringUtils.equalsIgnoreCase("counter", dataType.getName().toString())  ||
+        if (StringUtils.equalsIgnoreCase("counter", dataType.getName().toString())  ||
             StringUtils.equalsIgnoreCase("int", dataType.getName().toString())      ||
-            StringUtils.equalsIgnoreCase("varint", dataType.getName().toString())      ||
             StringUtils.equalsIgnoreCase("smallint", dataType.getName().toString())) {
-            return TypeToken.of(BigInteger.class);
+            return TypeToken.of(Integer.class);
+        }
+
+        if (StringUtils.equalsIgnoreCase("bigint", dataType.getName().toString()) ||
+            StringUtils.equalsIgnoreCase("varint", dataType.getName().toString())) {
+            return TypeToken.of(Long.class);
         }
 
         if (StringUtils.equalsIgnoreCase("boolean", dataType.getName().toString())) {
@@ -664,12 +751,16 @@ class CassandraResultSet extends AbstractResultSet implements ResultSet {
         }
 
         if (StringUtils.equalsIgnoreCase("timestamp", dataType.getName().toString())) {
-            return TypeToken.of(Date.class);
+            return TypeToken.of(java.util.Date.class);
         }
 
         if (StringUtils.equalsIgnoreCase("uuid", dataType.getName().toString()) ||
                 StringUtils.equalsIgnoreCase("timeuuid", dataType.getName().toString())) {
             return TypeToken.of(UUID.class);
+        }
+
+        if (StringUtils.equalsIgnoreCase("blob", dataType.getName().toString())) {
+            return TypeToken.of(ByteBuffer.class);
         }
 
         return TypeToken.of(String.class);
