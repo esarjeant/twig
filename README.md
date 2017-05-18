@@ -26,12 +26,13 @@ the 2.1.1 DataStax driver.
 
 Release Notes - 3.0.1
 ---------------------
-Add support for additional native data-tpes in Cassandra 3.x:
+Add support for additional native data-types in Cassandra 3.x:
 
 * LocalDate
 * LocalTime
 
-Update conversion logic for LIST, SET and MAP types returning from Cassandra.
+Update conversion logic for LIST, SET and MAP types returning from Cassandra. Clarify unit tests surrounding
+these data-types. 
 
 Release Notes - 3.0.0
 ---------------------
