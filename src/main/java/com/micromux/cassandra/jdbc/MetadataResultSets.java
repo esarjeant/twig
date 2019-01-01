@@ -20,21 +20,25 @@
  */
 package com.micromux.cassandra.jdbc;
 
+import com.datastax.driver.core.*;
 import com.micromux.cassandra.jdbc.meta.CassandraColumn;
 import com.micromux.cassandra.jdbc.meta.CassandraResultSetMetaData;
 import com.micromux.cassandra.jdbc.meta.CassandraRow;
+import org.apache.commons.lang3.StringUtils;
 
 import java.math.BigDecimal;
 import java.net.URL;
 import java.nio.charset.CharacterCodingException;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.List;
-import java.util.Map;
+import java.sql.Date;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.*;
 
 public class MetadataResultSets extends AbstractResultSet implements ResultSet {
+
     static final String TABLE_CONSTANT = "TABLE";
+    static final String VIEW_CONSTANT = "VIEW";
 
     // array backed results - navigate using rowId
     private final List<CassandraRow> rows = new ArrayList<CassandraRow>();
@@ -76,17 +80,14 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet {
      * @throws SQLException Fatal database error.
      */
     public static ResultSet makeTableTypes(CassandraStatement statement) throws SQLException {
-        //final  Entry[][] tableTypes = { { new Entry("TABLE_TYPE",bytes(TABLE_CONSTANT),Entry.ASCII_TYPE)} };
 
-        // use tableTypes with the key in column number 1 (one based)
-        // CassandraResultSet result =  makeCqlResult(tableTypes, 1);
+        final MetadataResultSets metaResults = new MetadataResultSets();
 
-        MetadataResultSets metaResults = new MetadataResultSets();
+        CassandraColumn<String> tableTypeCol = new CassandraColumn<>("TABLE_TYPE", TABLE_CONSTANT);
+        metaResults.addRow(new CassandraRow(tableTypeCol));
 
-        CassandraColumn<String> tableTypeCol = new CassandraColumn<String>("TABLE_TYPE", TABLE_CONSTANT);
-        CassandraRow row = new CassandraRow(tableTypeCol);
-
-        metaResults.addRow(row);
+        CassandraColumn<String> viewTypeCol = new CassandraColumn<>("VIEW_TYPE", VIEW_CONSTANT);
+        metaResults.addRow(new CassandraRow(viewTypeCol));
 
         return metaResults;
 
@@ -115,33 +116,31 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet {
      * <LI><B>TABLE_CATALOG</B> String {@code =>} catalog name (may be <code>null</code>)
      * </OL>
      *
+     * @param statement     Statement to base schema query
+     * @param schemaPattern Pattern to apply which may include SQL wildcarding; use {@code null} for open match.
      * @return a <code>ResultSet</code> object in which each row is a
      * schema description
      * @throws SQLException if a database access error occurs
      */
-    public static ResultSet makeSchemas(CassandraStatement statement, String schemaPattern) throws SQLException {
-        if ("%".equals(schemaPattern)) schemaPattern = null;
+    public static ResultSet makeSchemas(final CassandraStatement statement,
+                                        final String schemaPattern) throws SQLException {
 
-        // TABLE_SCHEM String => schema name
+        final Cluster cluster = statement.connection.getCluster();
+        final MetadataResultSets metaResult = new MetadataResultSets();
+
         // TABLE_CATALOG String => catalog name (may be null)
+        // TABLE_SCHEM String => schema name
+        for (KeyspaceMetadata keyspace : cluster.getMetadata().getKeyspaces()) {
 
-        String query = "SELECT keyspace_name FROM system_schema.keyspaces";
-        if (schemaPattern != null) query = query + " where keyspace_name = '" + schemaPattern + "'";
+            if (hasPatternMatch(keyspace.getName(), schemaPattern)) {
 
-        String catalog = statement.connection.getCatalog();
-        CassandraColumn<String> entryCatalog = new CassandraColumn<String>("TABLE_CATALOG", catalog);
+                CassandraColumn<String> entryCatalog = new CassandraColumn<>("TABLE_CATALOG", cluster.getClusterName());
+                CassandraColumn<String> entrySchema = new CassandraColumn<>("TABLE_SCHEM", keyspace.getName());
 
-        // determine the schemas
-        CassandraResultSet result = (CassandraResultSet) statement.executeQuery(query);
+                CassandraRow row = new CassandraRow(entrySchema, entryCatalog);
+                metaResult.addRow(row);
 
-        // create meta resultset
-        MetadataResultSets metaResult = new MetadataResultSets();
-
-        while (result.next()) {
-            CassandraColumn<String> entrySchema = new CassandraColumn<String>("TABLE_SCHEM", result.getString(1));
-
-            CassandraRow row = new CassandraRow(entrySchema, entryCatalog);
-            metaResult.addRow(row);
+            }
 
         }
 
@@ -151,15 +150,21 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet {
 
     /**
      * Query the list of available tables in the schema. This translates to column groups in Cassandra.
-     * This must match for the format expected by JDBC.
+     * This must match for the format expected by JDBC. Note the pattern values may specify SQL wildcard
+     * patterns such as "%".
      *
      * @param statement        Statement to use for query. This identifies the session to be used to execute CQL.
      * @param schemaPattern    Pattern to match on; this may be {@code null}.
      * @param tableNamePattern Pattern to match on; this may be {@code null}.
+     * @param typeSet          Set of types to query (TABLE | VIEW)
      * @return Navigable resultset that can be used to review the results of the table query.
      * @throws SQLException Fatal database error.
      */
-    public static ResultSet makeTables(CassandraStatement statement, String schemaPattern, String tableNamePattern) throws SQLException {
+    public static ResultSet makeTables(final CassandraStatement statement,
+                                       final String schemaPattern,
+                                       final String tableNamePattern,
+                                       final Set<String> typeSet) throws SQLException {
+
         //   1.   TABLE_CAT String => table catalog (may be null)
         //   2.   TABLE_SCHEM String => table schema (may be null)
         //   3.   TABLE_NAME String => table name
@@ -171,82 +176,105 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet {
         //   9.   SELF_REFERENCING_COL_NAME String => name of the designated "identifier" column of a typed table (may be null)
         //   10.  REF_GENERATION String => specifies how values in SELF_REFERENCING_COL_NAME are created. Values are "SYSTEM", "USER", "DERIVED". (may be null)        
 
-        if ("%".equals(schemaPattern)) schemaPattern = null;
-        if ("%".equals(tableNamePattern)) tableNamePattern = null;
-
-        // example query to retrieve tables
-        // SELECT keyspace_name,columnfamily_name,comment from schema_columnfamilies WHERE columnfamily_name = 'Test2';
-        StringBuilder query = new StringBuilder("SELECT keyspace_name,table_name,comment FROM system_schema.tables");
-
-        int filterCount = 0;
-        if (schemaPattern != null) filterCount++;
-        if (tableNamePattern != null) filterCount++;
-
-        // check to see if it is qualified
-        if (filterCount > 0) {
-            String expr = "%s = '%s'";
-            query.append(" WHERE ");
-            if (schemaPattern != null) {
-                query.append(String.format(expr, "keyspace_name", schemaPattern));
-                filterCount--;
-                if (filterCount > 0) query.append(" AND ");
-            }
-            if (tableNamePattern != null) query.append(String.format(expr, "table_name", tableNamePattern));
-            query.append(" ALLOW FILTERING");
-        }
-
-        String catalog = statement.connection.getCatalog();
-        CassandraColumn<String> entryCatalog = new CassandraColumn<String>("TABLE_CAT", catalog);
-        CassandraColumn<String> entryTableType = new CassandraColumn<String>("TABLE_TYPE", TABLE_CONSTANT);
-        CassandraColumn<String> entryTypeCatalog = new CassandraColumn<String>("TYPE_CAT", "");
-        CassandraColumn<String> entryTypeSchema = new CassandraColumn<String>("TYPE_SCHEM", "");
-        CassandraColumn<String> entryTypeName = new CassandraColumn<String>("TYPE_NAME", "");
-        CassandraColumn<String> entrySRCN = new CassandraColumn<String>("SELF_REFERENCING_COL_NAME", "");
-        CassandraColumn<String> entryRefGeneration = new CassandraColumn<String>("REF_GENERATION", "");
-
-        // determine the schemas
-        CassandraResultSet result = (CassandraResultSet) statement.executeQuery(query.toString());
-
         // create returned resultset
-        MetadataResultSets metaResults = new MetadataResultSets();
+        final MetadataResultSets metaResults = new MetadataResultSets();
 
-        while (result.next()) {
-            CassandraColumn<String> entrySchema = new CassandraColumn<String>("TABLE_SCHEM", result.getString(1));
-            CassandraColumn<String> entryTableName = new CassandraColumn<String>("TABLE_NAME",
-                    (result.getString(2) == null) ? "" : result.getString(2));
-            CassandraColumn<String> entryRemarks = new CassandraColumn<String>("REMARKS",
-                    (result.getString(3) == null) ? "" : result.getString(3));
+        final Cluster cluster = statement.connection.getCluster();
+        Metadata metadata = cluster.getMetadata();
 
-            CassandraRow row = new CassandraRow(entryCatalog,
-                    entrySchema,
-                    entryTableName,
-                    entryTableType,
-                    entryRemarks,
-                    entryTypeCatalog,
-                    entryTypeSchema,
-                    entryTypeName,
-                    entrySRCN,
-                    entryRefGeneration);
+        // enumerate all keyspaces
+        for (KeyspaceMetadata keyspace : metadata.getKeyspaces()) {
 
-            metaResults.addRow(row);
+            // accept this schema (keyspace) if it matches the pattern
+            if (hasPatternMatch(keyspace.getName(), schemaPattern)) {
 
+                // now look for tables and/or views to accept
+                if (null == typeSet || typeSet.isEmpty() || typeSet.contains(TABLE_CONSTANT)) {
+                    for (TableMetadata table : keyspace.getTables()) {
+
+                        if (hasPatternMatch(table.getName(), tableNamePattern)) {
+
+                            CassandraRow row = createCassandraRow(keyspace,
+                                    TABLE_CONSTANT,
+                                    table.getName(),
+                                    (null == table.getOptions()) ? "" : table.getOptions().getComment());
+
+                            metaResults.addRow(row);
+
+                        }
+                    }
+                }
+
+                if (null == typeSet || typeSet.isEmpty() || typeSet.contains(VIEW_CONSTANT)) {
+                    for (MaterializedViewMetadata view : keyspace.getMaterializedViews()) {
+
+                        if (hasPatternMatch(view.getName(), tableNamePattern)) {
+
+                            CassandraRow row = createCassandraRow(keyspace,
+                                    VIEW_CONSTANT,
+                                    view.getName(),
+                                    (null == view.getOptions()) ? "" : view.getOptions().getComment());
+
+                            metaResults.addRow(row);
+                        }
+                    }
+                }
+
+            }
         }
 
         return metaResults;
 
     }
 
+    private static CassandraRow createCassandraRow(final KeyspaceMetadata keyspace,
+                                                   final String tableType,
+                                                   final String tableName,
+                                                   final String tableComments) {
+
+        CassandraColumn<String> entryCatalog = new CassandraColumn<>("TABLE_CAT", keyspace.getName());
+        CassandraColumn<String> entryTypeCatalog = new CassandraColumn<>("TYPE_CAT", "");
+        CassandraColumn<String> entryTypeSchema = new CassandraColumn<>("TYPE_SCHEM", "");
+        CassandraColumn<String> entryTypeName = new CassandraColumn<>("TYPE_NAME", "");
+        CassandraColumn<String> entrySRCN = new CassandraColumn<>("SELF_REFERENCING_COL_NAME", "");
+        CassandraColumn<String> entryRefGeneration = new CassandraColumn<>("REF_GENERATION", "");
+        CassandraColumn<String> entryTableType = new CassandraColumn<>("TABLE_TYPE", tableType);
+        CassandraColumn<String> entrySchema = new CassandraColumn<>("TABLE_SCHEM", keyspace.getName());
+        CassandraColumn<String> entryTableName = new CassandraColumn<>("TABLE_NAME", tableName);
+        CassandraColumn<String> entryRemarks = new CassandraColumn<>("REMARKS", tableComments);
+
+        return new CassandraRow(entryCatalog,
+                entrySchema,
+                entryTableName,
+                entryTableType,
+                entryRemarks,
+                entryTypeCatalog,
+                entryTypeSchema,
+                entryTypeName,
+                entrySRCN,
+                entryRefGeneration);
+
+    }
+
     /**
-     * Query the column schema for the specified table name pattern.
+     * Query the column schema for the specified table name pattern. Note that values specified on the pattern
+     * match may include SQL wildcard symbols such as "%" which need to be interpreted.
      *
-     * @param statement         Valid statement with Connection.
-     * @param schemaPattern     Optional schema pattern or {@code null}
-     * @param tableNamePattern  Optional table name pattern or {@code null} for all.
-     * @param columnNamePattern Optional column name pattern or {@code null} for all.
+     * @param statement             Valid statement with Connection.
+     * @param keyspaceNamePattern   Optional schema pattern or {@code null}
+     * @param tableNamePattern      Optional table name pattern or {@code null} for all.
+     * @param columnNamePattern     Optional column name pattern or {@code null} for all.
      * @return Results with column information.
      * @throws SQLException
      */
-    public static ResultSet makeColumns(CassandraStatement statement, String schemaPattern, String tableNamePattern, String columnNamePattern) throws SQLException, CharacterCodingException {
+    public static ResultSet makeColumns(final CassandraStatement statement,
+                                        final String keyspaceNamePattern,
+                                        final String tableNamePattern,
+                                        final String columnNamePattern) throws SQLException, CharacterCodingException {
+
+        // create the resultsets that will return...
+        final MetadataResultSets metaResults = new MetadataResultSets();
+
         // 1.TABLE_CAT String => table catalog (may be null)
         // 2.TABLE_SCHEM String => table schema (may be null)
         // 3.TABLE_NAME String => table name
@@ -285,115 +313,18 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet {
         // - NO --- if this not a generated column
         // - empty string --- if it cannot be determined whether this is a generated column
 
-        if ("%".equals(schemaPattern)) schemaPattern = null;
-        if ("%".equals(tableNamePattern)) tableNamePattern = null;
-        if ("%".equals(columnNamePattern)) columnNamePattern = null;
+        final Cluster cluster = statement.connection.getCluster();
 
-        StringBuilder query = new StringBuilder("SELECT keyspace_name, table_name, column_name, type FROM system_schema.columns");
+        for (KeyspaceMetadata keyspace : cluster.getMetadata().getKeyspaces()) {
 
-
-        int filterCount = 0;
-        if (schemaPattern != null) filterCount++;
-        if (tableNamePattern != null) filterCount++;
-        if (columnNamePattern != null) filterCount++;
-
-        // check to see if it is qualified
-        if (filterCount > 0) {
-            String expr = "%s = '%s'";
-            query.append(" WHERE ");
-            if (schemaPattern != null) {
-                query.append(String.format(expr, "keyspace_name", schemaPattern));
-                filterCount--;
-                if (filterCount > 0) query.append(" AND ");
+            // find matching table structures
+            for (TableMetadata table : findTableMetaData(keyspace, keyspaceNamePattern, tableNamePattern)) {
+                appendCassandraRow(metaResults, cluster, table, columnNamePattern);
             }
-            if (tableNamePattern != null) {
-                query.append(String.format(expr, "table_name", tableNamePattern));
-                filterCount--;
-                if (filterCount > 0) query.append(" AND ");
-            }
-            if (columnNamePattern != null) query.append(String.format(expr, "column_name", columnNamePattern));
-            query.append(" ALLOW FILTERING");
-        }
 
-        String catalog = statement.connection.getCatalog();
-        CassandraColumn<String> entryCatalog = new CassandraColumn<String>("TABLE_CAT", catalog);
-        CassandraColumn<Integer> entryBufferLength = new CassandraColumn<Integer>("BUFFER_LENGTH", 0);
-        CassandraColumn<String> entryRemarks = new CassandraColumn<String>("REMARKS", "");
-        CassandraColumn<String> entryColumnDef = new CassandraColumn<String>("COLUMN_DEF", "");
-        CassandraColumn<String> entrySQLDataType = new CassandraColumn<String>("SQL_DATA_TYPE", "");
-        CassandraColumn<Integer> entrySQLDateTimeSub = new CassandraColumn<Integer>("SQL_DATETIME_SUB", 0);
-        CassandraColumn<String> entryScopeCatalog = new CassandraColumn<String>("SCOPE_CATLOG", "");
-        CassandraColumn<String> entryScopeSchema = new CassandraColumn<String>("SCOPE_SCHEMA", "");
-        CassandraColumn<String> entryScopeTable = new CassandraColumn<String>("SCOPE_TABLE", "");
-        CassandraColumn<Integer> entrySOURCEDT = new CassandraColumn<Integer>("SOURCE_DATA_TYPE", 0);
-        CassandraColumn<String> entryISAutoIncrement = new CassandraColumn<String>("IS_AUTOINCREMENT", "NO");
-        CassandraColumn<String> entryISGeneratedColumn = new CassandraColumn<String>("IS_GENERATEDCOLUMN", "NO");
-
-        int ordinalPosition = 0;
-
-        // define the PK columns
-        List<PKInfo> pks = getPrimaryKeys(statement, schemaPattern, tableNamePattern);
-
-        // create the resultsets that will return...
-        MetadataResultSets metaResults = new MetadataResultSets();
-
-        // define the columns
-        CassandraResultSet result = (CassandraResultSet) statement.executeQuery(query.toString());
-        while (result.next()) {
-            CassandraColumn<String> entrySchema = new CassandraColumn<String>("TABLE_SCHEM", result.getString(1));
-            CassandraColumn<String> entryTableName = new CassandraColumn<String>("TABLE_NAME",
-                    (result.getString(2) == null) ? "" : result.getString(2));
-            CassandraColumn<String> entryColumnName = new CassandraColumn<String>("COLUMN_NAME",
-                    (result.getString(3) == null) ? "" : result.getString(3));
-
-            String validator = result.getString(4);
-            CassandraValidatorType validatorType = CassandraValidatorType.fromValidator(validator);
-
-            CassandraColumn<Integer> entryDataType = new CassandraColumn<Integer>("DATA_TYPE", validatorType.getSqlType());
-            CassandraColumn<String> entryTypeName = new CassandraColumn<String>("TYPE_NAME", validatorType.getSqlDisplayName());
-
-            CassandraColumn<Integer> entryColumnSize = new CassandraColumn<Integer>("COLUMN_SIZE", validatorType.getSqlWidth());
-            CassandraColumn<Integer> entryDecimalDigits = new CassandraColumn<Integer>("DECIMAL_DIGITS", 0x00);
-            CassandraColumn<Integer> entryNPR = new CassandraColumn<Integer>("NUM_PREC_RADIX", validatorType.getSqlRadix());
-            CassandraColumn<Integer> entryCharOctetLength = new CassandraColumn<Integer>("CHAR_OCTET_LENGTH", validatorType.getSqlLength());
-
-            ordinalPosition++;
-            CassandraColumn<Integer> entryOrdinalPosition = new CassandraColumn<Integer>("ORDINAL_POSITION", ordinalPosition);
-            CassandraColumn<Integer> entryNullable = new CassandraColumn<Integer>("NULLABLE", DatabaseMetaData.columnNullable);
-            CassandraColumn<String> entryISNullable = new CassandraColumn<String>("IS_NULLABLE", "YES");
-
-            CassandraRow row = new CassandraRow(
-                    entryCatalog,
-                    entrySchema,
-                    entryTableName,
-                    entryColumnName,
-                    entryDataType,
-                    entryTypeName,
-                    entryColumnSize,
-                    entryBufferLength,
-                    entryDecimalDigits,
-                    entryNPR,
-                    entryNullable,
-                    entryRemarks,
-                    entryColumnDef,
-                    entrySQLDataType,
-                    entrySQLDateTimeSub,
-                    entryCharOctetLength,
-                    entryOrdinalPosition,
-                    entryISNullable,
-                    entryScopeCatalog,
-                    entryScopeSchema,
-                    entryScopeTable,
-                    entrySOURCEDT,
-                    entryISAutoIncrement,
-                    entryISGeneratedColumn
-            );
-
-            // determine if this is a pkey
-            if (isPrimaryKeyColumn(pks, entryColumnName)) {
-                metaResults.addFirst(row);
-            } else {
-                metaResults.addRow(row);
+            // find matching view structures
+            for (MaterializedViewMetadata view : findViewMetaData(keyspace, keyspaceNamePattern, tableNamePattern)) {
+                appendCassandraRow(metaResults, cluster, view, columnNamePattern);
             }
 
         }
@@ -402,15 +333,161 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet {
 
     }
 
-    private static boolean isPrimaryKeyColumn(List<PKInfo> pks, CassandraColumn<String> entryColumnName) {
+    private static void appendCassandraRow(final MetadataResultSets metaResults,
+                                           final Cluster cluster,
+                                           final AbstractTableMetadata table,
+                                           final String columnNamePattern) {
 
-        for (PKInfo i : pks) {
-            if (entryColumnName.getValue().equalsIgnoreCase(i.name)) {
-                return true;
-            }
+        // identify primary key columns
+        final List<String> pks = new LinkedList<>();
+
+        for (ColumnMetadata pk : table.getPrimaryKey()) {
+            pks.add(pk.getName());
         }
 
-        return false;
+        // construct non-varient meta-data results
+        CassandraColumn<String> entryCatalog = new CassandraColumn<>("TABLE_CAT", cluster.getClusterName());
+
+        CassandraColumn<Integer> entryBufferLength = new CassandraColumn<>("BUFFER_LENGTH", 0);
+        CassandraColumn<String> entryRemarks = new CassandraColumn<>("REMARKS", "");
+        CassandraColumn<String> entryColumnDef = new CassandraColumn<>("COLUMN_DEF", "");
+        CassandraColumn<String> entrySQLDataType = new CassandraColumn<>("SQL_DATA_TYPE", "");
+        CassandraColumn<Integer> entrySQLDateTimeSub = new CassandraColumn<>("SQL_DATETIME_SUB", 0);
+        CassandraColumn<String> entryScopeCatalog = new CassandraColumn<>("SCOPE_CATLOG", "");
+        CassandraColumn<String> entryScopeSchema = new CassandraColumn<>("SCOPE_SCHEMA", "");
+        CassandraColumn<String> entryScopeTable = new CassandraColumn<>("SCOPE_TABLE", "");
+        CassandraColumn<Integer> entrySOURCEDT = new CassandraColumn<>("SOURCE_DATA_TYPE", 0);
+        CassandraColumn<String> entryISAutoIncrement = new CassandraColumn<>("IS_AUTOINCREMENT", "NO");
+        CassandraColumn<String> entryISGeneratedColumn = new CassandraColumn<>("IS_GENERATEDCOLUMN", "NO");
+
+        int ordinalPosition = 1;
+
+        // enumerate available columns and build SQL meta-data
+        for (ColumnMetadata column : table.getColumns()) {
+
+            if (hasPatternMatch(column.getName(), columnNamePattern)) {
+
+                CassandraColumn<String> entrySchema = new CassandraColumn<>("TABLE_SCHEM", table.getKeyspace().getName());
+                CassandraColumn<String> entryTableName = new CassandraColumn<>("TABLE_NAME", table.getName());
+                CassandraColumn<String> entryColumnName = new CassandraColumn<>("COLUMN_NAME", column.getName());
+
+                // identify the validator for this datatype
+                CassandraValidatorType validatorType = CassandraValidatorType.fromValidator(column.getType());
+
+                CassandraColumn<Integer> entryDataType = new CassandraColumn<>("DATA_TYPE", validatorType.getSqlType());
+                CassandraColumn<String> entryTypeName = new CassandraColumn<>("TYPE_NAME", validatorType.getSqlDisplayName());
+
+                CassandraColumn<Integer> entryColumnSize = new CassandraColumn<>("COLUMN_SIZE", validatorType.getSqlWidth());
+                CassandraColumn<Integer> entryDecimalDigits = new CassandraColumn<>("DECIMAL_DIGITS", 0x00);
+                CassandraColumn<Integer> entryNPR = new CassandraColumn<>("NUM_PREC_RADIX", validatorType.getSqlRadix());
+                CassandraColumn<Integer> entryCharOctetLength = new CassandraColumn<>("CHAR_OCTET_LENGTH", validatorType.getSqlLength());
+
+                CassandraColumn<Integer> entryOrdinalPosition = new CassandraColumn<>("ORDINAL_POSITION", ordinalPosition++);
+                CassandraColumn<Integer> entryNullable = new CassandraColumn<>("NULLABLE", DatabaseMetaData.columnNullable);
+                CassandraColumn<String> entryISNullable = new CassandraColumn<>("IS_NULLABLE", "YES");
+
+                CassandraRow row = new CassandraRow(
+                        entryCatalog,
+                        entrySchema,
+                        entryTableName,
+                        entryColumnName,
+                        entryDataType,
+                        entryTypeName,
+                        entryColumnSize,
+                        entryBufferLength,
+                        entryDecimalDigits,
+                        entryNPR,
+                        entryNullable,
+                        entryRemarks,
+                        entryColumnDef,
+                        entrySQLDataType,
+                        entrySQLDateTimeSub,
+                        entryCharOctetLength,
+                        entryOrdinalPosition,
+                        entryISNullable,
+                        entryScopeCatalog,
+                        entryScopeSchema,
+                        entryScopeTable,
+                        entrySOURCEDT,
+                        entryISAutoIncrement,
+                        entryISGeneratedColumn);
+
+                // determine if this is a pkey
+                if (pks.contains(column.getName())) {
+                    metaResults.addFirst(row);
+                } else {
+                    metaResults.addRow(row);
+                }
+            }
+
+        }
+
+    }
+
+    private static List<TableMetadata> findTableMetaData(KeyspaceMetadata keyspace,
+                                                         String schemaPattern,
+                                                         String tableNamePattern) {
+
+        final List<TableMetadata> tableMetadatas = new LinkedList<>();
+
+        if (hasPatternMatch(keyspace.getName(), schemaPattern)) {
+
+            for (TableMetadata table : keyspace.getTables()) {
+                if (hasPatternMatch(table.getName(), tableNamePattern)) {
+                    tableMetadatas.add(table);
+                }
+            }
+
+        }
+
+        return tableMetadatas;
+
+    }
+
+    /**
+     * Determine if a pattern match can be made on a specified value. This supports primitive wildcarding
+     * via SQL {@code %} (percent) match conditions.
+     *
+     * @param value     Value to wildcard
+     * @param pattern   Pattern to check
+     * @return Returns {@code true} if pattern match was successful and {@code false} if not.
+     */
+    private static boolean hasPatternMatch(String value, String pattern) {
+
+        // always true if no pattern requested
+        if (StringUtils.isEmpty(pattern)) {
+            return true;
+        }
+
+        // does pattern contain any wildcards? implement primitive like comparison
+        if (StringUtils.contains(pattern, "%")) {
+            String substring = StringUtils.remove(pattern, '%');
+            return StringUtils.contains(value, substring);
+        }
+
+        // finally - exact match was requested
+        return StringUtils.equalsIgnoreCase(value, pattern);
+
+    }
+
+    private static List<MaterializedViewMetadata> findViewMetaData(KeyspaceMetadata keyspace,
+                                                                   String schemaPattern,
+                                                                   String tableNamePattern) {
+
+        final List<MaterializedViewMetadata> viewMetadatas = new LinkedList<>();
+
+        if (hasPatternMatch(keyspace.getName(), schemaPattern)) {
+
+            for (MaterializedViewMetadata view : keyspace.getMaterializedViews()) {
+
+                if (hasPatternMatch(view.getName(), tableNamePattern)) {
+                    viewMetadatas.add(view);
+                }
+            }
+
+        }
+
+        return viewMetadatas;
 
     }
 
@@ -442,135 +519,32 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet {
         //12.PAGES int => When TYPE is tableIndexStatisic then this is the number of pages used for the table, otherwise it is the number of pages used for the current index.
         //13.FILTER_CONDITION String => Filter condition, if any. (may be null)
 
-        StringBuilder query = new StringBuilder("SELECT keyspace_name, table_name, index_name, options FROM system_schema.indexes");
+        Cluster cluster = statement.connection.getCluster();
+        List<KeyspaceMetadata> keyspaces = new LinkedList<>();
 
-        int filterCount = 0;
-        if (schema != null) filterCount++;
-        if (table != null) filterCount++;
+        if (StringUtils.isEmpty(schema)) {
+            keyspaces.addAll(cluster.getMetadata().getKeyspaces());
+        } else {
+            KeyspaceMetadata keyspace = cluster.getMetadata().getKeyspace(schema);
 
-        // check to see if it is qualified
-        if (filterCount > 0) {
-            String expr = "%s = '%s'";
-            query.append(" WHERE ");
-            if (schema != null) {
-                query.append(String.format(expr, "keyspace_name", schema));
-                filterCount--;
-                if (filterCount > 0) query.append(" AND ");
+            if (keyspace != null) {
+                keyspaces.add(keyspace);
             }
-            if (table != null) query.append(String.format(expr, "table_name", table));
-            query.append(" ALLOW FILTERING");
         }
-
-        // name of the catalog (keyspace)
-        String catalog = statement.connection.getCatalog();
-        CassandraColumn<String> entryCatalog = new CassandraColumn<String>("TABLE_CAT", catalog);
 
         // resultset for return
         MetadataResultSets metaResults = new MetadataResultSets();
 
-        int ordinalPosition = 0;
+        // loop over the keyspaces looking for primary key data
+        for (KeyspaceMetadata keyspace : keyspaces) {
 
-        // define the columns
-        CassandraResultSet result = (CassandraResultSet) statement.executeQuery(query.toString());
-        while (result.next()) {
-
-            ordinalPosition++;
-
-            CassandraColumn<String> entrySchema = new CassandraColumn<String>("TABLE_SCHEM", result.getString(1));
-            CassandraColumn<String> entryTableName = new CassandraColumn<String>("TABLE_NAME",
-                    (result.getString(2) == null) ? "" : result.getString(2));
-            CassandraColumn<Boolean> entryNonUnique = new CassandraColumn<Boolean>("NON_UNIQUE", Boolean.TRUE);
-            CassandraColumn<String> entryIndexQualifier = new CassandraColumn<String>("INDEX_QUALIFIER", catalog);
-            CassandraColumn<String> entryIndexName = new CassandraColumn<String>("INDEX_NAME", (result.getString(3) == null ? "" : result.getString(3)));
-            CassandraColumn<Short> entryType = new CassandraColumn<Short>("TYPE", DatabaseMetaData.tableIndexHashed);
-            CassandraColumn<Integer> entryOrdinalPosition = new CassandraColumn<Integer>("ORDINAL_POSITION", ordinalPosition);
-
-            Map<String,String> options = (Map)result.getObject(4);
-            CassandraColumn<String> entryColumnName = new CassandraColumn<String>("COLUMN_NAME", options.get("target"));
-            CassandraColumn<String> entryAoD = new CassandraColumn<String>("ASC_OR_DESC", null);
-            CassandraColumn<Integer> entryCardinality = new CassandraColumn<Integer>("CARDINALITY", -1);
-            CassandraColumn<Integer> entryPages = new CassandraColumn<Integer>("PAGES", -1);
-            CassandraColumn<String> entryFilter = new CassandraColumn<String>("FILTER_CONDITION", "");
-
-            CassandraRow row = new CassandraRow(
-                    entryCatalog,
-                    entrySchema,
-                    entryTableName,
-                    entryNonUnique,
-                    entryIndexQualifier,
-                    entryIndexName,
-                    entryType,
-                    entryOrdinalPosition,
-                    entryColumnName,
-                    entryAoD,
-                    entryCardinality,
-                    entryPages,
-                    entryFilter
-            );
-
-            metaResults.addRow(row);
+            for (TableMetadata tableMetadata : findTableMetaData(keyspace, schema, table)) {
+                appendIndexCassandraRow(cluster, keyspace, tableMetadata, metaResults);
+            }
 
         }
 
         return metaResults;
-
-    }
-
-    private static List<PKInfo> getPrimaryKeys(CassandraStatement statement, String schema, String table) throws SQLException {
-        StringBuilder query = new StringBuilder("SELECT keyspace_name, table_name, column_name, type, kind FROM system_schema.columns");
-
-        int filterCount = 0;
-        if (schema != null) filterCount++;
-        if (table != null) filterCount++;
-
-        // check to see if it is qualified
-        if (filterCount > 0) {
-            String expr = "%s = '%s'";
-            query.append(" WHERE ");
-            if (schema != null) {
-                query.append(String.format(expr, "keyspace_name", schema));
-                filterCount--;
-                if (filterCount > 0) query.append(" AND ");
-            }
-            if (table != null) query.append(String.format(expr, "table_name", table));
-            query.append(" ALLOW FILTERING");
-        }
-
-        // interrogate the results for primary keys
-        List<PKInfo> primaryKeys = new ArrayList<PKInfo>();
-        CassandraResultSet result = (CassandraResultSet) statement.executeQuery(query.toString());
-        while (result.next()) {
-
-            String rschema = result.getString(1);
-            String rtable = result.getString(2);
-            String columnName = result.getString(3);
-            String validator = result.getString(4);
-            String type = result.getString(5);
-
-            if (!"regular".equalsIgnoreCase(type)) {
-
-                CassandraValidatorType validatorType = CassandraValidatorType.fromValidator(validator);
-
-                PKInfo pk = createPKInfo(primaryKeys, rschema, rtable, columnName, validatorType);
-                primaryKeys.add(pk);
-
-            }
-
-        }
-
-        return primaryKeys;
-
-    }
-
-    private static PKInfo createPKInfo(List<PKInfo> retval, String schema, String table, String columnName, CassandraValidatorType validator) {
-        PKInfo pki = new PKInfo();
-        pki.name = columnName;
-        pki.schema = schema;
-        pki.table = table;
-        pki.type = validator.getSqlType();
-        pki.typeName = validator.getSqlName();
-
-        return pki;
 
     }
 
@@ -935,14 +909,6 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet {
 
     }
 
-    private static class PKInfo {
-        public String typeName;
-        public String schema;
-        public String table;
-        public String name;
-        public int type;
-    }
-
     /**
      * Construct the primary keys for the specified schema and table name.
      *
@@ -960,26 +926,47 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet {
         //5.KEY_SEQ short => sequence number within primary key( a value of 1 represents the first column of the primary key, a value of 2 would represent the second column within the primary key).
         //6.PK_NAME String => primary key name (may be null)
 
-        List<PKInfo> pks = getPrimaryKeys(statement, schema, table);
-
-        String catalog = statement.connection.getCatalog();
-        CassandraColumn<String> entryCatalog = new CassandraColumn<String>("TABLE_CAT", catalog);
-
-        int seq = 0;
+        final Cluster cluster = statement.connection.getCluster();
 
         // resulting metadata
-        MetadataResultSets metaResults = new MetadataResultSets();
+        final MetadataResultSets metaResults = new MetadataResultSets();
 
-        // define the columns
-        for (PKInfo info : pks) {
+        KeyspaceMetadata keyspace = cluster.getMetadata().getKeyspace(schema);
 
-            CassandraColumn<String> entrySchema = new CassandraColumn<String>("TABLE_SCHEM", info.schema);
-            CassandraColumn<String> entryTableName = new CassandraColumn<String>("TABLE_NAME", info.table);
-            CassandraColumn<String> entryColumnName = new CassandraColumn<String>("COLUMN_NAME", info.name);
+        if (null != keyspace) {
 
-            seq++;
-            CassandraColumn<Integer> entryKeySeq = new CassandraColumn<Integer>("KEY_SEQ", seq);
-            CassandraColumn<String> entryPKName = new CassandraColumn<String>("PK_NAME", "");
+            // match on table
+            for (TableMetadata tableMetadata : findTableMetaData(keyspace, schema, table)) {
+                appendKeyCassandraRow(cluster, keyspace, tableMetadata, metaResults);
+            }
+
+            // match on view
+            for (MaterializedViewMetadata viewMetadata : findViewMetaData(keyspace, schema, table)) {
+                appendKeyCassandraRow(cluster, keyspace, viewMetadata, metaResults);
+            }
+
+        }
+
+        return metaResults;
+
+    }
+
+    private static void appendKeyCassandraRow(final Cluster cluster,
+                                              final KeyspaceMetadata keyspace,
+                                              final AbstractTableMetadata tableMetadata,
+                                              final MetadataResultSets metaResults) {
+
+        int ordinalPosition = 1;
+
+        CassandraColumn<String> entryCatalog = new CassandraColumn<>("TABLE_CAT", cluster.getClusterName());
+        CassandraColumn<String> entrySchema = new CassandraColumn<>("TABLE_SCHEM", keyspace.getName());
+        CassandraColumn<String> entryTableName = new CassandraColumn<>("TABLE_NAME", tableMetadata.getName());
+
+        for (ColumnMetadata columnMetadata : tableMetadata.getPrimaryKey()) {
+
+            CassandraColumn<String> entryColumnName = new CassandraColumn<>("COLUMN_NAME", columnMetadata.getName());
+            CassandraColumn<Integer> entryKeySeq = new CassandraColumn<>("KEY_SEQ", ordinalPosition++);
+            CassandraColumn<String> entryPKName = new CassandraColumn<>("PK_NAME", "");
 
             CassandraRow row = new CassandraRow(
                     entryCatalog,
@@ -994,7 +981,54 @@ public class MetadataResultSets extends AbstractResultSet implements ResultSet {
 
         }
 
-        return metaResults;
+    }
+
+    private static void appendIndexCassandraRow(final Cluster cluster,
+                                                final KeyspaceMetadata keyspace,
+                                                final TableMetadata tableMetadata,
+                                                final MetadataResultSets metaResults) {
+
+        int ordinalPosition = 1;
+
+        for (IndexMetadata indexMetadata : tableMetadata.getIndexes()) {
+
+            CassandraColumn<String> entryCatalog = new CassandraColumn<>("TABLE_CAT", cluster.getClusterName());
+            CassandraColumn<String> entrySchema = new CassandraColumn<>("TABLE_SCHEM", keyspace.getName());
+            CassandraColumn<String> entryTableName = new CassandraColumn<>("TABLE_NAME", tableMetadata.getName());
+
+            CassandraColumn<Boolean> entryNonUnique = new CassandraColumn<>("NON_UNIQUE", Boolean.TRUE);
+            CassandraColumn<String> entryIndexQualifier = new CassandraColumn<>("INDEX_QUALIFIER", keyspace.getName());
+
+            CassandraColumn<String> entryIndexName = new CassandraColumn<>("INDEX_NAME", indexMetadata.getName());
+
+            CassandraColumn<Short> entryType = new CassandraColumn<>("TYPE", DatabaseMetaData.tableIndexHashed);
+            CassandraColumn<Integer> entryOrdinalPosition = new CassandraColumn<>("ORDINAL_POSITION", ordinalPosition++);
+
+            CassandraColumn<String> entryColumnName = new CassandraColumn<>("COLUMN_NAME", indexMetadata.getTarget());
+            CassandraColumn<String> entryAoD = new CassandraColumn<>("ASC_OR_DESC", null);
+            CassandraColumn<Integer> entryCardinality = new CassandraColumn<>("CARDINALITY", -1);
+            CassandraColumn<Integer> entryPages = new CassandraColumn<>("PAGES", -1);
+            CassandraColumn<String> entryFilter = new CassandraColumn<>("FILTER_CONDITION", "");
+
+            CassandraRow row = new CassandraRow(
+                    entryCatalog,
+                    entrySchema,
+                    entryTableName,
+                    entryNonUnique,
+                    entryIndexQualifier,
+                    entryIndexName,
+                    entryType,
+                    entryOrdinalPosition,
+                    entryColumnName,
+                    entryAoD,
+                    entryCardinality,
+                    entryPages,
+                    entryFilter
+            );
+
+            metaResults.addRow(row);
+
+        }
 
     }
 

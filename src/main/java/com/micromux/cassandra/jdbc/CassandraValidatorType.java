@@ -1,6 +1,7 @@
 package com.micromux.cassandra.jdbc;
 
 import com.datastax.driver.core.DataType;
+import org.apache.commons.lang3.StringUtils;
 
 import java.sql.Types;
 
@@ -130,20 +131,18 @@ public enum CassandraValidatorType {
     /**
      * Convert a Cassandra validator into a validator type. Always default to the
      * {@code Unknown} type and then attempt to parse the name.
-     * @param validator  Name of the validator to check
-     * @return Resulting type.
+     * @param dataType  Datatype to lookup
+     * @return Resulting validator for type.
      */
-    public static CassandraValidatorType fromValidator(String validator) {
+    public static CassandraValidatorType fromValidator(DataType dataType) {
 
 
         CassandraValidatorType validatorType = Unknown;
 
         try {
 
-            DataType.Name name = DataType.Name.valueOf(validator.toUpperCase());
-
             for (CassandraValidatorType cvt : CassandraValidatorType.values()) {
-                if (name.equals(cvt.getName())) {
+                if (StringUtils.equalsIgnoreCase(dataType.getName().name(), cvt.getName().name())) {
                     validatorType = cvt;
                     break;
                 }
@@ -156,4 +155,5 @@ public enum CassandraValidatorType {
         return validatorType;
 
     }
+
 }

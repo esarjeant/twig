@@ -20,8 +20,13 @@
  */
 package com.micromux.cassandra.jdbc;
 
+import org.apache.commons.lang3.StringUtils;
+
 import java.nio.charset.CharacterCodingException;
 import java.sql.*;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 import static com.micromux.cassandra.jdbc.Utils.NOT_SUPPORTED;
 import static com.micromux.cassandra.jdbc.Utils.NO_INTERFACE;
@@ -512,26 +517,39 @@ class CassandraDatabaseMetaData implements DatabaseMetaData
         return MetadataResultSets.makeTableTypes(statement);
     }
 
-    public ResultSet getTables(String catalog, String schemaPattern, String tableNamePattern, String[] types) throws SQLException
-    {
-    	boolean askingForTable = (types == null);
-    	if (types != null)
-    	{
-	    	for (String t: types)
-	    	{
-	    		if (MetadataResultSets.TABLE_CONSTANT.equals(t))
-	    		{
-	    			askingForTable = true;
-	    			break;
-	    		}
-	    	}
+    /**
+     * Retrieves a description of the tables available in the given catalog.
+     * Only table descriptions matching the catalog, schema, table
+     * name and type criteria are returned.  They are ordered by
+     * <code>TABLE_TYPE</code>, <code>TABLE_CAT</code>,
+     * <code>TABLE_SCHEM</code> and <code>TABLE_NAME</code>.
+     *
+     * @param catalog  Catalog (database or schema instance)
+     * @param schemaPattern  Schema pattern
+     * @param tableNamePattern  Table pattern
+     * @param types  One or more types; {@code null} returns all types
+     * @return Results with the data structures requested.
+     * @throws SQLException  Error querying or connecting
+     */
+    public ResultSet getTables(String catalog, String schemaPattern, String tableNamePattern, String[] types) throws SQLException {
+
+        final Set<String> typeSet = new HashSet<>();
+
+        if ((null == types) || 0 == types.length) {
+            typeSet.add(MetadataResultSets.TABLE_CONSTANT);
+            typeSet.add(MetadataResultSets.VIEW_CONSTANT);
+        } else {
+            typeSet.addAll(Arrays.asList(types));
+        }
+
+    	if ((null == catalog || StringUtils.equalsIgnoreCase(catalog, connection.getCatalog()))
+                && !typeSet.isEmpty()) {
+    		if (null == schemaPattern) schemaPattern = connection.getSchema(); //limit to current schema if set
+	        return MetadataResultSets.makeTables(statement, schemaPattern, tableNamePattern, typeSet);
     	}
-    	if ((catalog == null || connection.getCatalog().equals(catalog)) && askingForTable)
-    	{
-    		if (schemaPattern == null) schemaPattern = connection.getSchema(); //limit to current schema if set
-	        return MetadataResultSets.makeTables(statement, schemaPattern, tableNamePattern);
-    	}
+
         return new CassandraResultSet();
+
     }
 
     public String getTimeDateFunctions() throws SQLException
