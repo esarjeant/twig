@@ -29,6 +29,14 @@ Release Notes - 3.0.1
 Support for materialized views; meta-data enhancements to query via Cassandra 3.x Cluster rather than using
 raw CQL statements against the system_schema.
 
+Add support for additional native data-types in Cassandra 3.x:
+
+* LocalDate
+* LocalTime
+
+Update conversion logic for LIST, SET and MAP types returning from Cassandra. Clarify unit tests surrounding
+these data-types. 
+
 Release Notes - 3.0.0
 ---------------------
 First version to provide Cassandra 3.x support. This release also requires JDK 1.7 or later to run.
