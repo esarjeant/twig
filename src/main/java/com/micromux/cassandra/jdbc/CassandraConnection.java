@@ -671,4 +671,9 @@ class CassandraConnection extends AbstractConnection implements Connection
         if (preparedStatement != null) trace(preparedStatement.getQueryString());
         return session.execute(boundStatement);
     }
+
+    public final Cluster getCluster() throws SQLException {
+        checkNotClosed();
+        return session.getCluster();
+    }
 }

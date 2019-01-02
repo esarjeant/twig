@@ -26,6 +26,9 @@ the 2.1.1 DataStax driver.
 
 Release Notes - 3.0.1
 ---------------------
+Support for materialized views; meta-data enhancements to query via Cassandra 3.x Cluster rather than using
+raw CQL statements against the system_schema.
+
 Add support for additional native data-types in Cassandra 3.x:
 
 * LocalDate
